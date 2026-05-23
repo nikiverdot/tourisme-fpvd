@@ -1101,13 +1101,13 @@ function getGroupedFHBookings(k) {
     if (gKey in keyMap) {
       const g = groups[keyMap[gKey]];
       g.pax += (bk.pax || 0);
-      g.participants.push({ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, via: bk.via, comment: bk.comment, status: bk.status });
+      g.participants.push({ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, via: bk.via, comment: bk.comment, bookingPk: bk.bookingPk, status: bk.status });
     } else {
       keyMap[gKey] = groups.length;
       groups.push({
         dateKey: bk.dateKey, time: bk.time, activity: bk.activity,
         pax: bk.pax || 0, status: bk.status, source: 'fareharbor',
-        participants: [{ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, via: bk.via, comment: bk.comment, status: bk.status }]
+        participants: [{ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, via: bk.via, comment: bk.comment, bookingPk: bk.bookingPk, status: bk.status }]
       });
     }
   }
@@ -1632,8 +1632,9 @@ function renderVisiteCell(bk, b, k, idx, isLast) {
   let   label;
 
   // Couleur par canal — format (XXX) parenthèses
-  const VIA_COLOR = { 'FH':'#9a3412','RDV':'#094848','GYG':'#166534','Viator':'#1e40af','GE':'#0a4a4a' };
-  const viaLabel = v => '<span style="font-size:10px;font-weight:800;color:'+(VIA_COLOR[v]||'#475569')+'">('+esc(v)+')</span>';
+  const VIA_COLOR   = { 'FH':'#9a3412','RDV':'#094848','GYG':'#166534','Viator':'#1e40af','GE':'#0a4a4a','Grape Escapes':'#0a4a4a' };
+  const VIA_DISPLAY = { 'GE':'Grape Escapes' };
+  const viaLabel = v => '<span style="font-size:10px;font-weight:800;color:'+(VIA_COLOR[v]||'#475569')+'">('+esc(VIA_DISPLAY[v]||v)+')</span>';
 
   if (isFH) {
     const activity = esc(bk.activity || 'Dégustation');
@@ -2026,15 +2027,8 @@ function openBookingModal(b, k, idx) {
           <option value="a_regler"  ${defStatus==='a_regler' ?'selected':''}>💳 À régler</option>
         </select>
       </div>
-      <div class="form-group"><label class="form-label">Via</label>
-        <select id="f-via" class="form-select">
-          <option value=""       ${!bk.via            ?'selected':''}>— Direct</option>
-          <option value="FH"     ${bk.via==='FH'      ?'selected':''}>FareHarbor (FH)</option>
-          <option value="GYG"    ${bk.via==='GYG'     ?'selected':''}>Get Your Guide (GYG)</option>
-          <option value="GE"     ${bk.via==='GE'      ?'selected':''}>Grape Escapes (GE)</option>
-          <option value="Viator" ${bk.via==='Viator'  ?'selected':''}>Viator</option>
-          <option value="RDV"    ${bk.via==='RDV'     ?'selected':''}>Rue des Vignerons (RDV)</option>
-        </select>
+      <div class="form-group"><label class="form-label">Via <span style="font-size:10px;color:#94a3b8;font-weight:400">— affiche (texte)</span></label>
+        <input id="f-via" class="form-input" type="text" maxlength="30" placeholder="RDV, GYG, Viator…" value="${esc(bk.via||'')}">
       </div>
     </div>
     <div class="form-group"><label class="form-label">Groupe / Client</label><input id="f-desc" class="form-input" type="text" placeholder="Famille Martin…" value="${esc(bk.description||'')}"></div>
@@ -2075,7 +2069,7 @@ function openFHDetail(k, idx) {
 
   const VIA_FH = {'GE':'background:#e8f5f4;color:#0a4a4a;border:1px solid #a8d4d0','GYG':'background:#f0fdf4;color:#166534;border:1px solid #86efac','Viator':'background:#eff6ff;color:#1e40af;border:1px solid #93c5fd','RDV':'background:#f0f8f7;color:#094848;border:1px solid #c4956a'};
   const VIA_OPTIONS = ['', 'RDV', 'GYG', 'Viator', 'GE'];
-  const VIA_LABELS  = { '':'— Aucun', 'RDV':'(RDV) Rue des Vignerons', 'GYG':'(GYG) GetYourGuide', 'Viator':'(Viator) Viator', 'GE':'(GE) Grape Escapes' };
+  const VIA_LABELS  = { '':'— Aucun', 'RDV':'(RDV) Rue des Vignerons', 'GYG':'(GYG) GetYourGuide', 'Viator':'(Viator) Viator', 'GE':'(Grape Escapes)' };
 
   const tagSelect = (p) => {
     if (!p.bookingPk) return '';
@@ -2096,7 +2090,7 @@ function openFHDetail(k, idx) {
         + (p.langFlag ? '<span style="font-size:16px">' + p.langFlag + '</span>' : '')
         + '<div><strong>' + (p.pax||0) + ' pers.</strong>'
         + (p.clientName ? ' · <span style="color:#0e5c5c">' + esc(p.clientName) + '</span>' : '')
-        + (p.via && VIA_FH[p.via] ? ' <span style="font-size:9px;font-weight:800;padding:1px 4px;border-radius:3px;'+VIA_FH[p.via]+'">'+esc(p.via)+'</span>' : '')
+        + (p.via && VIA_FH[p.via] ? ' <span style="font-size:9px;font-weight:800;padding:1px 4px;border-radius:3px;'+VIA_FH[p.via]+'">('+esc({'GE':'Grape Escapes'}[p.via]||p.via)+')</span>' : '')
         + (p.status==='option'   ? ' <span style="font-size:10px;background:#fef9c3;color:#92400e;padding:1px 5px;border-radius:3px">option</span>'   : '')
         + (p.status==='a_regler' ? ' <span style="font-size:10px;background:#fef2f2;color:#b91c1c;padding:1px 5px;border-radius:3px;font-weight:800">À RÉGLER</span>' : '')
         + '</div></div>'
