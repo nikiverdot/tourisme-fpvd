@@ -1579,35 +1579,37 @@ function renderVisiteCell(bk, b, k, idx, isLast) {
   const timePart   = bk.time || '—';
   let   label;
 
+  // Couleur par canal — format (XXX) parenthèses
+  const VIA_COLOR = { 'FH':'#9a3412','RDV':'#094848','GYG':'#166534','Viator':'#1e40af','GE':'#0a4a4a' };
+  const viaLabel = v => '<span style="font-size:10px;font-weight:800;color:'+(VIA_COLOR[v]||'#475569')+'">('+esc(v)+')</span>';
+
   if (isFH) {
     const activity = esc(bk.activity || 'Dégustation');
-    const VIA_P = {'GE':'background:#e8f5f4;color:#0a4a4a;border:1px solid #a8d4d0','GYG':'background:#f0fdf4;color:#166534;border:1px solid #86efac','Viator':'background:#eff6ff;color:#1e40af;border:1px solid #93c5fd','RDV':'background:#f0f8f7;color:#094848;border:1px solid #c4956a'};
     const participants = bk.participants || [{ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, via: bk.via }];
     const partStr = participants.map(p => {
       const parts = [];
-      if (p.pax)         parts.push(p.pax + 'pax');
-      if (p.langCode)    parts.push(p.langCode);
-      if (p.langFlag)    parts.push(p.langFlag);
-      if (p.clientName)  parts.push(esc(p.clientName));
-      if (p.via && VIA_P[p.via]) parts.push('<span style="font-size:9px;font-weight:800;padding:1px 4px;border-radius:3px;'+VIA_P[p.via]+'">'+esc(p.via)+'</span>');
+      if (p.pax)        parts.push(p.pax + 'pax');
+      if (p.langCode)   parts.push(p.langCode);
+      if (p.langFlag)   parts.push(p.langFlag);
+      if (p.clientName) parts.push(esc(p.clientName));
+      parts.push(viaLabel(p.via || 'FH'));   // toujours (RDV), (GYG), (FH)…
       return parts.join(' ');
     }).join(' <span style="color:#64748b;font-weight:900"> + </span>');
-    label = '<strong>' + timePart + '</strong> : ' + activity + ' — ' + partStr + ' <span style="color:#9a3412;font-size:10px;font-weight:700">(FH)</span>';
+    label = '<strong>' + timePart + '</strong> : ' + activity + ' — ' + partStr;
   } else {
     const desc    = esc(bk.description || '');
     const paxPart = bk.pax ? bk.pax + 'pax' : '';
     const comm    = bk.comment ? esc(bk.comment.slice(0,40)) : '';
     const priceTag = bk.price ? ' <span style="color:#475569;font-size:10px">(' + esc(bk.price) + ')</span>' : '';
-    const VIA_CSS = {'FH':'background:#fff7ed;color:#c2410c;border:1px solid #fed7aa','GYG':'background:#f0fdf4;color:#166534;border:1px solid #86efac','Viator':'background:#eff6ff;color:#1e40af;border:1px solid #93c5fd','RDV':'background:#f0f8f7;color:#094848;border:1px solid #c4956a','GE':'background:#e8f5f4;color:#0a4a4a;border:1px solid #a8d4d0'};
     const via = bk.via || '';
-    const viaTag = via && VIA_CSS[via] ? ' <span style="font-size:9px;font-weight:800;padding:1px 5px;border-radius:3px;' + VIA_CSS[via] + '">' + via + '</span>' : '';
     label = '<strong>' + timePart + '</strong>'
       + (desc ? ' : ' + desc : '')
       + (paxPart ? ' <span style="color:#94a3b8">— ' + paxPart + '</span>' : '')
-      + viaTag + priceTag
+      + (via ? ' ' + viaLabel(via) : '')
+      + priceTag
       + (comm ? ' <span style="color:#94a3b8;font-size:10px"> · ' + comm + '</span>' : '');
     if (bk.status==='option')   label += ' <span class="visite-badge badge-option">option</span>';
-    if (bk.status==='a_regler') label += ' <span class="visite-badge badge-aregler">À RÉGLER</span>';
+    if (bk.status==='a_regler') label += ' <span style="font-size:10px;font-weight:800;color:#b91c1c">(À RÉGLER)</span>';
   }
 
   const addBtn = isLast
