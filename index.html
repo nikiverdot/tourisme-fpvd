@@ -425,14 +425,12 @@ thead th { position: sticky; top: 0; z-index: 200; }
 
   /* Masqués sur mobile */
   #presence-bar  { display: none !important; }
-  #btn-csv-import { display: none !important; }
   .col-panel-wrap { display: none !important; }
   .btn-export, label.btn-import { display: none !important; }
   #sync-label  { display: none; }
 
-  /* Bouton admin : icône seule sur mobile */
-  #btn-admin { padding: 4px 8px; font-size: 12px; }
-  #btn-admin::after { content: ''; }
+  /* Bouton admin et import CSV : compacts sur mobile */
+  #btn-admin, #btn-csv-import { padding: 5px 9px; font-size: 11px; }
 
 
   /* Chip utilisateur : avatar seul */
