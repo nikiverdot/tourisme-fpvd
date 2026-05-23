@@ -1805,7 +1805,7 @@ function openBookingModal(b, k, idx) {
   document.getElementById('modal-title').textContent = (edit?'Modifier':'Ajouter') + ' visite · ' + DAYS_FR[date.getDay()] + ' ' + date.getDate() + ' ' + MONTHS_FR[date.getMonth()];
   document.getElementById('modal-body').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <div class="form-group"><label class="form-label">Heure</label><input id="f-time" class="form-input" type="text" placeholder="10h30" value="${bk.time||''}"></div>
+      <div class="form-group"><label class="form-label">Heure</label><input id="f-time" class="form-input" type="text" inputmode="numeric" placeholder="10h00" value="${bk.time||''}" onblur="fmtTime(this)" oninput="this.value=this.value.replace(/[^\dh:]/g,'')"></div>
       <div class="form-group"><label class="form-label">Pax</label><input id="f-pax" class="form-input" type="number" min="1" placeholder="10" value="${bk.pax||''}"></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -1834,9 +1834,19 @@ function openBookingModal(b, k, idx) {
     : '<button class="btn-ms" onclick="closeModal()">Annuler</button><button class="btn-mp" onclick="saveBooking()">Ajouter</button>';
   openModal();
 }
+function fmtTime(inp) {
+  const v = inp.value.replace(/[^\d]/g, '');
+  if (!v) { inp.value = ''; return; }
+  let h, m;
+  if (v.length <= 2) { h = parseInt(v, 10); m = 0; }
+  else { h = parseInt(v.slice(0, v.length - 2), 10); m = parseInt(v.slice(-2), 10); }
+  h = Math.min(h, 23); m = Math.min(m, 59);
+  inp.value = h + 'h' + String(m).padStart(2, '0');
+}
 function saveBooking() {
   const {b,k,idx}=modalCtx;
-  const bk={time:document.getElementById('f-time').value.trim(), pax:parseInt(document.getElementById('f-pax').value)||0, status:document.getElementById('f-status').value, via:document.getElementById('f-via').value, description:document.getElementById('f-desc').value.trim(), comment:document.getElementById('f-comment').value.trim(), price:document.getElementById('f-price').value.trim()};
+  const timeInp = document.getElementById('f-time'); fmtTime(timeInp);
+  const bk={time:timeInp.value, pax:parseInt(document.getElementById('f-pax').value)||0, status:document.getElementById('f-status').value, via:document.getElementById('f-via').value, description:document.getElementById('f-desc').value.trim(), comment:document.getElementById('f-comment').value.trim(), price:document.getElementById('f-price').value.trim()};
   if(!state.boutiques[b].bookings[k]) state.boutiques[b].bookings[k]=[];
   if(idx!==null&&idx>=0) state.boutiques[b].bookings[k][idx]=bk;
   else state.boutiques[b].bookings[k].push(bk);
