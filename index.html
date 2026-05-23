@@ -1690,10 +1690,9 @@ function renderVisiteCell(bk, b, k, idx, isLast) {
   const timePart   = bk.time || '—';
   let   label;
 
-  // Couleur par canal — format (XXX) parenthèses
-  const VIA_COLOR   = { 'FH':'#9a3412','RDV':'#094848','GYG':'#166534','Viator':'#1e40af','GE':'#0a4a4a','Grape Escapes':'#0a4a4a' };
+  // Canal badge — rouge, légèrement plus grand que le nom du client
   const VIA_DISPLAY = { 'GE':'Grape Escapes' };
-  const viaLabel = v => '<span style="font-size:10px;font-weight:800;color:'+(VIA_COLOR[v]||'#475569')+'">('+esc(VIA_DISPLAY[v]||v)+')</span>';
+  const viaLabel = v => '<span style="font-size:13px;font-weight:900;color:#dc2626">('+esc(VIA_DISPLAY[v]||v)+')</span>';
 
   if (isFH) {
     const activity = esc(bk.activity || 'Dégustation');
