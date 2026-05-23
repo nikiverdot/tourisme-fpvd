@@ -350,16 +350,23 @@ thead th { position: sticky; top: 0; z-index: 200; }
 /* ── AUTH OVERLAY ── */
 #auth-overlay {
   position: fixed; inset: 0; z-index: 9999;
-  background: linear-gradient(135deg,#1e1b4b 0%,#312e81 50%,#4c1d95 100%);
-  display: flex; align-items: center; justify-content: center;
+  background-image: url('https://cdn.prod.website-files.com/5f7c10e9af4f6bb644e8b103/5fe34525d9fe492bedee5a8a_CHA%CC%82TEAU-DE-SAINT-AUBIN---Vignoble-(Serge-CHAPUIS)-016-BD.png');
+  background-size: cover; background-position: center;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px;
 }
+#auth-overlay::before {
+  content: ''; position: absolute; inset: 0;
+  background: rgba(10, 55, 55, 0.78);
+}
+.auth-logo-img { height: 90px; width: auto; position: relative; z-index: 1; filter: drop-shadow(0 4px 16px rgba(0,0,0,0.4)); }
 .auth-card {
-  background: white; border-radius: 20px; padding: 36px 32px;
-  width: 380px; max-width: 94vw; box-shadow: 0 32px 80px rgba(0,0,0,0.35);
+  background: rgba(255,255,255,0.97); border-radius: 16px; padding: 32px 32px 28px;
+  width: 360px; max-width: 94vw; box-shadow: 0 24px 60px rgba(0,0,0,0.45);
+  position: relative; z-index: 1;
 }
-.auth-logo { font-size: 18px; font-weight: 900; text-align: center; margin-bottom: 4px; }
+.auth-logo { font-size: 16px; font-weight: 800; text-align: center; margin-bottom: 3px; color: #1e293b; }
 .auth-logo span { color: #7c3aed; }
-.auth-sub  { font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 22px; }
+.auth-sub  { font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 20px; }
 .auth-tabs { display: flex; gap: 6px; margin-bottom: 18px; }
 .auth-tab  { flex: 1; padding: 8px; border: 1.5px solid #e2e8f0; border-radius: 8px;
   font-size: 12px; font-weight: 700; cursor: pointer; background: white; color: #64748b; }
@@ -511,6 +518,7 @@ thead th { position: sticky; top: 0; z-index: 200; }
 
 <!-- ══ AUTH OVERLAY ══ -->
 <div id="auth-overlay">
+  <img src="https://cdn.prod.website-files.com/5f7c10e9af4f6bb644e8b103/5fe34d7b15013a70c482a195_logo-famille-piffaut-or.png" alt="Famille Piffaut" class="auth-logo-img">
   <div class="auth-card">
     <div class="auth-logo">Famille Piffaut <span>Planning</span></div>
     <div class="auth-sub">Accès réservé aux membres autorisés</div>
