@@ -34,6 +34,11 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; colo
   box-shadow: 0 1px 4px rgba(0,0,0,0.07);
 }
 .app-logo { font-size: 15px; font-weight: 800; white-space: nowrap; color: #1e293b; }
+.app-logo-img-wrap { display: flex; align-items: center; text-decoration: none; flex-shrink: 0; }
+.app-logo-img { height: 32px; width: auto; object-fit: contain; }
+.app-footer { flex-shrink: 0; background: #1e293b; color: #94a3b8; font-size: 11px; text-align: center; padding: 6px 16px; letter-spacing: 0.02em; }
+.app-footer a { color: #c4b5fd; text-decoration: none; }
+.app-footer a:hover { text-decoration: underline; }
 .app-logo span { color: #7c3aed; }
 .boutique-tabs { display: flex; gap: 5px; }
 .tab-btn { padding: 5px 13px; border-radius: 20px; border: 2px solid #e2e8f0; cursor: pointer; font-weight: 700; font-size: 13px; background: white; color: #64748b; transition: all 0.15s; white-space: nowrap; }
@@ -487,6 +492,10 @@ thead th { position: sticky; top: 0; z-index: 200; }
 }
 
 /* ── Très petit mobile (≤ 380px, ex. iPhone SE) ── */
+@media (max-width: 600px) {
+  .app-logo-img { height: 24px; }
+  .app-footer { font-size: 10px; padding: 5px 10px; }
+}
 @media (max-width: 380px) {
   .tab-btn  { font-size: 10px; padding: 6px 3px; }
   .app-logo { display: none; }
@@ -524,6 +533,9 @@ thead th { position: sticky; top: 0; z-index: 200; }
 <div class="app-wrapper">
 
 <div class="app-header">
+  <a href="https://www.famille-piffaut.fr" target="_blank" class="app-logo-img-wrap" title="Famille Piffaut Vins &amp; Domaines">
+    <img src="https://cdn.prod.website-files.com/5f7c10e9af4f6bb644e8b103/5fe34d7b15013a70c482a195_logo-famille-piffaut-or.png" alt="Famille Piffaut" class="app-logo-img">
+  </a>
   <div class="app-logo">Famille Piffaut <span>Planning</span></div>
   <div class="boutique-tabs">
     <button id="tab-bulle"   class="tab-btn tab-bulle"  onclick="switchBoutique('bulle')">🫧 Atelier de la Bulle</button>
@@ -581,6 +593,9 @@ thead th { position: sticky; top: 0; z-index: 200; }
   <div class="leg-item"><div class="leg-dot" style="background:#fef08a;border-color:#fcd34d"></div>JF (statut)</div>
 </div>
 
+<div class="app-footer">
+  © 2026 <a href="https://www.famille-piffaut.fr" target="_blank">Famille Piffaut Vins &amp; Domaines</a> · Tous droits réservés · Application développée par Monique Verdot
+</div>
 </div><!-- /.app-wrapper -->
 
 <div id="modal-overlay" class="modal-overlay" style="display:none" onclick="overlayClick(event)">
