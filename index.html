@@ -580,6 +580,7 @@ thead th { position: sticky; top: 0; z-index: 200; }
 <div class="toolbar">
   <button class="btn btn-today"  onclick="scrollToToday()">📍 Aujourd'hui</button>
   <button class="btn btn-ics"    onclick="syncFareHarbor()" id="btn-ics">🔄 Sync FareHarbor</button>
+  <button class="btn btn-ics"    onclick="openFHSettings()" title="Configuration API FareHarbor" style="padding:4px 8px;font-size:14px;min-width:0">⚙️</button>
   <span   class="ics-msg"        id="ics-status"></span>
   <button class="btn btn-export" onclick="exportData()">⬇ Exporter</button>
   <label  class="btn btn-import">⬆ Importer<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
@@ -659,6 +660,7 @@ let state = {
 };
 
 let fhBookings   = {};
+let fhChannelMap = {};   // bookingPk → via code (from FH API)
 let modalCtx     = null;
 let firstDataLoad = true;
 let db          = null;
@@ -1151,6 +1153,65 @@ async function fetchWithTimeout(url, ms) {
   });
 }
 
+// Fetch booking channels (affiliate/partner) from FH API
+// Returns { bookingPk → via_code } map
+async function fetchFHChannels(year) {
+  const appKey  = localStorage.getItem('fh-api-app')  || '';
+  const userKey = localStorage.getItem('fh-api-user') || '';
+  if (!appKey || !userKey) return {};
+
+  const FH_AFF = { 'vignerons':'RDV', 'rdv':'RDV', 'viator':'Viator', 'getyourguide':'GYG', 'gyg':'GYG', 'grapeescapes':'GE', 'grape-escapes':'GE' };
+  const apiUrl = 'https://fareharbor.com/api/v1/companies/andre-delorme/bookings/?start-date=' + year + '-01-01&end-date=' + year + '-12-31&per_page=300';
+  const hdrs   = { 'X-FareHarbor-API-App': appKey, 'X-FareHarbor-API-User': userKey, 'Accept': 'application/json' };
+
+  const proxies = [
+    () => fetch(apiUrl, { headers: hdrs }),
+    () => fetch('https://corsproxy.io/?' + encodeURIComponent(apiUrl), { headers: hdrs }),
+  ];
+  for (const src of proxies) {
+    try {
+      const resp = await src();
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      const map = {};
+      for (const bk of (data.bookings || [])) {
+        const aff = bk.affiliate_company;
+        if (!aff) continue;
+        const key = (aff.shortname || aff.name || '').toLowerCase().replace(/[\s-]+/g,'');
+        const via = Object.entries(FH_AFF).find(([k]) => key.includes(k));
+        if (via) map[bk.pk] = via[1];
+      }
+      return map;
+    } catch(e) { /* next */ }
+  }
+  return {};
+}
+
+// Open FH API key settings modal
+function openFHSettings() {
+  const appKey  = localStorage.getItem('fh-api-app')  || '';
+  const userKey = localStorage.getItem('fh-api-user') || '';
+  document.getElementById('modal-title').textContent = '⚙️ API FareHarbor';
+  document.getElementById('modal-body').innerHTML =
+    '<div class="fh-note">Les clés API permettent de détecter le canal de réservation (Rue des Vignerons, Viator…).<br>Disponibles dans FareHarbor → Paramètres → API.</div>'
+    + '<div class="form-group"><label class="form-label">Clé App (X-FareHarbor-API-App)</label>'
+    + '<input id="fh-api-app-inp" class="form-input" type="password" value="' + esc(appKey) + '" placeholder="fhXXXXXXXXXX" autocomplete="off"></div>'
+    + '<div class="form-group"><label class="form-label">Clé Utilisateur (X-FareHarbor-API-User)</label>'
+    + '<input id="fh-api-usr-inp" class="form-input" type="password" value="' + esc(userKey) + '" placeholder="fhXXXXXXXXXX" autocomplete="off"></div>'
+    + (appKey ? '<div style="font-size:11px;color:#16a34a;padding:4px 0">✓ Clés configurées</div>' : '<div style="font-size:11px;color:#94a3b8;padding:4px 0">Aucune clé configurée — sync ICS fonctionne sans clés.</div>');
+  document.getElementById('modal-actions').innerHTML =
+    '<button class="btn-ms" onclick="saveFHSettings()">💾 Enregistrer</button>'
+    + '<button class="btn-ms" style="background:#f1f5f9;color:#475569;border-color:#e2e8f0" onclick="closeModal()">Annuler</button>';
+  openModal();
+}
+function saveFHSettings() {
+  const app  = document.getElementById('fh-api-app-inp').value.trim();
+  const user = document.getElementById('fh-api-usr-inp').value.trim();
+  app  ? localStorage.setItem('fh-api-app',  app)  : localStorage.removeItem('fh-api-app');
+  user ? localStorage.setItem('fh-api-user', user) : localStorage.removeItem('fh-api-user');
+  closeModal();
+}
+
 async function syncFareHarbor() {
   const btn = document.getElementById('btn-ics');
   const msg = document.getElementById('ics-status');
@@ -1174,11 +1235,19 @@ async function syncFareHarbor() {
       const txt = await resp.text();
       if (!txt.includes('BEGIN:VEVENT')) continue;
       const events = parseICS(txt);
+
+      // Enrich with partner/channel from FH API (if keys configured)
+      msg.style.color='#64748b'; msg.textContent='⏳ Récupération des canaux…';
+      const channelMap = await fetchFHChannels(state.currentYear);
+      const channelCnt = Object.keys(channelMap).length;
+      events.forEach(ev => { if (!ev.via && ev.bookingPk && channelMap[ev.bookingPk]) ev.via = channelMap[ev.bookingPk]; });
+
       fhBookings = {};
       events.forEach(ev => { if(!fhBookings[ev.dateKey]) fhBookings[ev.dateKey]=[]; fhBookings[ev.dateKey].push(ev); });
       const cnt = events.length;
       msg.style.color='#16a34a';
-      msg.textContent = '✓ ' + cnt + ' réservation' + (cnt!==1?'s':'') + ' importée' + (cnt!==1?'s':'');
+      msg.textContent = '✓ ' + cnt + ' réservation' + (cnt!==1?'s':'') + ' importée' + (cnt!==1?'s':'')
+        + (channelCnt > 0 ? ' · ' + channelCnt + ' canal' + (channelCnt>1?'x':'') + ' identifié' + (channelCnt>1?'s':'') : '');
       ok = true; break;
     } catch(e) { /* try next */ }
   }
@@ -1265,11 +1334,14 @@ function parseICS(raw) {
     for (const bk of descBlocks) {
       const lines = bk.split('\n').map(l=>l.trim()).filter(Boolean);
 
-      // clientName: line immediately after "BOOKING #XXXXXXXX"
-      let clientName = '';
+      // bookingPk + clientName: line immediately after "BOOKING #XXXXXXXX"
+      let clientName = '', bookingPk = 0;
       for (let i=0;i<lines.length;i++) {
-        if (/^BOOKING\s*#?\d+$/i.test(lines[i]) && lines[i+1]) {
-          clientName = lines[i+1].trim().slice(0,35); break;
+        const bm = lines[i].match(/^BOOKING\s*#?(\d+)$/i);
+        if (bm) {
+          bookingPk = parseInt(bm[1]);
+          if (lines[i+1]) clientName = lines[i+1].trim().slice(0,35);
+          break;
         }
       }
       if (!clientName) {
@@ -1313,7 +1385,7 @@ function parseICS(raw) {
         if (m) { comment=m[1].trim().slice(0,80); break; }
       }
 
-      events.push({ dateKey, time, pax, status:evStatus, activity, langFlag, langCode, clientName, via, comment, source:'fareharbor' });
+      events.push({ dateKey, time, pax, status:evStatus, activity, langFlag, langCode, clientName, via, comment, bookingPk, source:'fareharbor' });
     }
   });
   return events.sort((a,b)=>(a.dateKey+a.time).localeCompare(b.dateKey+b.time));
