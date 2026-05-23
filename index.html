@@ -1077,13 +1077,13 @@ function getGroupedFHBookings(k) {
     if (gKey in keyMap) {
       const g = groups[keyMap[gKey]];
       g.pax += (bk.pax || 0);
-      g.participants.push({ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, status: bk.status });
+      g.participants.push({ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, via: bk.via, comment: bk.comment, status: bk.status });
     } else {
       keyMap[gKey] = groups.length;
       groups.push({
         dateKey: bk.dateKey, time: bk.time, activity: bk.activity,
         pax: bk.pax || 0, status: bk.status, source: 'fareharbor',
-        participants: [{ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, status: bk.status }]
+        participants: [{ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, via: bk.via, comment: bk.comment, status: bk.status }]
       });
     }
   }
@@ -1231,24 +1231,14 @@ function parseICS(raw) {
       time=String(u.getHours()).padStart(2,'0')+'h'+(u.getMinutes()?String(u.getMinutes()).padStart(2,'0'):'');
     } else { dateKey=dt.slice(0,4)+'-'+dt.slice(4,6)+'-'+dt.slice(6,8); time=''; }
 
-    // Pax — search summary then desc
-    let pax = 1;
-    for (const p of [/^(\d+)\s*[×x×]/i, /\((\d+)\s*(?:pax|pers|person)/i, /(\d+)\s*(?:pax|personnes?|participants?)/i]) {
-      const m=(rawSum+' '+rawDesc).match(p); if(m){pax=parseInt(m[1]);break;}
-    }
-
     // Clean activity name: strip all noise from FareHarbor SUMMARY
     let activity = rawSum
-      .replace(/^\d+\s*[×x×]\s*/i,'')                        // "2 × Dégustation"
-      .replace(/\bBOOKING\s*#?\s*\d+\b/gi,'')                // "BOOKING #1234"
-      .replace(/\b#\d{4,}\b/g,'')                            // "#12345"
-      // Remove " (booking: N Personnes)" and variants
-      .replace(/\(\s*booking\s*:\s*\d+\s*\w+\s*\)/gi,'')
-      // Remove " (N Personnes)" / "(N pax)" / "(N persons)"
+      .replace(/^\d+\s*[×x×]\s*/i,'')
+      .replace(/\bBOOKING\s*#?\s*\d+\b/gi,'')
+      .replace(/\b#\d{4,}\b/g,'')
+      .replace(/\(\s*booking\s*:\s*[^)]+\)/gi,'')            // "( booking: 6 Personnes)" and multi-word variants
       .replace(/\(\s*\d+\s*(?:personnes?|pax|persons?|pers\.?)\s*\)/gi,'')
-      // Remove " en Français", " en Anglais", " in English", " auf Deutsch" etc.
-      .replace(/\s+(?:en|in|auf|en|in)\s+(français|anglais|english|deutsch|spanish|español|italiano|italian|dutch|português|portuguese|russian)\b.*/gi,'')
-      // Remove language suffix after dash: "- English", "– Français"
+      .replace(/\s+(?:en|in|auf)\s+(français|anglais|english|deutsch|spanish|español|italiano|italian|dutch|português|portuguese|russian)\b.*/gi,'')
       .replace(/\s*[-–—]\s*(english|french|français|deutsch|español|italiano|dutch|portuguese|anglais|allemand|espagnol|italien)\b.*/i,'')
       .replace(/\s*\((english|french|français|deutsch|español|italiano|dutch|portuguese|anglais|allemand|espagnol|italien)\)/gi,'')
       .replace(/\s{2,}/g,' ')
@@ -1259,21 +1249,72 @@ function parseICS(raw) {
     const lang = detectLang(rawSum + ' ' + rawDesc);
     const langFlag = lang ? lang.flag : '';
     const langCode = lang ? lang.code : '';
+    const evStatus = status==='TENTATIVE'?'option':'confirmed';
 
-    // Client name — scan description lines
-    let clientName = '';
-    const descLines = rawDesc.split('\n').map(l=>l.trim()).filter(Boolean);
-    for (const line of descLines) {
-      const m = line.match(/^(?:client|customer|guest|name|nom|booked by|réservé par|contact|attendee)\s*[:\-]\s*(.+)/i);
-      if (m) { clientName = m[1].replace(/\s+/g,' ').trim().slice(0,35); break; }
-    }
-    // Fallback: look for "First Last" pattern after removing known prefixes
-    if (!clientName) {
-      const m = rawDesc.match(/([A-ZÁÀÂÉÈÊÎÏÔÙÛÜ][a-záàâéèêîïôùûü]+ [A-ZÁÀÂÉÈÊÎÏÔÙÛÜ]{2,})/);
-      if (m) clientName = m[1].slice(0,35);
+    // ── Split multi-booking VEVENT by FH separator ──────────────────
+    // FareHarbor puts multiple bookings in one VEVENT description,
+    // each block ending with "----------" separator
+    const descBlocks = rawDesc.split(/\n\s*-{3,}\s*\n/).map(b=>b.trim()).filter(Boolean);
+
+    if (descBlocks.length === 0) {
+      const pm = rawSum.match(/(\d+)\s*(?:pax|personnes?|participants?)/i);
+      events.push({ dateKey, time, pax: pm?parseInt(pm[1]):1, status:evStatus, activity, langFlag, langCode, clientName:'', via:'', comment:'', source:'fareharbor' });
+      return;
     }
 
-    events.push({ dateKey, time, pax, status:status==='TENTATIVE'?'option':'confirmed', activity, langFlag, langCode, clientName, source:'fareharbor' });
+    for (const bk of descBlocks) {
+      const lines = bk.split('\n').map(l=>l.trim()).filter(Boolean);
+
+      // clientName: line immediately after "BOOKING #XXXXXXXX"
+      let clientName = '';
+      for (let i=0;i<lines.length;i++) {
+        if (/^BOOKING\s*#?\d+$/i.test(lines[i]) && lines[i+1]) {
+          clientName = lines[i+1].trim().slice(0,35); break;
+        }
+      }
+      if (!clientName) {
+        for (const line of lines) {
+          const m = line.match(/^(?:client|customer|guest|name|nom|booked by|réservé par|contact|attendee)\s*[:\-]\s*(.+)/i);
+          if (m) { clientName = m[1].trim().slice(0,35); break; }
+        }
+      }
+
+      // pax: "N Personnes" / "N pax" / "N De deux à..."
+      let pax = 0;
+      for (const line of lines) {
+        const m = line.match(/^(\d+)\s+(?:personnes?|pax|persons?|de\s)/i);
+        if (m) { pax=parseInt(m[1]); break; }
+      }
+      if (!pax) { const m=bk.match(/(\d+)\s*(?:pax|personnes?|participants?)/i); if(m) pax=parseInt(m[1]); }
+      if (!pax) pax=1;
+
+      // via: detect from email domain or keywords in this booking block
+      let via = '';
+      const emailM = bk.match(/[\w.+%-]+@([\w.-]+\.\w+)/);
+      if (emailM) {
+        const dom = emailM[1].toLowerCase();
+        if (dom.includes('grapeescapes')) via='GE';
+        else if (dom.includes('viator')) via='Viator';
+        else if (dom.includes('getyourguide')||dom.includes('gyg.')) via='GYG';
+        else if (dom.includes('vignerons')||dom.includes('rdv')) via='RDV';
+      }
+      if (!via) {
+        const hl=bk.toLowerCase();
+        if (/rue des vignerons/.test(hl)) via='RDV';
+        else if (/\bviator\b/.test(hl)) via='Viator';
+        else if (/get your guide|gyg/.test(hl)) via='GYG';
+        else if (/grape escapes/.test(hl)) via='GE';
+      }
+
+      // comment
+      let comment = '';
+      for (const line of lines) {
+        const m = line.match(/^commentaires?\s*[:\-]\s*(.+)/i);
+        if (m) { comment=m[1].trim().slice(0,80); break; }
+      }
+
+      events.push({ dateKey, time, pax, status:evStatus, activity, langFlag, langCode, clientName, via, comment, source:'fareharbor' });
+    }
   });
   return events.sort((a,b)=>(a.dateKey+a.time).localeCompare(b.dateKey+b.time));
 }
@@ -1462,13 +1503,15 @@ function renderVisiteCell(bk, b, k, idx, isLast) {
 
   if (isFH) {
     const activity = esc(bk.activity || 'Dégustation');
-    const participants = bk.participants || [{ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName }];
+    const VIA_P = {'GE':'background:#e8f5f4;color:#0a4a4a;border:1px solid #a8d4d0','GYG':'background:#f0fdf4;color:#166534;border:1px solid #86efac','Viator':'background:#eff6ff;color:#1e40af;border:1px solid #93c5fd','RDV':'background:#f0f8f7;color:#094848;border:1px solid #c4956a'};
+    const participants = bk.participants || [{ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, via: bk.via }];
     const partStr = participants.map(p => {
       const parts = [];
       if (p.pax)         parts.push(p.pax + 'pax');
       if (p.langCode)    parts.push(p.langCode);
       if (p.langFlag)    parts.push(p.langFlag);
       if (p.clientName)  parts.push(esc(p.clientName));
+      if (p.via && VIA_P[p.via]) parts.push('<span style="font-size:9px;font-weight:800;padding:1px 4px;border-radius:3px;'+VIA_P[p.via]+'">'+esc(p.via)+'</span>');
       return parts.join(' ');
     }).join(' <span style="color:#64748b;font-weight:900"> + </span>');
     label = '<strong>' + timePart + '</strong> : ' + activity + ' — ' + partStr + ' <span style="color:#9a3412;font-size:10px;font-weight:700">(FH)</span>';
@@ -1894,21 +1937,29 @@ function openFHDetail(k, idx) {
   const participants = bk.participants || [bk];
   document.getElementById('modal-title').textContent = 'FareHarbor · ' + DAYS_FR[date.getDay()] + ' ' + date.getDate() + ' ' + MONTHS_FR[date.getMonth()];
 
+  const VIA_FH = {'GE':'background:#e8f5f4;color:#0a4a4a;border:1px solid #a8d4d0','GYG':'background:#f0fdf4;color:#166534;border:1px solid #86efac','Viator':'background:#eff6ff;color:#1e40af;border:1px solid #93c5fd','RDV':'background:#f0f8f7;color:#094848;border:1px solid #c4956a'};
   let partHtml = '';
   if (participants.length > 1) {
     partHtml = '<div class="form-group"><label class="form-label">Groupes (' + participants.length + ')</label>';
     participants.forEach(p => {
-      partHtml += '<div style="padding:5px 0;border-bottom:1px solid #f1f5f9;display:flex;gap:8px;align-items:center">'
+      partHtml += '<div style="padding:6px 0;border-bottom:1px solid #f1f5f9">'
+        + '<div style="display:flex;gap:8px;align-items:center">'
         + (p.langFlag ? '<span style="font-size:16px">' + p.langFlag + '</span>' : '')
         + '<div><strong>' + (p.pax||0) + ' pers.</strong>'
         + (p.clientName ? ' · <span style="color:#0e5c5c">' + esc(p.clientName) + '</span>' : '')
+        + (p.via && VIA_FH[p.via] ? ' <span style="font-size:9px;font-weight:800;padding:1px 4px;border-radius:3px;'+VIA_FH[p.via]+'">'+esc(p.via)+'</span>' : '')
         + (p.status==='option' ? ' <span style="font-size:10px;background:#fef9c3;color:#92400e;padding:1px 5px;border-radius:3px">option</span>' : '')
-        + '</div></div>';
+        + '</div></div>'
+        + (p.comment ? '<div style="font-size:11px;color:#64748b;margin-top:3px;padding-left:24px">💬 ' + esc(p.comment) + '</div>' : '')
+        + '</div>';
     });
     partHtml += '</div>';
   } else {
     const p = participants[0];
-    partHtml = (p.clientName ? '<div class="form-group"><label class="form-label">Client</label><div style="padding:5px;font-weight:700;color:#0e5c5c">' + (p.langFlag||'') + ' ' + esc(p.clientName) + '</div></div>' : '');
+    partHtml = (p.clientName ? '<div class="form-group"><label class="form-label">Client</label><div style="padding:5px;font-weight:700;color:#0e5c5c">' + (p.langFlag||'') + ' ' + esc(p.clientName)
+      + (p.via && VIA_FH[p.via] ? ' <span style="font-size:9px;font-weight:800;padding:1px 4px;border-radius:3px;'+VIA_FH[p.via]+'">'+esc(p.via)+'</span>' : '')
+      + '</div></div>' : '')
+      + (p.comment ? '<div class="form-group"><label class="form-label">Commentaire client</label><div style="padding:5px;font-size:12px;color:#475569;font-style:italic">💬 ' + esc(p.comment) + '</div></div>' : '');
   }
 
   document.getElementById('modal-body').innerHTML =
