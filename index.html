@@ -1592,10 +1592,10 @@ function renderVisiteCell(bk, b, k, idx, isLast) {
       if (p.langCode)   parts.push(p.langCode);
       if (p.langFlag)   parts.push(p.langFlag);
       if (p.clientName) parts.push(esc(p.clientName));
-      parts.push(viaLabel(p.via || 'FH'));   // toujours (RDV), (GYG), (FH)…
+      if (p.via)        parts.push(viaLabel(p.via));  // (RDV), (GYG)… seulement si partenaire détecté
       return parts.join(' ');
     }).join(' <span style="color:#64748b;font-weight:900"> + </span>');
-    label = '<strong>' + timePart + '</strong> : ' + activity + ' — ' + partStr;
+    label = '<strong>' + timePart + '</strong> : ' + activity + ' — ' + partStr + ' <span style="color:#9a3412;font-size:10px;font-weight:700">(FH)</span>';
   } else {
     const desc    = esc(bk.description || '');
     const paxPart = bk.pax ? bk.pax + 'pax' : '';
