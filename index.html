@@ -1697,18 +1697,17 @@ function renderVisiteCell(bk, b, k, idx, isLast) {
   if (isFH) {
     const activity = esc(bk.activity || 'Dégustation');
     const participants = bk.participants || [{ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, via: bk.via }];
+    const fhBadge = '<span style="color:#dc2626;font-size:13px;font-weight:900">(FH)</span>';
     const partStr = participants.map(p => {
       const parts = [];
       if (p.pax)        parts.push(p.pax + 'pax');
       if (p.langCode)   parts.push(p.langCode);
       if (p.langFlag)   parts.push(p.langFlag);
       if (p.clientName) parts.push(esc(p.clientName));
-      if (p.via)        parts.push(viaLabel(p.via));  // (RDV), (GYG)… seulement si partenaire détecté
+      parts.push(p.via ? viaLabel(p.via) : fhBadge);  // badge par participant
       return parts.join(' ');
     }).join(' <span style="color:#64748b;font-weight:900"> + </span>');
-    const hasVia = participants.some(p => p.via);
-    label = '<strong>' + timePart + '</strong> : ' + activity + ' — ' + partStr
-      + (hasVia ? '' : ' <span style="color:#dc2626;font-size:13px;font-weight:900">(FH)</span>');
+    label = '<strong>' + timePart + '</strong> : ' + activity + ' — ' + partStr;
   } else {
     const desc    = esc(bk.description || '');
     const paxPart = bk.pax ? bk.pax + 'pax' : '';
