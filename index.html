@@ -582,6 +582,7 @@ thead th { position: sticky; top: 0; z-index: 200; }
   <button class="btn btn-today"  onclick="scrollToToday()">📍 Aujourd'hui</button>
   <button class="btn btn-ics"    onclick="syncFareHarbor()" id="btn-ics">🔄 Sync FareHarbor</button>
   <button class="btn btn-ics"    onclick="openFHSettings()" title="Configuration API FareHarbor" style="padding:4px 8px;font-size:14px;min-width:0">⚙️</button>
+  <label  class="btn btn-ics"    title="Importer CSV FareHarbor (Rapports → Réservations → Exporter)" style="cursor:pointer;font-size:11px">📊 CSV FH<input type="file" accept=".csv,.txt" onchange="importFHAffiliatesCSV(event)" style="display:none"></label>
   <span   class="ics-msg"        id="ics-status"></span>
   <button class="btn btn-export" onclick="exportData()">⬇ Exporter</button>
   <label  class="btn btn-import">⬆ Importer<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
@@ -1312,6 +1313,64 @@ async function saveFHTag(bookingPk, via) {
   closeModal();
   render();
   toast('✅ ' + (via ? '(' + via + ') enregistré' : 'Tag retiré'), '#16a34a');
+}
+
+// ═══ FH CSV AFFILIATE IMPORT ══════════════════
+function mapFHAffiliate(raw) {
+  if (!raw) return '';
+  const n = raw.toLowerCase().replace(/[-\s_]+/g,'');
+  if (n.includes('vignerons')||n.includes('ruedes')||n==='rdv') return 'RDV';
+  if (n.includes('getyourguide')||n.includes('gyg'))            return 'GYG';
+  if (n.includes('viator'))                                      return 'Viator';
+  if (n.includes('grapeescapes')||n.includes('grapes'))          return 'GE';
+  return raw.trim().slice(0,30); // keep unknown affiliates as-is
+}
+
+async function importFHAffiliatesCSV(e) {
+  const file = e.target.files[0]; e.target.value=''; if (!file) return;
+  const text = await file.text();
+  // Detect separator (comma or semicolon)
+  const sep = (text.split('\n')[0]||'').includes(';') ? ';' : ',';
+  const rows = text.split('\n').map(r => r.split(sep).map(c => c.replace(/^"|"$/g,'').trim()));
+  if (rows.length < 2) return toast('❌ CSV vide ou invalide', '#dc2626');
+
+  const headers = rows[0].map(h => h.toLowerCase().replace(/[^a-z0-9]/g,''));
+  // Find booking # column
+  const pkCol = headers.findIndex(h =>
+    h.includes('confirmation')||h.includes('booking')||h==='no'||h==='n'||h==='pk'||h==='id'||h.startsWith('#'));
+  // Find affiliate column
+  const affCol = headers.findIndex(h =>
+    h.includes('affili')||h.includes('canal')||h.includes('channel')||h.includes('partenaire')||h.includes('source')||h.includes('bookedby'));
+
+  if (pkCol < 0) return toast('❌ Colonne N° réservation introuvable dans le CSV', '#dc2626');
+  if (affCol < 0) return toast('❌ Colonne affilié introuvable dans le CSV', '#dc2626');
+
+  const newTags = {};
+  let count = 0;
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i]; if (row.length <= Math.max(pkCol, affCol)) continue;
+    const rawPk  = row[pkCol].replace(/\D/g,'');
+    const rawAff = row[affCol];
+    if (!rawPk || !rawAff) continue;
+    const pk  = parseInt(rawPk);
+    const via = mapFHAffiliate(rawAff);
+    if (pk && via) { newTags[pk] = via; count++; }
+  }
+  if (!count) return toast('⚠ Aucun affilié trouvé dans le CSV', '#d97706');
+
+  // Merge into fhTags and Firebase
+  Object.assign(fhTags, newTags);
+  if (db) {
+    const updates = {};
+    Object.entries(newTags).forEach(([pk, via]) => { updates['piffaut-fh-tags/' + pk] = via; });
+    await db.ref().update(updates).catch(()=>{});
+  }
+  // Apply to live fhBookings
+  Object.values(fhBookings).forEach(dayEvs => dayEvs.forEach(ev => {
+    if (fhTags[ev.bookingPk]) ev.via = fhTags[ev.bookingPk];
+  }));
+  render();
+  toast('✅ ' + count + ' affilié' + (count>1?'s':'') + ' importé' + (count>1?'s':'') + ' depuis CSV', '#16a34a');
 }
 
 // Language → { code, flag }
