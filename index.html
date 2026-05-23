@@ -602,7 +602,7 @@ thead th { position: sticky; top: 0; z-index: 200; }
 // ═══ CONSTANTS ════════════════════════════════
 const DAYS_FR   = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
 const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
-const STATUSES       = ['va','ad','csa','repos','conges','formation','maladie','jf','off'];
+const STATUSES       = ['va','ad','csa','repos','conges','formation','maladie','off'];
 const STATUS_LABELS  = { va:'Veuve Ambal', ad:'André Delorme', csa:'CSA', repos:'Repos', conges:'Congés', formation:'École', maladie:'Maladie', jf:'Jour Férié', off:'–' };
 const STATUS_ABBR    = { va:'VA', ad:'AD', csa:'CSA', repos:'REPOS', conges:'CP', formation:'ÉCOLE', maladie:'MAL', jf:'JF', off:'+' };
 const STATUS_CLASSES = { va:'s-va', ad:'s-ad', csa:'s-csa', repos:'s-repos', conges:'s-conges', formation:'s-formation', maladie:'s-maladie', jf:'s-jf', off:'s-off' };
@@ -984,7 +984,10 @@ function addDays(d,n) { const c=new Date(d); c.setDate(c.getDate()+n); return c;
 function isToday(d) { const t=new Date(); t.setHours(0,0,0,0); const c=new Date(d); c.setHours(0,0,0,0); return c.getTime()===t.getTime(); }
 
 // ═══ DATA HELPERS ═════════════════════════════
-function getStatus(b,k,e) { return state.boutiques[b].schedule?.[k]?.[e] || 'off'; }
+function getStatus(b,k,e) {
+  const s = state.boutiques[b].schedule?.[k]?.[e] || 'off';
+  return s === 'jf' ? 'off' : s; // JF supprimé → OFF
+}
 function setStatus(b,k,e,s) {
   if(!state.boutiques[b].schedule[k]) state.boutiques[b].schedule[k]={};
   state.boutiques[b].schedule[k][e]=s;
