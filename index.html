@@ -1028,6 +1028,12 @@ function setStatusNote(b,k,e,v) {
 }
 function getManualBookings(b,k) { return state.boutiques[b].bookings?.[k] || []; }
 function getFHBookings(k) { return fhBookings[k] || []; }
+function timeToSort(t) {
+  if (!t) return 9999;
+  const m = t.match(/(\d{1,2})[h:](\d{0,2})/);
+  if (!m) return 9999;
+  return parseInt(m[1]) * 100 + parseInt(m[2] || '0');
+}
 
 // Regroupe les réservations FH du même créneau (heure + activité) sur 1 ligne
 function getGroupedFHBookings(k) {
@@ -1054,7 +1060,12 @@ function getGroupedFHBookings(k) {
 
 function getAllBookings(b,k) {
   const fh = b==='delorme' ? getGroupedFHBookings(k) : [];
-  return [...fh, ...getManualBookings(b,k)];
+  // Tag manual bookings with their original index so modal can edit/delete correctly
+  const manual = getManualBookings(b,k).map((bk, i) => Object.assign({}, bk, { _manualIdx: i }));
+  const all = [...fh, ...manual];
+  // Sort chronologically by time (10h30 → 1030)
+  all.sort((a, bb) => timeToSort(a.time) - timeToSort(bb.time));
+  return all;
 }
 function maxGroupPax(b,k) { return getAllBookings(b,k).reduce((m,bk)=>Math.max(m,bk.pax||0),0); }
 function absentCount(b,k) {
@@ -1407,8 +1418,8 @@ function render() {
 
 function renderVisiteCell(bk, b, k, idx, isLast) {
   const isFH     = bk.source === 'fareharbor';
-  const fhCount  = b==='delorme' ? getGroupedFHBookings(k).length : 0;
-  const manualIdx = isFH ? idx : idx - fhCount;
+  // After chronological sort, use the pre-tagged _manualIdx to reference the stored array
+  const manualIdx = isFH ? idx : (bk._manualIdx !== undefined ? bk._manualIdx : idx);
   const onclick  = isFH
     ? 'openFHDetail(\'' + k + '\',' + idx + ')'
     : 'openBookingModal(\'' + b + '\',\'' + k + '\',' + manualIdx + ')';
@@ -1434,7 +1445,7 @@ function renderVisiteCell(bk, b, k, idx, isLast) {
     const paxPart = bk.pax ? bk.pax + 'pax' : '';
     const comm    = bk.comment ? esc(bk.comment.slice(0,40)) : '';
     const priceTag = bk.price ? ' <span style="color:#475569;font-size:10px">(' + esc(bk.price) + ')</span>' : '';
-    const VIA_CSS = {'FH':'background:#fff7ed;color:#c2410c;border:1px solid #fed7aa','GYG':'background:#f0fdf4;color:#166534;border:1px solid #86efac','Viator':'background:#eff6ff;color:#1e40af;border:1px solid #93c5fd','RDV':'background:#faf5ff;color:#6d28d9;border:1px solid #c4b5fd'};
+    const VIA_CSS = {'FH':'background:#fff7ed;color:#c2410c;border:1px solid #fed7aa','GYG':'background:#f0fdf4;color:#166534;border:1px solid #86efac','Viator':'background:#eff6ff;color:#1e40af;border:1px solid #93c5fd','RDV':'background:#faf5ff;color:#6d28d9;border:1px solid #c4b5fd','GE':'background:#fdf4ff;color:#7e22ce;border:1px solid #d8b4fe'};
     const via = bk.via || '';
     const viaTag = via && VIA_CSS[via] ? ' <span style="font-size:9px;font-weight:800;padding:1px 5px;border-radius:3px;' + VIA_CSS[via] + '">' + via + '</span>' : '';
     label = '<strong>' + timePart + '</strong>'
@@ -1809,6 +1820,7 @@ function openBookingModal(b, k, idx) {
           <option value="" ${!bk.via?'selected':''}>— Direct</option>
           <option value="FH" ${bk.via==='FH'?'selected':''}>FareHarbor (FH)</option>
           <option value="GYG" ${bk.via==='GYG'?'selected':''}>Get Your Guide (GYG)</option>
+          <option value="GE" ${bk.via==='GE'?'selected':''}>Grape Escapes (GE)</option>
           <option value="Viator" ${bk.via==='Viator'?'selected':''}>Viator</option>
           <option value="RDV" ${bk.via==='RDV'?'selected':''}>Rue des Vignerons (RDV)</option>
         </select>
