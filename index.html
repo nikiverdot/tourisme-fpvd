@@ -2096,10 +2096,12 @@ function parseAndImportCSV(text, overwrite) {
     initDay('delorme', k);
 
     // ── Notes de la journée ──
-    // Bulle : col 2 (RDV/rappels)
-    const rdv = (row[2]||'').trim();
-    if (rdv && rdv.length > 2 && !state.boutiques.bulle.notes[k]) {
-      state.boutiques.bulle.notes[k] = rdv.substring(0, 400);
+    // Bulle : col 2 (RDV/rappels) + col 3 (Visites/Réservations)
+    const rdv    = (row[2]||'').trim();
+    const visites = (row[3]||'').trim();
+    const bulleNote = [rdv, visites].filter(s => s && s.length > 2).join('\n──────\n');
+    if (bulleNote && (overwrite || !state.boutiques.bulle.notes[k])) {
+      state.boutiques.bulle.notes[k] = bulleNote.substring(0, 800);
       noteCnt++;
     }
     // Delorme : col 11 (Visites/Dégustations AD)
