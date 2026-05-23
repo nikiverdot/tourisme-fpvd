@@ -1708,7 +1708,7 @@ function renderVisiteCell(bk, b, k, idx, isLast) {
     }).join(' <span style="color:#64748b;font-weight:900"> + </span>');
     const hasVia = participants.some(p => p.via);
     label = '<strong>' + timePart + '</strong> : ' + activity + ' — ' + partStr
-      + (hasVia ? '' : ' <span style="color:#9a3412;font-size:10px;font-weight:700">(FH)</span>');
+      + (hasVia ? '' : ' <span style="color:#dc2626;font-size:13px;font-weight:900">(FH)</span>');
   } else {
     const desc    = esc(bk.description || '');
     const paxPart = bk.pax ? bk.pax + 'pax' : '';
