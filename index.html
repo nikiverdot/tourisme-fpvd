@@ -36,13 +36,13 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; colo
 .app-logo { font-size: 15px; font-weight: 800; white-space: nowrap; color: #1e293b; }
 .app-logo-img-wrap { display: flex; align-items: center; text-decoration: none; flex-shrink: 0; }
 .app-logo-img { height: 32px; width: auto; object-fit: contain; }
-.app-footer { flex-shrink: 0; background: #1e293b; color: #94a3b8; font-size: 11px; text-align: center; padding: 6px 16px; letter-spacing: 0.02em; }
-.app-footer a { color: #c4b5fd; text-decoration: none; }
+.app-footer { flex-shrink: 0; background: #0d3d3d; color: #a8c8c4; font-size: 11px; text-align: center; padding: 7px 16px; letter-spacing: 0.03em; border-top: 2px solid #c4956a; }
+.app-footer a { color: #c4956a; text-decoration: none; font-weight: 600; }
 .app-footer a:hover { text-decoration: underline; }
-.app-logo span { color: #7c3aed; }
+.app-logo span { color: #0e5c5c; }
 .boutique-tabs { display: flex; gap: 5px; }
 .tab-btn { padding: 5px 13px; border-radius: 20px; border: 2px solid #e2e8f0; cursor: pointer; font-weight: 700; font-size: 13px; background: white; color: #64748b; transition: all 0.15s; white-space: nowrap; }
-.tab-bulle   { border-color: #7c3aed; background: #7c3aed; color: white; }
+.tab-bulle   { border-color: #0e5c5c; background: #0e5c5c; color: white; }
 .tab-delorme { border-color: #0891b2; background: #0891b2; color: white; }
 .year-nav { display: flex; align-items: center; gap: 5px; margin-left: auto; }
 .year-label { font-weight: 800; font-size: 14px; min-width: 46px; text-align: center; }
@@ -51,14 +51,14 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; colo
 .sync-badge { display: flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; }
 .sync-online  { background: #dcfce7; color: #15803d; }
 .sync-offline { background: #f1f5f9; color: #94a3b8; }
-.sync-saving  { background: #ede9fe; color: #6d28d9; }
+.sync-saving  { background: #e0f2f0; color: #094848; }
 .sync-error   { background: #fef2f2; color: #dc2626; }
 .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .sync-online .sync-dot { animation: pulse 2s infinite; }
 .sync-saving .sync-dot { animation: pulse 0.7s infinite; }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.25} }
 .user-chip { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #64748b; cursor: pointer; padding: 3px 8px; border-radius: 20px; border: 1px solid #e2e8f0; }
-.user-avatar { width: 20px; height: 20px; border-radius: 50%; background: #7c3aed; color: white; font-size: 9px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+.user-avatar { width: 20px; height: 20px; border-radius: 50%; background: #0e5c5c; color: white; font-size: 9px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
 
 /* ── TOOLBAR ── */
 .toolbar {
@@ -68,7 +68,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; colo
 }
 .btn { padding: 5px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid transparent; white-space: nowrap; }
 .btn:hover { opacity: 0.8; }
-.btn-today  { background: #faf5ff; color: #7c3aed; border-color: #c4b5fd; }
+.btn-today  { background: #f0f8f7; color: #0e5c5c; border-color: #c4956a; }
 .btn-ics    { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
 .btn-export { background: #f0fdf4; color: #16a34a; border-color: #86efac; }
 .btn-import { background: #eff6ff; color: #2563eb; border-color: #93c5fd; cursor: pointer; }
@@ -120,7 +120,7 @@ tr.day-row td:first-child { border-left: 1px solid #e2e8f0; }
 tr.day-row:hover td { background-color: rgba(248,250,252,0.6); }
 tr.row-ferie td { background: #fef08a !important; }
 tr.row-ferie .s-off { background: #fef08a !important; color: #a16207 !important; border-color: transparent !important; }
-tr.row-today  td { background: #faf5ff !important; }
+tr.row-today  td { background: #f0f8f7 !important; }
 tr.row-sunday td { background: #fecaca; }
 tr.row-saturday td { background: #fffbf5; }
 tr.row-alert td { background: #fff5f5 !important; }
@@ -159,7 +159,7 @@ tr.row-ferme .exc-toggle:hover { color: #f1f5f9; }
 /* First row of a day group — top border stronger */
 tr.day-first td { border-top: 2px solid #cbd5e1 !important; }
 tr.day-first td:first-child { border-left: 1px solid #e2e8f0; }
-tr.row-today.day-first td { border-top: 2px solid #7c3aed !important; }
+tr.row-today.day-first td { border-top: 2px solid #0e5c5c !important; }
 tr.row-alert.day-first td { border-top: 2px solid #ef4444 !important; }
 
 /* JOUR cell */
@@ -170,7 +170,7 @@ td.jour-cell {
 }
 tr.row-sunday  td.jour-cell { color: #ef4444; }
 tr.row-saturday td.jour-cell { color: #f97316; }
-tr.row-today   td.jour-cell { color: #7c3aed; }
+tr.row-today   td.jour-cell { color: #0e5c5c; }
 
 /* DATE cell */
 td.date-cell {
@@ -179,7 +179,7 @@ td.date-cell {
 }
 .date-num   { display: block; font-size: 22px; font-weight: 800; color: #1e293b; line-height: 1; }
 .date-month { display: block; font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em; }
-tr.row-today .date-num  { color: #7c3aed; }
+tr.row-today .date-num  { color: #0e5c5c; }
 tr.row-sunday .date-num { color: #ef4444; }
 tr.row-alert .date-num  { color: #dc2626; }
 
@@ -190,7 +190,7 @@ td.rdv-cell {
 }
 td.rdv-cell:hover { background: rgba(124,58,237,0.04) !important; }
 .rdv-text { font-size: 13px; color: #374151; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
-.rdv-add  { font-size: 12px; color: #c4b5fd; }
+.rdv-add  { font-size: 12px; color: #c4956a; }
 td.rdv-cell.has-note .rdv-add { display: none; }
 
 /* VISITE cell */
@@ -205,8 +205,8 @@ td.visite-cell { padding: 3px 8px; vertical-align: middle !important; }
 .visite-badge { font-size: 11px; font-weight: 700; padding: 1px 5px; border-radius: 4px; white-space: nowrap; }
 .badge-option { background: #fef9c3; color: #92400e; }
 .visite-empty { font-size: 13px; color: #cbd5e1; padding: 2px 0; }
-.add-visite-btn { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; color: #a78bfa; cursor: pointer; padding: 2px 6px; border-radius: 4px; margin-top: 1px; }
-.add-visite-btn:hover { background: #faf5ff; }
+.add-visite-btn { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; color: #4a9e9e; cursor: pointer; padding: 2px 6px; border-radius: 4px; margin-top: 1px; }
+.add-visite-btn:hover { background: #f0f8f7; }
 
 /* PAX cell */
 td.pax-cell {
@@ -244,14 +244,14 @@ td.emp-cell { padding: 3px 3px; text-align: center; vertical-align: middle !impo
   cursor: pointer; text-align: center; transition: all 0.1s; user-select: none;
 }
 .period-btn:hover { background: #f8fafc; }
-.period-btn.selected { border-color: #7c3aed; background: #faf5ff; color: #7c3aed; }
+.period-btn.selected { border-color: #0e5c5c; background: #f0f8f7; color: #0e5c5c; }
 
 /* Status colors */
 .s-va       { background: #dbeafe; color: #1d4ed8; border-color: #93c5fd; }
 .s-ad       { background: #fef9c3; color: #a16207; border-color: #fcd34d; }
 .s-csa      { background: #e8d4b0; color: #5c2800; border-color: #c49a50; }
 .s-jf       { background: #f1f5f9; color: #94a3b8; border-color: #e2e8f0; }
-.s-repos    { background: #ede9fe; color: #6d28d9; border-color: #c4b5fd; }
+.s-repos    { background: #e0f2f0; color: #094848; border-color: #7bc4bc; }
 .s-conges   { background: #dcfce7; color: #15803d; border-color: #86efac; }
 .s-formation{ background: #fce7f3; color: #9d174d; border-color: #f9a8d4; }
 .s-maladie  { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
@@ -301,7 +301,7 @@ thead th.th-renfort { background: #fef9c3 !important; color: #92400e !important;
   letter-spacing: 0.07em; padding: 0 14px 6px; border-bottom: 1px solid #f1f5f9; margin-bottom: 4px; }
 .col-item { display: flex; align-items: center; gap: 8px; padding: 5px 14px; cursor: pointer; font-size: 12px; }
 .col-item:hover { background: #f8fafc; }
-.col-item input[type=checkbox] { width: 14px; height: 14px; cursor: pointer; accent-color: #7c3aed; }
+.col-item input[type=checkbox] { width: 14px; height: 14px; cursor: pointer; accent-color: #0e5c5c; }
 .col-item label { cursor: pointer; flex: 1; user-select: none; }
 .col-sep { border: none; border-top: 1px solid #f1f5f9; margin: 4px 0; }
 
@@ -314,7 +314,7 @@ thead th { position: sticky; top: 0; z-index: 200; }
 }
 .resize-handle:hover::after, .resize-handle.resizing::after {
   content: ''; position: absolute; left: 3px; top: 20%; bottom: 20%;
-  width: 2px; background: #7c3aed; border-radius: 2px;
+  width: 2px; background: #0e5c5c; border-radius: 2px;
 }
 
 /* ── MODAL ── */
@@ -327,7 +327,7 @@ thead th { position: sticky; top: 0; z-index: 200; }
 .form-group   { margin-bottom: 11px; }
 .form-label   { font-size: 10px; font-weight: 700; color: #64748b; display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
 .form-input, .form-select, .form-textarea { width: 100%; padding: 7px 9px; border: 1.5px solid #e2e8f0; border-radius: 7px; font-size: 13px; background: #f8fafc; color: #1e293b; font-family: inherit; }
-.form-input:focus, .form-select:focus, .form-textarea:focus { outline: none; border-color: #7c3aed; background: white; }
+.form-input:focus, .form-select:focus, .form-textarea:focus { outline: none; border-color: #0e5c5c; background: white; }
 .form-textarea { resize: vertical; min-height: 70px; }
 .status-picker { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; }
 .status-option { padding: 7px 4px; border-radius: 7px; border: 2px solid transparent; cursor: pointer; text-align: center; font-size: 11px; font-weight: 700; }
@@ -336,13 +336,13 @@ thead th { position: sticky; top: 0; z-index: 200; }
 .so-ad       { background: #fef9c3; color: #a16207; }
 .so-csa      { background: #e8d4b0; color: #5c2800; }
 .so-jf       { background: #f1f5f9; color: #94a3b8; }
-.so-repos    { background: #ede9fe; color: #6d28d9; }
+.so-repos    { background: #e0f2f0; color: #094848; border: 1px solid #7bc4bc; }
 .so-conges   { background: #dcfce7; color: #15803d; }
 .so-formation{ background: #fce7f3; color: #9d174d; }
 .so-maladie  { background: #fee2e2; color: #991b1b; }
 .so-off      { background: #f1f5f9; color: #94a3b8; }
 .modal-actions { display: flex; gap: 7px; justify-content: flex-end; margin-top: 14px; padding-top: 12px; border-top: 1px solid #f1f5f9; }
-.btn-mp  { padding: 7px 16px; background: #7c3aed; color: white; border-radius: 7px; font-weight: 700; cursor: pointer; border: none; font-size: 12px; }
+.btn-mp  { padding: 7px 16px; background: #0e5c5c; color: white; border-radius: 7px; font-weight: 700; cursor: pointer; border: none; font-size: 12px; }
 .btn-ms  { padding: 7px 12px; background: #f1f5f9; color: #374151; border-radius: 7px; font-weight: 600; cursor: pointer; border: 1px solid #e2e8f0; font-size: 12px; }
 .btn-md  { padding: 7px 12px; background: #fef2f2; color: #dc2626; border-radius: 7px; font-weight: 600; cursor: pointer; border: 1px solid #fca5a5; font-size: 12px; }
 .btn-mfh { padding: 7px 12px; background: #fff7ed; color: #c2410c; border-radius: 7px; font-weight: 600; cursor: pointer; border: 1px solid #fed7aa; font-size: 12px; }
@@ -365,18 +365,18 @@ thead th { position: sticky; top: 0; z-index: 200; }
   position: relative; z-index: 1;
 }
 .auth-logo { font-size: 16px; font-weight: 800; text-align: center; margin-bottom: 3px; color: #1e293b; }
-.auth-logo span { color: #7c3aed; }
+.auth-logo span { color: #0e5c5c; }
 .auth-sub  { font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 20px; }
 .auth-tabs { display: flex; gap: 6px; margin-bottom: 18px; }
 .auth-tab  { flex: 1; padding: 8px; border: 1.5px solid #e2e8f0; border-radius: 8px;
   font-size: 12px; font-weight: 700; cursor: pointer; background: white; color: #64748b; }
-.auth-tab.active { background: #7c3aed; color: white; border-color: #7c3aed; }
+.auth-tab.active { background: #0e5c5c; color: white; border-color: #0e5c5c; }
 .auth-input { width: 100%; padding: 10px 14px; border: 1.5px solid #e2e8f0; border-radius: 9px;
   font-size: 14px; margin-bottom: 10px; background: #f8fafc; font-family: inherit; color: #1e293b; }
-.auth-input:focus { outline: none; border-color: #7c3aed; background: white; }
-.auth-btn { width: 100%; padding: 11px; background: #7c3aed; color: white; border: none;
+.auth-input:focus { outline: none; border-color: #0e5c5c; background: white; }
+.auth-btn { width: 100%; padding: 11px; background: #0e5c5c; color: white; border: none;
   border-radius: 9px; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 4px; }
-.auth-btn:hover { background: #6d28d9; }
+.auth-btn:hover { background: #094848; }
 .auth-link { width: 100%; padding: 8px; background: transparent; color: #94a3b8; border: none;
   font-size: 11px; cursor: pointer; margin-top: 6px; text-decoration: underline; }
 .auth-msg { border-radius: 7px; padding: 8px 12px; font-size: 12px; margin-bottom: 12px; display: none; }
@@ -393,7 +393,7 @@ thead th { position: sticky; top: 0; z-index: 200; }
   align-items: center; justify-content: center; font-size: 8px; font-weight: 800; color: white; }
 
 /* ── ADMIN ── */
-.btn-admin { background: #faf5ff !important; color: #7c3aed !important; border-color: #c4b5fd !important; }
+.btn-admin { background: #f0f8f7 !important; color: #0e5c5c !important; border-color: #c4956a !important; }
 .admin-user-row { display: flex; align-items: center; justify-content: space-between;
   padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: 12px; gap: 8px; }
 .admin-user-row:last-child { border-bottom: none; }
@@ -588,7 +588,7 @@ thead th { position: sticky; top: 0; z-index: 200; }
   <div class="leg-item"><div class="leg-dot" style="background:#dbeafe;border-color:#93c5fd"></div>VA</div>
   <div class="leg-item"><div class="leg-dot" style="background:#fef9c3;border-color:#fcd34d"></div>AD</div>
   <div class="leg-item"><div class="leg-dot" style="background:#e8d4b0;border-color:#c49a50"></div>CSA</div>
-  <div class="leg-item"><div class="leg-dot" style="background:#ede9fe;border-color:#c4b5fd"></div>Repos</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#e0f2f0;border-color:#7bc4bc"></div>Repos</div>
   <div class="leg-item"><div class="leg-dot" style="background:#dcfce7;border-color:#86efac"></div>Congés</div>
   <div class="leg-item"><div class="leg-dot" style="background:#fce7f3;border-color:#f9a8d4"></div>École</div>
   <div class="leg-item"><div class="leg-dot" style="background:#fee2e2;border-color:#fca5a5"></div>Maladie</div>
@@ -638,7 +638,7 @@ let state = {
   currentYear: new Date().getFullYear(),
   boutiques: {
     bulle: {
-      name: 'Atelier de la Bulle', color: '#7c3aed',
+      name: 'Atelier de la Bulle', color: '#0e5c5c',
       employees: ['Loic','Estelle','Agathe','Alice','Monique'],
       schedule: {}, schedulePM: {}, bookings: {}, notes: {}, renforts: {}, statusNotes: {}
     },
@@ -834,7 +834,7 @@ function relTime(ts) {
 }
 
 // ═══ PRESENCE (QUI EST CONNECTÉ) ══════════════
-const PRES_COLORS = ['#7c3aed','#0891b2','#dc2626','#16a34a','#d97706','#db2777','#0284c7','#059669','#b45309'];
+const PRES_COLORS = ['#0e5c5c','#0891b2','#dc2626','#16a34a','#d97706','#db2777','#0284c7','#059669','#b45309'];
 function userColor(uid) { let h=0; for(let i=0;i<uid.length;i++) h=(h*31+uid.charCodeAt(i))&0xffff; return PRES_COLORS[Math.abs(h)%PRES_COLORS.length]; }
 
 function initPresence(user) {
@@ -850,7 +850,7 @@ function initPresence(user) {
       const isMe = authUser && uid === authUser.uid;
       const initials = (u.name||'?').substring(0,2).toUpperCase();
       return '<div class="presence-chip" title="' + esc(u.name||u.email) + (isMe?' (vous)':'') + '">'
-        + '<div class="presence-avatar" style="background:' + (u.color||'#7c3aed') + '">' + initials + '</div>'
+        + '<div class="presence-avatar" style="background:' + (u.color||'#0e5c5c') + '">' + initials + '</div>'
         + esc((u.name||u.email).split(' ')[0]) + (isMe ? ' ✎' : '') + '</div>';
     }).join('');
   });
@@ -881,7 +881,7 @@ async function loadAdminList() {
   const snap = await db.ref(ACL_PATH).once('value');
   const users = snap.val() || {};
   let html = '<p style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Utilisateurs autorisés</p>';
-  html += '<div class="admin-user-row"><span>👑 ' + esc(ADMIN_EMAIL) + '</span><span style="font-size:10px;background:#faf5ff;color:#7c3aed;border:1px solid #c4b5fd;padding:2px 7px;border-radius:4px;font-weight:700">ADMIN</span></div>';
+  html += '<div class="admin-user-row"><span>👑 ' + esc(ADMIN_EMAIL) + '</span><span style="font-size:10px;background:#f0f8f7;color:#0e5c5c;border:1px solid #c4956a;padding:2px 7px;border-radius:4px;font-weight:700">ADMIN</span></div>';
   Object.entries(users).forEach(([k,u]) => {
     html += '<div class="admin-user-row"><div><strong>' + esc(u.name||'') + '</strong> <span style="color:#94a3b8;font-size:11px">' + esc(u.email) + '</span></div>'
       + '<button onclick="adminRemoveUser(\'' + k + '\')" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:5px;padding:2px 8px;cursor:pointer;font-size:10px;font-weight:600;flex-shrink:0">Retirer</button></div>';
@@ -1469,7 +1469,7 @@ function renderVisiteCell(bk, b, k, idx, isLast) {
     const paxPart = bk.pax ? bk.pax + 'pax' : '';
     const comm    = bk.comment ? esc(bk.comment.slice(0,40)) : '';
     const priceTag = bk.price ? ' <span style="color:#475569;font-size:10px">(' + esc(bk.price) + ')</span>' : '';
-    const VIA_CSS = {'FH':'background:#fff7ed;color:#c2410c;border:1px solid #fed7aa','GYG':'background:#f0fdf4;color:#166534;border:1px solid #86efac','Viator':'background:#eff6ff;color:#1e40af;border:1px solid #93c5fd','RDV':'background:#faf5ff;color:#6d28d9;border:1px solid #c4b5fd','GE':'background:#fdf4ff;color:#7e22ce;border:1px solid #d8b4fe'};
+    const VIA_CSS = {'FH':'background:#fff7ed;color:#c2410c;border:1px solid #fed7aa','GYG':'background:#f0fdf4;color:#166534;border:1px solid #86efac','Viator':'background:#eff6ff;color:#1e40af;border:1px solid #93c5fd','RDV':'background:#f0f8f7;color:#094848;border:1px solid #c4956a','GE':'background:#e8f5f4;color:#0a4a4a;border:1px solid #a8d4d0'};
     const via = bk.via || '';
     const viaTag = via && VIA_CSS[via] ? ' <span style="font-size:9px;font-weight:800;padding:1px 5px;border-radius:3px;' + VIA_CSS[via] + '">' + via + '</span>' : '';
     label = '<strong>' + timePart + '</strong>'
@@ -1893,14 +1893,14 @@ function openFHDetail(k, idx) {
       partHtml += '<div style="padding:5px 0;border-bottom:1px solid #f1f5f9;display:flex;gap:8px;align-items:center">'
         + (p.langFlag ? '<span style="font-size:16px">' + p.langFlag + '</span>' : '')
         + '<div><strong>' + (p.pax||0) + ' pers.</strong>'
-        + (p.clientName ? ' · <span style="color:#7c3aed">' + esc(p.clientName) + '</span>' : '')
+        + (p.clientName ? ' · <span style="color:#0e5c5c">' + esc(p.clientName) + '</span>' : '')
         + (p.status==='option' ? ' <span style="font-size:10px;background:#fef9c3;color:#92400e;padding:1px 5px;border-radius:3px">option</span>' : '')
         + '</div></div>';
     });
     partHtml += '</div>';
   } else {
     const p = participants[0];
-    partHtml = (p.clientName ? '<div class="form-group"><label class="form-label">Client</label><div style="padding:5px;font-weight:700;color:#7c3aed">' + (p.langFlag||'') + ' ' + esc(p.clientName) + '</div></div>' : '');
+    partHtml = (p.clientName ? '<div class="form-group"><label class="form-label">Client</label><div style="padding:5px;font-weight:700;color:#0e5c5c">' + (p.langFlag||'') + ' ' + esc(p.clientName) + '</div></div>' : '');
   }
 
   document.getElementById('modal-body').innerHTML =
