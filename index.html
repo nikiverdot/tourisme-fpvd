@@ -1,0 +1,2035 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Planning — Famille Piffaut</title>
+<script>
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyBm87BwlYsB_xDX0NQ9Hw0B1BA8X4pRD4M",
+  authDomain:        "planning-tourisme.firebaseapp.com",
+  databaseURL:       "https://planning-tourisme-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "planning-tourisme",
+  storageBucket:     "planning-tourisme.firebasestorage.app",
+  messagingSenderId: "546018620268",
+  appId:             "1:546018620268:web:043de99203b72cb9e27949"
+};
+const FAREHARBOR_ICS_DELORME = "https://fareharbor.com/integrations/ics/andre-delorme/calendar/?token=cc1ce7f0-f5f4-43d8-b6ec-b0d86f86f062";
+</script>
+<style>
+:root { color-scheme: light; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; color: #1e293b; font-size: 15px; }
+.app-wrapper { display: flex; flex-direction: column; height: 100vh; }
+
+/* ── HEADER ── */
+.app-header {
+  background: white; border-bottom: 1px solid #e2e8f0;
+  padding: 10px 16px; display: flex; align-items: center; gap: 10px;
+  flex-wrap: wrap; flex-shrink: 0;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+}
+.app-logo { font-size: 15px; font-weight: 800; white-space: nowrap; color: #1e293b; }
+.app-logo span { color: #7c3aed; }
+.boutique-tabs { display: flex; gap: 5px; }
+.tab-btn { padding: 5px 13px; border-radius: 20px; border: 2px solid #e2e8f0; cursor: pointer; font-weight: 700; font-size: 13px; background: white; color: #64748b; transition: all 0.15s; white-space: nowrap; }
+.tab-bulle   { border-color: #7c3aed; background: #7c3aed; color: white; }
+.tab-delorme { border-color: #0891b2; background: #0891b2; color: white; }
+.year-nav { display: flex; align-items: center; gap: 5px; margin-left: auto; }
+.year-label { font-weight: 800; font-size: 14px; min-width: 46px; text-align: center; }
+.nav-btn { width: 26px; height: 26px; border-radius: 6px; border: 1px solid #e2e8f0; background: white; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; color: #64748b; }
+.nav-btn:hover { background: #f1f5f9; }
+.sync-badge { display: flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+.sync-online  { background: #dcfce7; color: #15803d; }
+.sync-offline { background: #f1f5f9; color: #94a3b8; }
+.sync-saving  { background: #ede9fe; color: #6d28d9; }
+.sync-error   { background: #fef2f2; color: #dc2626; }
+.sync-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.sync-online .sync-dot { animation: pulse 2s infinite; }
+.sync-saving .sync-dot { animation: pulse 0.7s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.25} }
+.user-chip { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #64748b; cursor: pointer; padding: 3px 8px; border-radius: 20px; border: 1px solid #e2e8f0; }
+.user-avatar { width: 20px; height: 20px; border-radius: 50%; background: #7c3aed; color: white; font-size: 9px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+
+/* ── TOOLBAR ── */
+.toolbar {
+  padding: 6px 16px; display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+.btn { padding: 5px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid transparent; white-space: nowrap; }
+.btn:hover { opacity: 0.8; }
+.btn-today  { background: #faf5ff; color: #7c3aed; border-color: #c4b5fd; }
+.btn-ics    { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
+.btn-export { background: #f0fdf4; color: #16a34a; border-color: #86efac; }
+.btn-import { background: #eff6ff; color: #2563eb; border-color: #93c5fd; cursor: pointer; }
+.ics-msg    { font-size: 11px; color: #64748b; }
+
+/* ── TABLE WRAP ── */
+.table-wrap {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+/* ── TABLE ── */
+/* border-collapse:separate é obrigatório para position:sticky funcionar no Chrome/Safari */
+table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 800px; }
+col.col-jour  { width: 50px; }
+col.col-date  { width: 60px; }
+col.col-rdv   { width: 200px; }
+col.col-visite{ width: 320px; }
+col.col-pax   { width: 42px; }
+col.col-emp     { width: 68px; }
+col.col-renfort { width: 80px; }
+
+/* Sticky header — top:0 funciona porque table-wrap é o scroll container e border-collapse:separate */
+thead th {
+  position: sticky; top: 0; z-index: 200;
+  background: #e2e8f0;
+  border-top: 1px solid #cbd5e1;
+  border-right: 1px solid #cbd5e1;
+  border-bottom: 2px solid #94a3b8;
+  padding: 7px 8px; font-size: 12px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.07em; color: #475569;
+  text-align: center; white-space: nowrap;
+}
+thead th:first-child { border-left: 1px solid #cbd5e1; }
+thead th.th-left { text-align: left; }
+
+/* Month separator */
+tr.month-sep td {
+  background: #334155; color: #e2e8f0;
+  font-size: 13px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.1em; padding: 6px 12px;
+  border: none;
+}
+
+/* Day rows — border-right+bottom only (separate mode evita bordas duplas) */
+tr.day-row td { border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+tr.day-row td:first-child { border-left: 1px solid #e2e8f0; }
+tr.day-row:hover td { background-color: rgba(248,250,252,0.6); }
+tr.row-ferie td { background: #fef08a !important; }
+tr.row-today  td { background: #faf5ff !important; }
+tr.row-sunday td { background: #fecaca; }
+tr.row-saturday td { background: #fffbf5; }
+tr.row-alert td { background: #fff5f5 !important; }
+.ferie-label { display: block; font-size: 10px; font-weight: 800; color: #a16207; text-transform: uppercase; letter-spacing: 0.04em; line-height: 1.2; margin-top: 2px; }
+
+/* ── JOURS FERMÉS — Caveau André Delorme ── */
+tr.row-ferme td                { background: #64748b !important; border-color: #475569 !important; }
+tr.row-ferme td.jour-cell      { color: #cbd5e1 !important; }
+tr.row-ferme .date-num         { color: #f1f5f9 !important; }
+tr.row-ferme .date-month       { color: #94a3b8 !important; }
+tr.row-ferme .rdv-text         { color: #e2e8f0 !important; }
+tr.row-ferme .rdv-add          { color: #475569 !important; }
+tr.row-ferme .visite-empty     { color: #475569 !important; }
+tr.row-ferme .add-visite-btn   { color: #94a3b8 !important; }
+tr.row-ferme .visite-line      { color: #cbd5e1 !important; border-color: #475569 !important; }
+tr.row-ferme .status-cell      { background: #475569 !important; color: #64748b !important; border-color: #4b5563 !important; pointer-events: none; }
+tr.row-ferme .status-cell:hover{ transform: none !important; opacity: 1 !important; }
+
+/* Bouton d'exception */
+.exc-toggle {
+  display: block; margin-top: 3px; font-size: 9px; cursor: pointer;
+  color: #94a3b8; text-align: center; line-height: 1.2;
+  user-select: none;
+}
+.exc-toggle:hover { color: #475569; }
+tr.row-ferme .exc-toggle { color: #94a3b8; }
+tr.row-ferme .exc-toggle:hover { color: #f1f5f9; }
+.exc-badge {
+  display: inline-block; font-size: 8px; font-weight: 800;
+  padding: 1px 5px; border-radius: 3px; margin-top: 2px;
+  letter-spacing: 0.04em; white-space: nowrap;
+}
+.exc-ouvert { background: #dcfce7; color: #15803d; }
+.exc-ferme  { background: #fee2e2; color: #dc2626; }
+
+/* First row of a day group — top border stronger */
+tr.day-first td { border-top: 2px solid #cbd5e1 !important; }
+tr.day-first td:first-child { border-left: 1px solid #e2e8f0; }
+tr.row-today.day-first td { border-top: 2px solid #7c3aed !important; }
+tr.row-alert.day-first td { border-top: 2px solid #ef4444 !important; }
+
+/* JOUR cell */
+td.jour-cell {
+  text-align: center; padding: 4px 2px; vertical-align: middle !important;
+  font-size: 13px; font-weight: 700; text-transform: uppercase;
+  color: #94a3b8; letter-spacing: 0.04em;
+}
+tr.row-sunday  td.jour-cell { color: #ef4444; }
+tr.row-saturday td.jour-cell { color: #f97316; }
+tr.row-today   td.jour-cell { color: #7c3aed; }
+
+/* DATE cell */
+td.date-cell {
+  text-align: center; padding: 2px 4px; vertical-align: middle !important;
+  white-space: nowrap;
+}
+.date-num   { display: block; font-size: 22px; font-weight: 800; color: #1e293b; line-height: 1; }
+.date-month { display: block; font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em; }
+tr.row-today .date-num  { color: #7c3aed; }
+tr.row-sunday .date-num { color: #ef4444; }
+tr.row-alert .date-num  { color: #dc2626; }
+
+/* RDV / notes cell */
+td.rdv-cell {
+  padding: 5px 8px; vertical-align: top !important;
+  cursor: pointer; min-width: 0;
+}
+td.rdv-cell:hover { background: rgba(124,58,237,0.04) !important; }
+.rdv-text { font-size: 13px; color: #374151; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+.rdv-add  { font-size: 12px; color: #c4b5fd; }
+td.rdv-cell.has-note .rdv-add { display: none; }
+
+/* VISITE cell */
+td.visite-cell { padding: 3px 8px; vertical-align: middle !important; }
+.visite-line {
+  font-size: 13px; color: #1e293b; padding: 2px 0;
+  border-bottom: 1px solid #f1f5f9; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.visite-line:last-of-type { border-bottom: none; }
+.visite-line strong { color: #0f172a; font-weight: 900; }
+.visite-badge { font-size: 11px; font-weight: 700; padding: 1px 5px; border-radius: 4px; white-space: nowrap; }
+.badge-option { background: #fef9c3; color: #92400e; }
+.visite-empty { font-size: 13px; color: #cbd5e1; padding: 2px 0; }
+.add-visite-btn { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; color: #a78bfa; cursor: pointer; padding: 2px 6px; border-radius: 4px; margin-top: 1px; }
+.add-visite-btn:hover { background: #faf5ff; }
+
+/* PAX cell */
+td.pax-cell {
+  text-align: center; padding: 4px 4px; vertical-align: middle !important;
+  font-size: 15px; font-weight: 800;
+}
+.pax-big { color: #dc2626; }
+
+/* EMPLOYEE cell */
+td.emp-cell { padding: 3px 3px; text-align: center; vertical-align: middle !important; }
+.status-cell {
+  border-radius: 6px; cursor: pointer; text-align: center;
+  font-size: 12px; font-weight: 800; min-height: 36px; height: auto;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border: 2px solid transparent; transition: transform 0.1s;
+  user-select: none; letter-spacing: 0.03em; width: 100%;
+  padding: 3px 2px; gap: 1px;
+}
+.status-note {
+  font-size: 9px; font-weight: 600; opacity: 0.8; letter-spacing: 0.01em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+.status-cell:hover { transform: scale(1.04); opacity: 0.85; }
+/* Demi-journée (matin / après-midi) */
+.status-half {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 800; letter-spacing: 0.03em; gap: 2px;
+  min-height: 17px; width: 100%;
+}
+.half-tag { font-size: 7px; opacity: 0.65; font-weight: 600; }
+/* Boutons période dans la modale */
+.period-btn {
+  flex: 1; padding: 6px 4px; border-radius: 6px; border: 1.5px solid #e2e8f0;
+  background: white; font-size: 11px; font-weight: 600; color: #64748b;
+  cursor: pointer; text-align: center; transition: all 0.1s; user-select: none;
+}
+.period-btn:hover { background: #f8fafc; }
+.period-btn.selected { border-color: #7c3aed; background: #faf5ff; color: #7c3aed; }
+
+/* Status colors */
+.s-va       { background: #dbeafe; color: #1d4ed8; border-color: #93c5fd; }
+.s-ad       { background: #fef9c3; color: #a16207; border-color: #fcd34d; }
+.s-csa      { background: #e8d4b0; color: #5c2800; border-color: #c49a50; }
+.s-jf       { background: #fef08a; color: #a16207; border-color: #fcd34d; }
+.s-repos    { background: #ede9fe; color: #6d28d9; border-color: #c4b5fd; }
+.s-conges   { background: #dcfce7; color: #15803d; border-color: #86efac; }
+.s-formation{ background: #fce7f3; color: #9d174d; border-color: #f9a8d4; }
+.s-maladie  { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+.s-off      { background: #f1f5f9; color: #94a3b8; border-color: #e2e8f0; }
+.s-off:hover { background: #e2e8f0; color: #64748b; }
+.cell-alert { outline: 2px solid #ef4444; outline-offset: 1px; border-radius: 5px; }
+
+/* RENFORT cells */
+td.renfort-cell {
+  padding: 3px 4px; text-align: center; vertical-align: middle !important;
+}
+.renfort-chip {
+  display: inline-flex; align-items: center; gap: 3px;
+  background: #fef9c3; color: #78350f; border: 1px solid #fcd34d;
+  border-radius: 5px; padding: 2px 6px; font-size: 12px; font-weight: 700;
+  cursor: pointer; white-space: nowrap; max-width: 100%; overflow: hidden;
+  text-overflow: ellipsis;
+}
+.renfort-chip:hover { background: #fef08a; }
+.renfort-empty {
+  font-size: 12px; color: #cbd5e1; cursor: pointer; padding: 2px 4px;
+  display: block; text-align: center;
+}
+.renfort-empty:hover { color: #94a3b8; }
+tr.row-ferme .renfort-empty { color: #475569 !important; }
+tr.row-ferme .renfort-chip  { opacity: 0.5; pointer-events: none; }
+
+/* Thead rename hint */
+thead th.th-emp { cursor: pointer; }
+thead th.th-emp:hover { background: #d1d5db; }
+thead th.th-emp::after { content: ' ✎'; font-size: 8px; opacity: 0.4; }
+thead th.th-renfort { background: #fef9c3 !important; color: #92400e !important; border-color: #fcd34d !important; }
+
+/* LEGEND */
+.legend { display: flex; gap: 10px; padding: 8px 16px; flex-wrap: wrap; background: white; border-top: 1px solid #e2e8f0; font-size: 13px; flex-shrink: 0; }
+.leg-item { display: flex; align-items: center; gap: 4px; color: #475569; }
+.leg-dot  { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; border: 2px solid transparent; }
+
+/* ── COLUMN MANAGER ── */
+.col-panel {
+  position: absolute; top: calc(100% + 4px); right: 0; z-index: 400;
+  background: white; border: 1px solid #e2e8f0; border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12); padding: 10px 0; min-width: 200px;
+}
+.col-panel-wrap { position: relative; }
+.col-panel-title { font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase;
+  letter-spacing: 0.07em; padding: 0 14px 6px; border-bottom: 1px solid #f1f5f9; margin-bottom: 4px; }
+.col-item { display: flex; align-items: center; gap: 8px; padding: 5px 14px; cursor: pointer; font-size: 12px; }
+.col-item:hover { background: #f8fafc; }
+.col-item input[type=checkbox] { width: 14px; height: 14px; cursor: pointer; accent-color: #7c3aed; }
+.col-item label { cursor: pointer; flex: 1; user-select: none; }
+.col-sep { border: none; border-top: 1px solid #f1f5f9; margin: 4px 0; }
+
+/* Resize handle on th */
+thead th { position: sticky; top: 0; z-index: 200; }
+.th-inner { display: flex; align-items: center; gap: 3px; position: relative; }
+.resize-handle {
+  position: absolute; right: -4px; top: 0; bottom: 0; width: 8px;
+  cursor: col-resize; z-index: 10;
+}
+.resize-handle:hover::after, .resize-handle.resizing::after {
+  content: ''; position: absolute; left: 3px; top: 20%; bottom: 20%;
+  width: 2px; background: #7c3aed; border-radius: 2px;
+}
+
+/* ── MODAL ── */
+.modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(2px); }
+.modal { background: white; border-radius: 14px; padding: 20px; width: 400px; max-width: 94vw; box-shadow: 0 24px 64px rgba(0,0,0,0.18); max-height: 90vh; overflow-y: auto; }
+.modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.modal-title  { font-size: 14px; font-weight: 800; color: #0f172a; }
+.modal-close  { width: 26px; height: 26px; border-radius: 7px; border: 1px solid #e2e8f0; background: #f8fafc; cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center; color: #64748b; }
+.modal-close:hover { background: #f1f5f9; }
+.form-group   { margin-bottom: 11px; }
+.form-label   { font-size: 10px; font-weight: 700; color: #64748b; display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+.form-input, .form-select, .form-textarea { width: 100%; padding: 7px 9px; border: 1.5px solid #e2e8f0; border-radius: 7px; font-size: 13px; background: #f8fafc; color: #1e293b; font-family: inherit; }
+.form-input:focus, .form-select:focus, .form-textarea:focus { outline: none; border-color: #7c3aed; background: white; }
+.form-textarea { resize: vertical; min-height: 70px; }
+.status-picker { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; }
+.status-option { padding: 7px 4px; border-radius: 7px; border: 2px solid transparent; cursor: pointer; text-align: center; font-size: 11px; font-weight: 700; }
+.status-option.selected { border-color: #1e293b !important; }
+.so-va       { background: #dbeafe; color: #1d4ed8; }
+.so-ad       { background: #fef9c3; color: #a16207; }
+.so-csa      { background: #e8d4b0; color: #5c2800; }
+.so-jf       { background: #fef08a; color: #a16207; }
+.so-repos    { background: #ede9fe; color: #6d28d9; }
+.so-conges   { background: #dcfce7; color: #15803d; }
+.so-formation{ background: #fce7f3; color: #9d174d; }
+.so-maladie  { background: #fee2e2; color: #991b1b; }
+.so-off      { background: #f1f5f9; color: #94a3b8; }
+.modal-actions { display: flex; gap: 7px; justify-content: flex-end; margin-top: 14px; padding-top: 12px; border-top: 1px solid #f1f5f9; }
+.btn-mp  { padding: 7px 16px; background: #7c3aed; color: white; border-radius: 7px; font-weight: 700; cursor: pointer; border: none; font-size: 12px; }
+.btn-ms  { padding: 7px 12px; background: #f1f5f9; color: #374151; border-radius: 7px; font-weight: 600; cursor: pointer; border: 1px solid #e2e8f0; font-size: 12px; }
+.btn-md  { padding: 7px 12px; background: #fef2f2; color: #dc2626; border-radius: 7px; font-weight: 600; cursor: pointer; border: 1px solid #fca5a5; font-size: 12px; }
+.btn-mfh { padding: 7px 12px; background: #fff7ed; color: #c2410c; border-radius: 7px; font-weight: 600; cursor: pointer; border: 1px solid #fed7aa; font-size: 12px; }
+.fh-note { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 7px; padding: 8px 10px; font-size: 11px; color: #92400e; margin-bottom: 10px; }
+/* ── AUTH OVERLAY ── */
+#auth-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: linear-gradient(135deg,#1e1b4b 0%,#312e81 50%,#4c1d95 100%);
+  display: flex; align-items: center; justify-content: center;
+}
+.auth-card {
+  background: white; border-radius: 20px; padding: 36px 32px;
+  width: 380px; max-width: 94vw; box-shadow: 0 32px 80px rgba(0,0,0,0.35);
+}
+.auth-logo { font-size: 18px; font-weight: 900; text-align: center; margin-bottom: 4px; }
+.auth-logo span { color: #7c3aed; }
+.auth-sub  { font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 22px; }
+.auth-tabs { display: flex; gap: 6px; margin-bottom: 18px; }
+.auth-tab  { flex: 1; padding: 8px; border: 1.5px solid #e2e8f0; border-radius: 8px;
+  font-size: 12px; font-weight: 700; cursor: pointer; background: white; color: #64748b; }
+.auth-tab.active { background: #7c3aed; color: white; border-color: #7c3aed; }
+.auth-input { width: 100%; padding: 10px 14px; border: 1.5px solid #e2e8f0; border-radius: 9px;
+  font-size: 14px; margin-bottom: 10px; background: #f8fafc; font-family: inherit; color: #1e293b; }
+.auth-input:focus { outline: none; border-color: #7c3aed; background: white; }
+.auth-btn { width: 100%; padding: 11px; background: #7c3aed; color: white; border: none;
+  border-radius: 9px; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 4px; }
+.auth-btn:hover { background: #6d28d9; }
+.auth-link { width: 100%; padding: 8px; background: transparent; color: #94a3b8; border: none;
+  font-size: 11px; cursor: pointer; margin-top: 6px; text-decoration: underline; }
+.auth-msg { border-radius: 7px; padding: 8px 12px; font-size: 12px; margin-bottom: 12px; display: none; }
+.auth-msg.show { display: block; }
+.auth-error   { background: #fef2f2; color: #dc2626; border: 1px solid #fca5a5; }
+.auth-success { background: #f0fdf4; color: #16a34a; border: 1px solid #86efac; }
+
+/* ── PRESENCE BAR ── */
+.presence-bar  { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.presence-chip { display: flex; align-items: center; gap: 4px; background: #f0fdf4;
+  border: 1px solid #86efac; border-radius: 20px; padding: 2px 8px 2px 4px;
+  font-size: 10px; font-weight: 600; color: #166534; white-space: nowrap; }
+.presence-avatar { width: 18px; height: 18px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center; font-size: 8px; font-weight: 800; color: white; }
+
+/* ── ADMIN ── */
+.btn-admin { background: #faf5ff !important; color: #7c3aed !important; border-color: #c4b5fd !important; }
+.admin-user-row { display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: 12px; gap: 8px; }
+.admin-user-row:last-child { border-bottom: none; }
+
+/* ── CONSECUTIVE WORK DAYS ── */
+.cell-warn-6 { outline: 2px solid #f97316 !important; outline-offset: 1px; border-radius: 5px; }
+.cell-warn-7 { outline: 2px solid #dc2626 !important; outline-offset: 1px; border-radius: 5px;
+  animation: warn-pulse 1.2s ease-in-out infinite; }
+@keyframes warn-pulse { 0%,100%{opacity:1} 50%{opacity:0.45} }
+</style>
+<style id="col-styles"></style>
+</head>
+<body>
+
+<!-- ══ AUTH OVERLAY ══ -->
+<div id="auth-overlay">
+  <div class="auth-card">
+    <div class="auth-logo">Famille Piffaut <span>Planning</span></div>
+    <div class="auth-sub">Accès réservé aux membres autorisés</div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchAuthTab('login')">Connexion</button>
+      <button class="auth-tab" onclick="switchAuthTab('register')">Premier accès</button>
+    </div>
+    <div id="auth-msg-err" class="auth-msg auth-error"></div>
+    <div id="auth-msg-ok"  class="auth-msg auth-success"></div>
+    <input type="email"    id="auth-email" class="auth-input" placeholder="Votre email" autocomplete="email" onkeydown="if(event.key==='Enter')authSubmit()">
+    <input type="password" id="auth-pass"  class="auth-input" placeholder="Mot de passe (min. 6 caractères)" autocomplete="current-password" onkeydown="if(event.key==='Enter')authSubmit()">
+    <div id="auth-name-row" style="display:none">
+      <input type="text" id="auth-name" class="auth-input" placeholder="Votre prénom (affiché à l'équipe)" onkeydown="if(event.key==='Enter')authSubmit()">
+    </div>
+    <button class="auth-btn" id="auth-submit-btn" onclick="authSubmit()">Connexion</button>
+    <button class="auth-link" onclick="doReset()">Mot de passe oublié ?</button>
+  </div>
+</div>
+
+<div class="app-wrapper">
+
+<div class="app-header">
+  <div class="app-logo">Famille Piffaut <span>Planning</span></div>
+  <div class="boutique-tabs">
+    <button id="tab-bulle"   class="tab-btn tab-bulle"  onclick="switchBoutique('bulle')">🫧 Atelier de la Bulle</button>
+    <button id="tab-delorme" class="tab-btn"            onclick="switchBoutique('delorme')">🍾 Caveau André Delorme</button>
+  </div>
+  <div id="presence-bar" class="presence-bar"></div>
+  <div id="sync-badge" class="sync-badge sync-offline"><div class="sync-dot"></div><span id="sync-label">Local</span></div>
+  <div class="user-chip" onclick="openRenameUserModal()" title="Modifier mon prénom">
+    <div class="user-avatar" id="user-avatar">?</div>
+    <span id="user-name-label">…</span>
+    <span style="font-size:9px;opacity:0.5">✎</span>
+  </div>
+  <button id="btn-admin" class="btn btn-admin" onclick="openAdminPanel()" style="display:none">⚙ Accès</button>
+  <button class="btn" style="background:#fef2f2;color:#dc2626;border-color:#fca5a5;font-size:10px" onclick="logoutUser()">Déconnexion</button>
+  <div class="year-nav">
+    <button class="nav-btn" onclick="prevYear()">‹</button>
+    <div class="year-label" id="year-label">2026</div>
+    <button class="nav-btn" onclick="nextYear()">›</button>
+  </div>
+</div>
+
+<div class="toolbar">
+  <button class="btn btn-today"  onclick="scrollToToday()">📍 Aujourd'hui</button>
+  <button class="btn btn-ics"    onclick="syncFareHarbor()" id="btn-ics">🔄 Sync FareHarbor</button>
+  <span   class="ics-msg"        id="ics-status"></span>
+  <button class="btn btn-export" onclick="exportData()">⬇ Exporter</button>
+  <label  class="btn btn-import">⬆ Importer<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
+  <button id="btn-csv-import" class="btn btn-import" onclick="openImportCSVModal()" style="display:none;background:#f0fdf4;color:#15803d;border-color:#86efac">📋 Import CSV 2026</button>
+  <div class="col-panel-wrap" style="margin-left:auto">
+    <button class="btn" style="background:#f8fafc;border-color:#e2e8f0;color:#475569" onclick="toggleColPanel(event)">⊞ Colonnes</button>
+    <div id="col-panel" class="col-panel" style="display:none"></div>
+  </div>
+</div>
+
+<div id="alerts-container"></div>
+
+<div class="table-wrap">
+  <table id="planning-table"></table>
+</div>
+
+<div class="legend">
+  <div class="leg-item"><div class="leg-dot" style="background:#dbeafe;border-color:#93c5fd"></div>VA</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#fef9c3;border-color:#fcd34d"></div>AD</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#e8d4b0;border-color:#c49a50"></div>CSA</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#ede9fe;border-color:#c4b5fd"></div>Repos</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#dcfce7;border-color:#86efac"></div>Congés</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#fce7f3;border-color:#f9a8d4"></div>École</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#fee2e2;border-color:#fca5a5"></div>Maladie</div>
+  <div class="leg-item" style="margin-left:8px"><div class="leg-dot" style="background:#dbeafe;border-color:#93c5fd"></div>✓ Confirmée</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#fef9c3;border-color:#fcd34d"></div>◌ Option</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#fff7ed;border-left:2px solid #f97316;border-radius:2px"></div>FH FareHarbor</div>
+  <div class="leg-item" style="margin-left:8px"><div class="leg-dot" style="background:#64748b;border-color:#475569"></div>Fermé (caveau)</div>
+  <div class="leg-item"><span style="font-size:10px">⚙</span> Exception jour</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#fef08a;border-color:#fcd34d"></div>Jour férié (ligne)</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#fef08a;border-color:#fcd34d"></div>JF (statut)</div>
+</div>
+
+</div><!-- /.app-wrapper -->
+
+<div id="modal-overlay" class="modal-overlay" style="display:none" onclick="overlayClick(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title"></div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modal-body"></div>
+    <div class="modal-actions" id="modal-actions"></div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script>
+// ═══ CONSTANTS ════════════════════════════════
+const DAYS_FR   = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+const STATUSES       = ['va','ad','csa','repos','conges','formation','maladie','jf','off'];
+const STATUS_LABELS  = { va:'Veuve Ambal', ad:'André Delorme', csa:'CSA', repos:'Repos', conges:'Congés', formation:'École', maladie:'Maladie', jf:'Jour Férié', off:'–' };
+const STATUS_ABBR    = { va:'VA', ad:'AD', csa:'CSA', repos:'REPOS', conges:'CP', formation:'ÉCOLE', maladie:'MAL', jf:'JF', off:'+' };
+const STATUS_CLASSES = { va:'s-va', ad:'s-ad', csa:'s-csa', repos:'s-repos', conges:'s-conges', formation:'s-formation', maladie:'s-maladie', jf:'s-jf', off:'s-off' };
+const SO_CLASSES     = { va:'so-va', ad:'so-ad', csa:'so-csa', repos:'so-repos', conges:'so-conges', formation:'so-formation', maladie:'so-maladie', jf:'so-jf', off:'so-off' };
+const DB_PATH = 'planning-piffaut-v1';
+
+// ═══ STATE ════════════════════════════════════
+let state = {
+  currentBoutique: 'bulle',
+  currentYear: new Date().getFullYear(),
+  boutiques: {
+    bulle: {
+      name: 'Atelier de la Bulle', color: '#7c3aed',
+      employees: ['Loic','Estelle','Agathe','Alice','Monique'],
+      schedule: {}, schedulePM: {}, bookings: {}, notes: {}, renforts: {}, statusNotes: {}
+    },
+    delorme: {
+      name: 'Caveau André Delorme', color: '#0891b2',
+      employees: ['Julie','Monique','Agathe','Poste ouvert (CDD)'],
+      schedule: {}, schedulePM: {}, bookings: {}, notes: {}, exceptions: {}, renforts: {}, statusNotes: {}
+    }
+  }
+};
+
+let fhBookings   = {};
+let modalCtx     = null;
+let firstDataLoad = true;
+let db          = null;
+let isFirebase  = false;
+let saveTimer   = null;
+let pendingSave = false;
+let authUser    = null;
+let currentUser = localStorage.getItem('piffaut-user') || '';
+let authTab     = 'login';
+
+const ADMIN_EMAIL = 'mfverdot@gmail.com';
+const ACL_PATH    = 'piffaut-acl';
+const PRES_PATH   = 'piffaut-presence';
+
+// ═══ AUTH UI ══════════════════════════════════
+function switchAuthTab(tab) {
+  authTab = tab;
+  document.querySelectorAll('.auth-tab').forEach((el,i) => el.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='register')));
+  document.getElementById('auth-name-row').style.display = tab === 'register' ? 'block' : 'none';
+  document.getElementById('auth-submit-btn').textContent = tab === 'login' ? 'Connexion' : 'Créer mon compte';
+  clearAuthMsg();
+}
+function showAuthErr(msg)  { const el=document.getElementById('auth-msg-err'); el.textContent=msg; el.className='auth-msg auth-error show'; document.getElementById('auth-msg-ok').className='auth-msg auth-success'; }
+function showAuthOk(msg)   { const el=document.getElementById('auth-msg-ok');  el.textContent=msg; el.className='auth-msg auth-success show'; document.getElementById('auth-msg-err').className='auth-msg auth-error'; }
+function clearAuthMsg()    { document.getElementById('auth-msg-err').className='auth-msg auth-error'; document.getElementById('auth-msg-ok').className='auth-msg auth-success'; }
+
+async function authSubmit() {
+  const email = (document.getElementById('auth-email').value||'').trim().toLowerCase();
+  const pass  = (document.getElementById('auth-pass').value||'').trim();
+  if (!email || !pass) return showAuthErr('Entrez votre email et mot de passe.');
+  document.getElementById('auth-submit-btn').disabled = true;
+  try {
+    if (authTab === 'login') {
+      await firebase.auth().signInWithEmailAndPassword(email, pass);
+    } else {
+      const name = (document.getElementById('auth-name').value||'').trim();
+      if (!name) { document.getElementById('auth-submit-btn').disabled=false; return showAuthErr('Entrez votre prénom.'); }
+      if (pass.length < 6) { document.getElementById('auth-submit-btn').disabled=false; return showAuthErr('Mot de passe trop court (min. 6 caractères).'); }
+      // Check ACL before creating account
+      const isAdmin = email === ADMIN_EMAIL.toLowerCase();
+      if (!isAdmin) {
+        const snap = await db.ref(ACL_PATH + '/' + emailKey(email)).once('value');
+        if (!snap.exists()) { document.getElementById('auth-submit-btn').disabled=false; return showAuthErr("Votre email n'est pas autorisé. Contactez mfverdot@gmail.com."); }
+      }
+      const cred = await firebase.auth().createUserWithEmailAndPassword(email, pass);
+      await cred.user.updateProfile({ displayName: name });
+    }
+  } catch(e) {
+    document.getElementById('auth-submit-btn').disabled = false;
+    const msgs = { 'auth/user-not-found':"Compte inconnu. Cliquez sur 'Premier accès' pour créer votre compte.", 'auth/wrong-password':'Mot de passe incorrect.', 'auth/invalid-credential':'Email ou mot de passe incorrect.', 'auth/email-already-in-use':"Ce compte existe déjà. Utilisez 'Connexion'.", 'auth/invalid-email':'Email invalide.' };
+    showAuthErr(msgs[e.code] || ('Erreur : ' + e.message));
+  }
+}
+
+async function doReset() {
+  const email = (document.getElementById('auth-email').value||'').trim();
+  if (!email) return showAuthErr('Entrez votre email pour réinitialiser le mot de passe.');
+  try { await firebase.auth().sendPasswordResetEmail(email); showAuthOk('Email de réinitialisation envoyé à ' + email); }
+  catch(e) { showAuthErr('Erreur : ' + e.message); }
+}
+
+function emailKey(email) { return email.toLowerCase().replace(/\./g,'_dot_').replace(/@/g,'_at_'); }
+
+// ═══ FIREBASE CORE ════════════════════════════
+function initFirebaseCore() {
+  if (FIREBASE_CONFIG.apiKey === 'YOUR_API_KEY') return false;
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.database();
+    isFirebase = true;
+    return true;
+  } catch(e) { console.error('Firebase init error', e); return false; }
+}
+
+function initFirebaseData() {
+  setSyncBadge('saving','Connexion…');
+  db.ref(DB_PATH).on('value', snap => {
+    if (pendingSave) return; // Ne pas écraser les modifications locales en cours de sauvegarde
+    const data = snap.val();
+    if (data && data.boutiques) {
+      Object.keys(data.boutiques).forEach(b => {
+        if (state.boutiques[b]) {
+          state.boutiques[b].schedule     = data.boutiques[b].schedule     || {};
+          state.boutiques[b].bookings     = data.boutiques[b].bookings     || {};
+          state.boutiques[b].notes        = data.boutiques[b].notes        || {};
+          state.boutiques[b].exceptions   = data.boutiques[b].exceptions   || {};
+          state.boutiques[b].renforts     = data.boutiques[b].renforts     || {};
+          state.boutiques[b].statusNotes  = data.boutiques[b].statusNotes  || {};
+          state.boutiques[b].schedulePM   = data.boutiques[b].schedulePM   || {};
+          if (data.boutiques[b].employees && data.boutiques[b].employees.length)
+            state.boutiques[b].employees = data.boutiques[b].employees;
+        }
+      });
+      patchEmployees();
+      render();
+      if (firstDataLoad) { firstDataLoad = false; setTimeout(scrollToToday, 150); }
+    }
+    const ts = data && data.lastUpdated;
+    setSyncBadge('online', ts ? 'Sync ' + relTime(ts) : 'Connecté');
+  }, () => setSyncBadge('error','Erreur sync'));
+}
+
+// ═══ SAVE (FIABLE) ════════════════════════════
+function buildPayload() {
+  const payload = { lastUpdated: Date.now(), lastUpdatedBy: currentUser||'Anonyme', boutiques: {} };
+  Object.keys(state.boutiques).forEach(b => {
+    payload.boutiques[b] = {
+      schedule:     state.boutiques[b].schedule     || {},
+      bookings:     state.boutiques[b].bookings     || {},
+      notes:        state.boutiques[b].notes        || {},
+      exceptions:   state.boutiques[b].exceptions   || {},
+      renforts:     state.boutiques[b].renforts     || {},
+      statusNotes:  state.boutiques[b].statusNotes  || {},
+      schedulePM:   state.boutiques[b].schedulePM   || {},
+      employees:    state.boutiques[b].employees    || []
+    };
+  });
+  return payload;
+}
+
+function doSaveNow() {
+  if (!db) return;
+  pendingSave = true;
+  setSyncBadge('saving','Sauvegarde…');
+  db.ref(DB_PATH).set(buildPayload())
+    .then(() => { pendingSave = false; setSyncBadge('online','✓ Sauvegardé'); })
+    .catch(err => {
+      pendingSave = false;
+      setSyncBadge('error','Erreur save');
+      // Retry once after 2s
+      setTimeout(() => { if (isFirebase && db) db.ref(DB_PATH).set(buildPayload()).catch(()=>{}); }, 2000);
+    });
+}
+
+function scheduleSave() {
+  if (!isFirebase) return;
+  pendingSave = true;
+  clearTimeout(saveTimer);
+  setSyncBadge('saving','…');
+  saveTimer = setTimeout(doSaveNow, 500);
+}
+
+function patchEmployees() {
+  // Bulle : Monique après Alice
+  const bulleEmps = state.boutiques.bulle.employees;
+  if (!bulleEmps.includes('Monique')) {
+    const idx = bulleEmps.indexOf('Alice');
+    idx >= 0 ? bulleEmps.splice(idx + 1, 0, 'Monique') : bulleEmps.push('Monique');
+    scheduleSave();
+  }
+  // Delorme : Monique après Julie
+  const delormeEmps = state.boutiques.delorme.employees;
+  if (!delormeEmps.includes('Monique')) {
+    const idx = delormeEmps.indexOf('Julie');
+    idx >= 0 ? delormeEmps.splice(idx + 1, 0, 'Monique') : delormeEmps.splice(1, 0, 'Monique');
+    scheduleSave();
+  }
+}
+
+// Sauvegarde immédiate quand l'onglet est masqué ou fermé
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && pendingSave) {
+    clearTimeout(saveTimer);
+    doSaveNow();
+  }
+});
+window.addEventListener('beforeunload', e => {
+  if (pendingSave) { clearTimeout(saveTimer); doSaveNow(); }
+});
+
+function setSyncBadge(t, l) {
+  const el = document.getElementById('sync-badge'); if (!el) return;
+  el.className = 'sync-badge sync-' + t;
+  document.getElementById('sync-label').textContent = l;
+}
+function relTime(ts) {
+  const d = Date.now() - ts;
+  if (d < 60000) return "à l'instant";
+  if (d < 3600000) return 'il y a ' + Math.floor(d/60000) + 'min';
+  return 'il y a ' + Math.floor(d/3600000) + 'h';
+}
+
+// ═══ PRESENCE (QUI EST CONNECTÉ) ══════════════
+const PRES_COLORS = ['#7c3aed','#0891b2','#dc2626','#16a34a','#d97706','#db2777','#0284c7','#059669','#b45309'];
+function userColor(uid) { let h=0; for(let i=0;i<uid.length;i++) h=(h*31+uid.charCodeAt(i))&0xffff; return PRES_COLORS[Math.abs(h)%PRES_COLORS.length]; }
+
+function initPresence(user) {
+  const pRef = db.ref(PRES_PATH + '/' + user.uid);
+  const name = currentUser || user.email.split('@')[0];
+  pRef.set({ name, email: user.email, color: userColor(user.uid), since: Date.now() });
+  pRef.onDisconnect().remove();
+  db.ref(PRES_PATH).on('value', snap => {
+    const all = snap.val() || {};
+    const bar = document.getElementById('presence-bar');
+    if (!bar) return;
+    bar.innerHTML = Object.entries(all).map(([uid, u]) => {
+      const isMe = authUser && uid === authUser.uid;
+      const initials = (u.name||'?').substring(0,2).toUpperCase();
+      return '<div class="presence-chip" title="' + esc(u.name||u.email) + (isMe?' (vous)':'') + '">'
+        + '<div class="presence-avatar" style="background:' + (u.color||'#7c3aed') + '">' + initials + '</div>'
+        + esc((u.name||u.email).split(' ')[0]) + (isMe ? ' ✎' : '') + '</div>';
+    }).join('');
+  });
+}
+
+// ═══ ADMIN ════════════════════════════════════
+function openAdminPanel() {
+  modalCtx = { type: 'admin' };
+  document.getElementById('modal-title').textContent = '⚙ Gestion des accès';
+  document.getElementById('modal-body').innerHTML =
+    '<div id="admin-list" style="margin-bottom:14px"></div>'
+    + '<div style="border-top:1px solid #f1f5f9;padding-top:12px">'
+    + '<p style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Inviter un utilisateur</p>'
+    + '<div class="form-group"><label class="form-label">Email</label><input id="adm-email" class="form-input" type="email" placeholder="prenom@email.com"></div>'
+    + '<div class="form-group"><label class="form-label">Prénom Nom</label><input id="adm-name" class="form-input" type="text" placeholder="Julie Martin"></div>'
+    + '<p style="font-size:10px;color:#94a3b8;margin-top:4px">💡 L\'utilisateur créera son propre mot de passe lors du premier accès.</p>'
+    + '</div>';
+  document.getElementById('modal-actions').innerHTML =
+    '<button class="btn-ms" onclick="closeModal()">Fermer</button>'
+    + '<button class="btn-mp" onclick="adminAddUser()">Autoriser cet email</button>';
+  openModal();
+  loadAdminList();
+}
+
+async function loadAdminList() {
+  const el = document.getElementById('admin-list'); if (!el) return;
+  el.innerHTML = '<div style="font-size:11px;color:#94a3b8;padding:4px 0">Chargement…</div>';
+  const snap = await db.ref(ACL_PATH).once('value');
+  const users = snap.val() || {};
+  let html = '<p style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Utilisateurs autorisés</p>';
+  html += '<div class="admin-user-row"><span>👑 ' + esc(ADMIN_EMAIL) + '</span><span style="font-size:10px;background:#faf5ff;color:#7c3aed;border:1px solid #c4b5fd;padding:2px 7px;border-radius:4px;font-weight:700">ADMIN</span></div>';
+  Object.entries(users).forEach(([k,u]) => {
+    html += '<div class="admin-user-row"><div><strong>' + esc(u.name||'') + '</strong> <span style="color:#94a3b8;font-size:11px">' + esc(u.email) + '</span></div>'
+      + '<button onclick="adminRemoveUser(\'' + k + '\')" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:5px;padding:2px 8px;cursor:pointer;font-size:10px;font-weight:600;flex-shrink:0">Retirer</button></div>';
+  });
+  if (!Object.keys(users).length) html += '<div style="font-size:11px;color:#94a3b8;padding:4px 0">Aucun autre utilisateur autorisé.</div>';
+  el.innerHTML = html;
+}
+
+async function adminAddUser() {
+  const email = (document.getElementById('adm-email').value||'').trim().toLowerCase();
+  const name  = (document.getElementById('adm-name').value||'').trim();
+  if (!email || !name) return toast('⚠ Remplissez email et prénom/nom','#dc2626');
+  await db.ref(ACL_PATH + '/' + emailKey(email)).set({ email, name, addedAt: Date.now(), addedBy: ADMIN_EMAIL });
+  toast('✅ ' + name + ' peut maintenant créer son compte','#16a34a');
+  document.getElementById('adm-email').value = '';
+  document.getElementById('adm-name').value  = '';
+  loadAdminList();
+}
+
+async function adminRemoveUser(key) {
+  if (!confirm('Retirer cet accès ?')) return;
+  await db.ref(ACL_PATH + '/' + key).remove();
+  toast('✅ Accès retiré','#16a34a');
+  loadAdminList();
+}
+
+// ═══ USER ═════════════════════════════════════
+function updateUserChip(user) {
+  const name = user.displayName || user.email.split('@')[0];
+  currentUser = name;
+  localStorage.setItem('piffaut-user', name);
+  const av = document.getElementById('user-avatar');
+  const nl = document.getElementById('user-name-label');
+  if (av) av.textContent = name.substring(0,2).toUpperCase();
+  if (nl) nl.textContent = name;
+  const isAdmin = user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const btn = document.getElementById('btn-admin');
+  if (btn) btn.style.display = isAdmin ? '' : 'none';
+  const btnCsv = document.getElementById('btn-csv-import');
+  if (btnCsv) btnCsv.style.display = isAdmin ? '' : 'none';
+}
+
+function logoutUser() {
+  if (authUser) db.ref(PRES_PATH + '/' + authUser.uid).remove().catch(()=>{});
+  firebase.auth().signOut();
+  document.getElementById('auth-overlay').style.display = 'flex';
+}
+
+function openRenameUserModal() {
+  if (!authUser) return;
+  document.getElementById('modal-title').textContent = '✎ Mon prénom affiché';
+  document.getElementById('modal-body').innerHTML =
+    '<div class="form-group"><label class="form-label">Prénom affiché à l\'équipe</label>'
+    + '<input id="f-myname" class="form-input" type="text" value="' + esc(currentUser) + '" placeholder="Ton prénom" autofocus></div>';
+  document.getElementById('modal-actions').innerHTML =
+    '<button class="btn-ms" onclick="closeModal()">Annuler</button>'
+    + '<button class="btn-mp" onclick="saveMyName()">Enregistrer</button>';
+  openModal();
+  setTimeout(() => { const el=document.getElementById('f-myname'); if(el){el.focus();el.select();} }, 80);
+}
+
+async function saveMyName() {
+  const name = (document.getElementById('f-myname').value||'').trim();
+  if (!name) return;
+  try {
+    await authUser.updateProfile({ displayName: name });
+    currentUser = name;
+    localStorage.setItem('piffaut-user', name);
+    document.getElementById('user-avatar').textContent = name.substring(0,2).toUpperCase();
+    document.getElementById('user-name-label').textContent = name;
+    if (db) db.ref(PRES_PATH + '/' + authUser.uid).update({ name });
+    closeModal();
+    toast('✅ Prénom mis à jour : ' + name, '#16a34a');
+  } catch(e) {
+    toast('❌ Erreur : ' + e.message, '#dc2626');
+  }
+}
+
+// ═══ CONSECUTIVE WORK DAYS ════════════════════
+const WORK_STATUSES = new Set(['va','ad','formation']);
+function consecutiveWorkDays(b, k, emp) {
+  const d0 = fromKey(k);
+  if (!WORK_STATUSES.has(getEffectiveStatus(b, k, emp, isDayFerme(b, k, d0)))) return 0;
+  let count = 1;
+  let d = addDays(d0, -1);
+  for (let i = 0; i < 13; i++) {
+    const dk = toKey(d);
+    if (!WORK_STATUSES.has(getEffectiveStatus(b, dk, emp, isDayFerme(b, dk, d)))) break;
+    count++;
+    d = addDays(d, -1);
+  }
+  return count;
+}
+
+// ═══ FÉRIÉS FRANÇAIS ══════════════════════════
+function easterDate(y) {
+  const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4;
+  const f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3);
+  const h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4;
+  const l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451);
+  const month=Math.floor((h+l-7*m+114)/31),day=((h+l-7*m+114)%31)+1;
+  return new Date(y,month-1,day);
+}
+function isFerie(d) {
+  const y=d.getFullYear(),mo=d.getMonth()+1,day=d.getDate();
+  const fixed={'1-1':"Jour de l'An",'5-1':'Fête du Travail','5-8':'Victoire 1945',
+    '7-14':'Fête Nationale','8-15':'Assomption','11-1':'Toussaint',
+    '11-11':'Armistice','12-25':'Noël'};
+  if(fixed[mo+'-'+day]) return fixed[mo+'-'+day];
+  const e=easterDate(y);
+  const mv=[[0,'Pâques'],[1,'Lundi de Pâques'],[39,'Ascension'],[49,'Pentecôte'],[50,'Lundi de Pentecôte']];
+  for(const [n,name] of mv){
+    const f=new Date(e); f.setDate(f.getDate()+n);
+    if(f.getMonth()===d.getMonth()&&f.getDate()===d.getDate()) return name;
+  }
+  return null;
+}
+
+// ═══ DATE UTILS ═══════════════════════════════
+function toKey(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function fromKey(k) { const [y,m,d]=k.split('-').map(Number); return new Date(y,m-1,d); }
+function addDays(d,n) { const c=new Date(d); c.setDate(c.getDate()+n); return c; }
+function isToday(d) { const t=new Date(); t.setHours(0,0,0,0); const c=new Date(d); c.setHours(0,0,0,0); return c.getTime()===t.getTime(); }
+
+// ═══ DATA HELPERS ═════════════════════════════
+function getStatus(b,k,e) { return state.boutiques[b].schedule?.[k]?.[e] || 'off'; }
+function setStatus(b,k,e,s) {
+  if(!state.boutiques[b].schedule[k]) state.boutiques[b].schedule[k]={};
+  state.boutiques[b].schedule[k][e]=s;
+  // Sync croisé : si l'employé existe dans l'autre boutique, on copie le statut
+  const other = b === 'bulle' ? 'delorme' : 'bulle';
+  if (state.boutiques[other].employees.includes(e)) {
+    if(!state.boutiques[other].schedule[k]) state.boutiques[other].schedule[k]={};
+    state.boutiques[other].schedule[k][e]=s;
+  }
+}
+function getNote(b,k) { return state.boutiques[b].notes?.[k] || ''; }
+function setNote(b,k,v) { if(!state.boutiques[b].notes) state.boutiques[b].notes={}; state.boutiques[b].notes[k]=v; }
+// ── Demi-journée AM/PM ────────────────────────
+function getStatusPM(b,k,e) { return state.boutiques[b].schedulePM?.[k]?.[e] ?? null; }
+function setStatusPM(b,k,e,s) {
+  if (!state.boutiques[b].schedulePM) state.boutiques[b].schedulePM = {};
+  if (!state.boutiques[b].schedulePM[k]) state.boutiques[b].schedulePM[k] = {};
+  state.boutiques[b].schedulePM[k][e] = s;
+  // Sync croisé
+  const other = b==='bulle'?'delorme':'bulle';
+  if (state.boutiques[other].employees.includes(e)) {
+    if (!state.boutiques[other].schedulePM) state.boutiques[other].schedulePM = {};
+    if (!state.boutiques[other].schedulePM[k]) state.boutiques[other].schedulePM[k] = {};
+    state.boutiques[other].schedulePM[k][e] = s;
+  }
+}
+function clearStatusPM(b,k,e) {
+  if (state.boutiques[b].schedulePM?.[k]) delete state.boutiques[b].schedulePM[k][e];
+  const other = b==='bulle'?'delorme':'bulle';
+  if (state.boutiques[other].employees.includes(e) && state.boutiques[other].schedulePM?.[k])
+    delete state.boutiques[other].schedulePM[k][e];
+}
+function getStatusNote(b,k,e) { return state.boutiques[b].statusNotes?.[k]?.[e] || ''; }
+function setStatusNote(b,k,e,v) {
+  if(!state.boutiques[b].statusNotes) state.boutiques[b].statusNotes={};
+  if(!state.boutiques[b].statusNotes[k]) state.boutiques[b].statusNotes[k]={};
+  if(v) state.boutiques[b].statusNotes[k][e]=v;
+  else delete state.boutiques[b].statusNotes[k][e];
+}
+function getManualBookings(b,k) { return state.boutiques[b].bookings?.[k] || []; }
+function getFHBookings(k) { return fhBookings[k] || []; }
+
+// Regroupe les réservations FH du même créneau (heure + activité) sur 1 ligne
+function getGroupedFHBookings(k) {
+  const raw = fhBookings[k] || [];
+  const groups = [];
+  const keyMap = {};
+  for (const bk of raw) {
+    const gKey = (bk.time||'') + '§§' + (bk.activity||'');
+    if (gKey in keyMap) {
+      const g = groups[keyMap[gKey]];
+      g.pax += (bk.pax || 0);
+      g.participants.push({ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, status: bk.status });
+    } else {
+      keyMap[gKey] = groups.length;
+      groups.push({
+        dateKey: bk.dateKey, time: bk.time, activity: bk.activity,
+        pax: bk.pax || 0, status: bk.status, source: 'fareharbor',
+        participants: [{ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, status: bk.status }]
+      });
+    }
+  }
+  return groups;
+}
+
+function getAllBookings(b,k) {
+  const fh = b==='delorme' ? getGroupedFHBookings(k) : [];
+  return [...fh, ...getManualBookings(b,k)];
+}
+function maxGroupPax(b,k) { return getAllBookings(b,k).reduce((m,bk)=>Math.max(m,bk.pax||0),0); }
+function absentCount(b,k) {
+  const sc = state.boutiques[b].schedule?.[k]||{};
+  return state.boutiques[b].employees.filter(e=>['repos','conges','formation','maladie'].includes(sc[e]||'off')).length;
+}
+function isAlert(b,k) { return absentCount(b,k)>=3 && maxGroupPax(b,k)>=10; }
+
+// ═══ CAVEAU FERME ═════════════════════════════
+// Normale : fermé Dim (0) + Lun (1)
+// Jan & Fév (mois 0-1) : fermé Sam (6) + Dim (0)
+function isCaveauFermeDefault(d) {
+  const dow = d.getDay();
+  const m   = d.getMonth();
+  return (m <= 1) ? (dow === 6 || dow === 0) : (dow === 0 || dow === 1);
+}
+function isDayFerme(b, k, d) {
+  if (b !== 'delorme') return false;
+  const exc = state.boutiques[b].exceptions?.[k];
+  if (exc === 'ouvert') return false;
+  if (exc === 'ferme')  return true;
+  return isCaveauFermeDefault(d);
+}
+function toggleException(b, k) {
+  if (b !== 'delorme') return;
+  const d   = fromKey(k);
+  const def = isCaveauFermeDefault(d);
+  if (!state.boutiques[b].exceptions) state.boutiques[b].exceptions = {};
+  const exc = state.boutiques[b].exceptions[k];
+  if (exc) {
+    delete state.boutiques[b].exceptions[k]; // retirer l'exception → retour au défaut
+  } else {
+    state.boutiques[b].exceptions[k] = def ? 'ouvert' : 'ferme'; // exception opposée au défaut
+  }
+  scheduleSave();
+  render();
+}
+// Retourne le statut effectif : Julie = AD automatique sur jours ouverts
+function getEffectiveStatus(b, k, emp, ferme) {
+  const raw = state.boutiques[b].schedule?.[k]?.[emp];
+  if (raw !== undefined) return raw;                   // valeur explicite → priorité
+  if (b === 'delorme' && !ferme && emp === 'Julie') return 'ad'; // auto AD
+  return 'off';
+}
+
+// ═══ FAREHARBOR ICS ════════════════════════════
+async function fetchWithTimeout(url, ms) {
+  return new Promise((res, rej) => {
+    const t = setTimeout(() => rej(new Error('timeout')), ms);
+    fetch(url).then(r => { clearTimeout(t); res(r); }).catch(e => { clearTimeout(t); rej(e); });
+  });
+}
+
+async function syncFareHarbor() {
+  const btn = document.getElementById('btn-ics');
+  const msg = document.getElementById('ics-status');
+  btn.disabled = true; btn.textContent = '⏳…';
+  msg.textContent = '';
+
+  const icsUrl = FAREHARBOR_ICS_DELORME;
+  const sources = [
+    () => fetchWithTimeout(icsUrl, 7000),
+    () => fetchWithTimeout('https://corsproxy.io/?' + icsUrl, 10000),
+    () => fetchWithTimeout('https://api.allorigins.win/raw?url=' + encodeURIComponent(icsUrl), 10000),
+    () => fetchWithTimeout('https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(icsUrl), 10000),
+    () => fetchWithTimeout('https://thingproxy.freeboard.io/fetch/' + icsUrl, 10000)
+  ];
+
+  let ok = false;
+  for (const src of sources) {
+    try {
+      const resp = await src();
+      if (!resp.ok) continue;
+      const txt = await resp.text();
+      if (!txt.includes('BEGIN:VEVENT')) continue;
+      const events = parseICS(txt);
+      fhBookings = {};
+      events.forEach(ev => { if(!fhBookings[ev.dateKey]) fhBookings[ev.dateKey]=[]; fhBookings[ev.dateKey].push(ev); });
+      const cnt = events.length;
+      msg.style.color='#16a34a';
+      msg.textContent = '✓ ' + cnt + ' réservation' + (cnt!==1?'s':'') + ' importée' + (cnt!==1?'s':'');
+      ok = true; break;
+    } catch(e) { /* try next */ }
+  }
+  if (!ok) { msg.style.color='#dc2626'; msg.textContent='⚠ FareHarbor inaccessible (CORS). Fonctionne depuis un serveur web.'; }
+  btn.disabled = false; btn.textContent = '🔄 Sync FareHarbor';
+  render();
+}
+
+// Language → { code, flag }
+const LANGS = [
+  { kw:['english','anglais','british'],       code:'ENG', flag:'🇬🇧' },
+  { kw:['american','usa'],                     code:'USA', flag:'🇺🇸' },
+  { kw:['français','french','france','fra'],   code:'FRA', flag:'🇫🇷' },
+  { kw:['deutsch','german','allemand'],        code:'DEU', flag:'🇩🇪' },
+  { kw:['español','spanish','espagnol'],       code:'ESP', flag:'🇪🇸' },
+  { kw:['italiano','italian','italien'],       code:'ITA', flag:'🇮🇹' },
+  { kw:['dutch','néerlandais','nederlands'],   code:'NLD', flag:'🇳🇱' },
+  { kw:['português','portuguese','portugais'], code:'PRT', flag:'🇵🇹' },
+  { kw:['chinese','chinois'],                  code:'CHN', flag:'🇨🇳' },
+  { kw:['japanese','japonais'],               code:'JPN', flag:'🇯🇵' },
+  { kw:['russian','russe'],                   code:'RUS', flag:'🇷🇺' },
+];
+
+function detectLang(text) {
+  const lower = text.toLowerCase();
+  for (const l of LANGS) {
+    if (l.kw.some(k => lower.includes(k))) return l;
+  }
+  return null;
+}
+
+function parseICS(raw) {
+  const events = [];
+  const text = raw.replace(/\r\n[ \t]/g,'').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  text.split('BEGIN:VEVENT').slice(1).forEach(block => {
+    const get = key => { const m=block.match(new RegExp('^'+key+'(?:;[^:]+)?:(.+)$','m')); return m?m[1].trim():''; };
+    const dtstart  = get('DTSTART');
+    const rawSum   = get('SUMMARY').replace(/\\n/g,' ').replace(/\\,/g,',').replace(/\\;/g,';');
+    const rawDesc  = get('DESCRIPTION').replace(/\\n/g,'\n').replace(/\\,/g,',');
+    const status   = get('STATUS');
+    if (status==='CANCELLED'||!dtstart) return;
+
+    // Date & time
+    let dateKey, time;
+    const dt = dtstart.replace('Z','');
+    if (dt.includes('T')) {
+      const [y,mo,d,h,mi]=[dt.slice(0,4),dt.slice(4,6),dt.slice(6,8),dt.slice(9,11),dt.slice(11,13)];
+      dateKey=y+'-'+mo+'-'+d;
+      const u=new Date(Date.UTC(+y,+mo-1,+d,+h,+mi));
+      time=String(u.getHours()).padStart(2,'0')+'h'+(u.getMinutes()?String(u.getMinutes()).padStart(2,'0'):'');
+    } else { dateKey=dt.slice(0,4)+'-'+dt.slice(4,6)+'-'+dt.slice(6,8); time=''; }
+
+    // Pax — search summary then desc
+    let pax = 1;
+    for (const p of [/^(\d+)\s*[×x×]/i, /\((\d+)\s*(?:pax|pers|person)/i, /(\d+)\s*(?:pax|personnes?|participants?)/i]) {
+      const m=(rawSum+' '+rawDesc).match(p); if(m){pax=parseInt(m[1]);break;}
+    }
+
+    // Clean activity name: strip all noise from FareHarbor SUMMARY
+    let activity = rawSum
+      .replace(/^\d+\s*[×x×]\s*/i,'')                        // "2 × Dégustation"
+      .replace(/\bBOOKING\s*#?\s*\d+\b/gi,'')                // "BOOKING #1234"
+      .replace(/\b#\d{4,}\b/g,'')                            // "#12345"
+      // Remove " (booking: N Personnes)" and variants
+      .replace(/\(\s*booking\s*:\s*\d+\s*\w+\s*\)/gi,'')
+      // Remove " (N Personnes)" / "(N pax)" / "(N persons)"
+      .replace(/\(\s*\d+\s*(?:personnes?|pax|persons?|pers\.?)\s*\)/gi,'')
+      // Remove " en Français", " en Anglais", " in English", " auf Deutsch" etc.
+      .replace(/\s+(?:en|in|auf|en|in)\s+(français|anglais|english|deutsch|spanish|español|italiano|italian|dutch|português|portuguese|russian)\b.*/gi,'')
+      // Remove language suffix after dash: "- English", "– Français"
+      .replace(/\s*[-–—]\s*(english|french|français|deutsch|español|italiano|dutch|portuguese|anglais|allemand|espagnol|italien)\b.*/i,'')
+      .replace(/\s*\((english|french|français|deutsch|español|italiano|dutch|portuguese|anglais|allemand|espagnol|italien)\)/gi,'')
+      .replace(/\s{2,}/g,' ')
+      .trim();
+    if (!activity) activity = 'Dégustation';
+
+    // Language — from summary + desc
+    const lang = detectLang(rawSum + ' ' + rawDesc);
+    const langFlag = lang ? lang.flag : '';
+    const langCode = lang ? lang.code : '';
+
+    // Client name — scan description lines
+    let clientName = '';
+    const descLines = rawDesc.split('\n').map(l=>l.trim()).filter(Boolean);
+    for (const line of descLines) {
+      const m = line.match(/^(?:client|customer|guest|name|nom|booked by|réservé par|contact|attendee)\s*[:\-]\s*(.+)/i);
+      if (m) { clientName = m[1].replace(/\s+/g,' ').trim().slice(0,35); break; }
+    }
+    // Fallback: look for "First Last" pattern after removing known prefixes
+    if (!clientName) {
+      const m = rawDesc.match(/([A-ZÁÀÂÉÈÊÎÏÔÙÛÜ][a-záàâéèêîïôùûü]+ [A-ZÁÀÂÉÈÊÎÏÔÙÛÜ]{2,})/);
+      if (m) clientName = m[1].slice(0,35);
+    }
+
+    events.push({ dateKey, time, pax, status:status==='TENTATIVE'?'option':'confirmed', activity, langFlag, langCode, clientName, source:'fareharbor' });
+  });
+  return events.sort((a,b)=>(a.dateKey+a.time).localeCompare(b.dateKey+b.time));
+}
+
+// ═══ RENDER ═══════════════════════════════════
+function render() {
+  const b    = state.currentBoutique;
+  const bout = state.boutiques[b];
+  const year = state.currentYear;
+  const emps = bout.employees;
+
+  document.getElementById('year-label').textContent = year;
+  document.getElementById('tab-bulle').className   = 'tab-btn'+(b==='bulle'?' tab-bulle':'');
+  document.getElementById('tab-delorme').className = 'tab-btn'+(b==='delorme'?' tab-delorme':'');
+
+  // colgroup
+  let html = '<colgroup><col class="col-jour"><col class="col-date"><col class="col-rdv"><col class="col-visite"><col class="col-pax">';
+  emps.forEach(() => html += '<col class="col-emp">');
+  html += '<col class="col-renfort"><col class="col-renfort">';
+  html += '</colgroup>';
+
+  // thead
+  const rh = (col) => '<div class="resize-handle" onmousedown="startResize(event,\'' + col + '\')"></div>';
+  html += '<thead><tr>';
+  html += '<th class="th-left" colspan="2" data-col="date"><div class="th-inner">Date' + rh('date') + '</div></th>';
+  html += '<th class="th-left" data-col="rdv"><div class="th-inner">RDV / Notes' + rh('rdv') + '</div></th>';
+  html += '<th class="th-left" data-col="visite"><div class="th-inner">Visites · Dégustations' + rh('visite') + '</div></th>';
+  html += '<th data-col="pax"><div class="th-inner">Pax' + rh('pax') + '</div></th>';
+  emps.forEach((e, idx) => {
+    const label = e.length > 10 ? e.split(' ')[0] : e;
+    html += '<th class="th-emp" data-col="emp-' + idx + '" onclick="openRenameEmpModal(\'' + b + '\',' + idx + ')" title="Renommer : ' + esc(e) + '"><div class="th-inner">' + esc(label) + rh('emp-' + idx) + '</div></th>';
+  });
+  html += '<th class="th-renfort" data-col="renfort-0"><div class="th-inner">Renfort 1' + rh('renfort-0') + '</div></th>';
+  html += '<th class="th-renfort" data-col="renfort-1"><div class="th-inner">Renfort 2' + rh('renfort-1') + '</div></th>';
+  html += '</tr></thead><tbody>';
+
+  const alertDaysList = [];
+  let   lastMonth = -1;
+  let   d = new Date(year, 0, 1);
+  const end = new Date(year, 11, 31);
+
+  while (d <= end) {
+    const m = d.getMonth();
+    if (m !== lastMonth) {
+      lastMonth = m;
+      html += '<tr class="month-sep"><td colspan="' + (emps.length+7) + '">' + MONTHS_FR[m] + ' ' + year + '</td></tr>';
+    }
+
+    const k        = toKey(d);
+    const dow      = d.getDay();
+    const today    = isToday(d);
+    const alert    = isAlert(b, k);
+    const bookings = getAllBookings(b, k);
+    const note     = getNote(b, k);
+    const rows     = Math.max(bookings.length, 1);
+    const ferme    = isDayFerme(b, k, d);
+    const exc      = b === 'delorme' ? (state.boutiques[b].exceptions?.[k] || null) : null;
+    const ferie    = isFerie(d);
+
+    if (alert) alertDaysList.push({ d: new Date(d), k });
+
+    const rowCls = ['day-row','day-first',
+      ferie  ? 'row-ferie'    : '',
+      ferme  ? 'row-ferme'    : '',
+      today  ? 'row-today'    : '',
+      dow===0 ? 'row-sunday'  : '',
+      dow===6 ? 'row-saturday': '',
+      alert  ? 'row-alert'   : ''
+    ].filter(Boolean).join(' ');
+
+    const subCls = ['day-row',
+      ferie  ? 'row-ferie'    : '',
+      ferme  ? 'row-ferme'    : '',
+      today  ? 'row-today'    : '',
+      dow===0 ? 'row-sunday'  : '',
+      dow===6 ? 'row-saturday': '',
+      alert  ? 'row-alert'   : ''
+    ].filter(Boolean).join(' ');
+
+    // ── FIRST ROW ──
+    html += '<tr class="' + rowCls + '" id="day-' + k + '">';
+
+    // Jour (rowspan) + bouton exception pour Delorme
+    let jourContent = DAYS_FR[dow];
+    if (b === 'delorme') {
+      const excTitle = exc
+        ? 'Annuler l\'exception (retour au défaut)'
+        : (ferme ? 'Marquer comme ouvert (exception)' : 'Marquer comme fermé (exception)');
+      const excIcon = exc
+        ? (exc === 'ouvert' ? '<span class="exc-badge exc-ouvert">EXC</span>' : '<span class="exc-badge exc-ferme">EXC</span>')
+        : '';
+      jourContent += '<span class="exc-toggle" onclick="event.stopPropagation();toggleException(\'' + b + '\',\'' + k + '\')" title="' + excTitle + '">⚙</span>' + excIcon;
+    }
+    html += '<td class="jour-cell" rowspan="' + rows + '">' + jourContent + '</td>';
+
+    // Date (rowspan)
+    html += '<td class="date-cell" rowspan="' + rows + '"><span class="date-num">' + d.getDate() + '</span><span class="date-month">' + MONTHS_FR[m].substring(0,3) + '</span>' + (ferie ? '<span class="ferie-label">' + esc(ferie) + '</span>' : '') + '</td>';
+
+    // RDV/Notes (rowspan)
+    html += '<td class="rdv-cell' + (note?' has-note':'') + '" data-col="rdv" rowspan="' + rows + '" onclick="openNoteModal(\'' + b + '\',\'' + k + '\')">';
+    html += note ? '<span class="rdv-text">' + esc(note) + '</span>' : '<span class="rdv-add">+ note</span>';
+    html += '</td>';
+
+    // First visite (or empty + add btn)
+    if (bookings.length === 0) {
+      html += '<td class="visite-cell" data-col="visite"><span class="visite-empty">—</span><br><span class="add-visite-btn" onclick="openBookingModal(\'' + b + '\',\'' + k + '\',null)">+ ajouter</span></td>';
+      html += '<td class="pax-cell" data-col="pax"></td>';
+    } else {
+      html += renderVisiteCell(bookings[0], b, k, 0, bookings.length === 1);
+      html += '<td class="pax-cell' + ((bookings[0].pax||0)>=10?' pax-big':'') + '" data-col="pax">' + (bookings[0].pax||'') + '</td>';
+    }
+
+    // Employee cells (rowspan)
+    emps.forEach((emp, empIdx) => {
+      const s      = getEffectiveStatus(b, k, emp, ferme);
+      const consec = consecutiveWorkDays(b, k, emp);
+      const warnCls = consec >= 7 ? ' cell-warn-7' : (consec >= 6 ? ' cell-warn-6' : '');
+      const warnTip = consec >= 7 ? ' ⚠ 7 jours consécutifs !' : (consec >= 6 ? ' ⚠ 6 jours : repos obligatoire demain' : '');
+      const clickEvt = ferme ? '' : 'onclick="openStatusModal(\'' + b + '\',\'' + k + '\',\'' + emp.replace(/'/g,"\\'") + '\')"';
+      const sn = getStatusNote(b, k, emp);
+      const noteHtml = sn ? '<span class="status-note">' + esc(sn) + '</span>' : '';
+      const consecHtml = consec>=6 ? '<span style="font-size:7px;opacity:.8">'+consec+'j</span>' : '';
+      const sPM = getStatusPM(b, k, emp);
+      if (sPM !== null && !ferme) {
+        // Cellule demi-journée : AM en haut, PM en bas
+        html += '<td class="emp-cell" data-col="emp-' + empIdx + '" rowspan="' + rows + '">' +
+          '<div class="status-cell' + warnCls + '" style="padding:0;gap:0;overflow:hidden;border-color:#94a3b8" ' + clickEvt + ' title="Matin: ' + STATUS_LABELS[s] + ' · Après-midi: ' + STATUS_LABELS[sPM] + warnTip + '">' +
+          '<div class="status-half ' + STATUS_CLASSES[s]  + '" style="border-bottom:1px solid rgba(0,0,0,.08)">' + STATUS_ABBR[s]  + '<span class="half-tag">M</span></div>' +
+          '<div class="status-half ' + STATUS_CLASSES[sPM] + '">' + STATUS_ABBR[sPM] + '<span class="half-tag">A</span>' + noteHtml + '</div>' +
+          '</div></td>';
+      } else {
+        html += '<td class="emp-cell" data-col="emp-' + empIdx + '" rowspan="' + rows + '"><div class="status-cell ' + STATUS_CLASSES[s] + (alert?' cell-alert':'') + warnCls + '" ' + clickEvt + ' title="' + STATUS_LABELS[s] + warnTip + '">' + STATUS_ABBR[s] + consecHtml + noteHtml + '</div></td>';
+      }
+    });
+
+    // Renfort cells (rowspan)
+    const rf = bout.renforts?.[k] || ['',''];
+    for (let ri = 0; ri < 2; ri++) {
+      const rfName = rf[ri] || '';
+      const rfClick = ferme ? '' : 'onclick="openRenfortModal(\'' + b + '\',\'' + k + '\',' + ri + ')"';
+      html += '<td class="renfort-cell" data-col="renfort-' + ri + '" rowspan="' + rows + '">';
+      if (rfName) {
+        html += '<span class="renfort-chip" ' + rfClick + '>👤 ' + esc(rfName) + '</span>';
+      } else {
+        html += '<span class="renfort-empty" ' + rfClick + '>+</span>';
+      }
+      html += '</td>';
+    }
+    html += '</tr>';
+
+    // ── ADDITIONAL ROWS (one per extra booking) ──
+    for (let i = 1; i < bookings.length; i++) {
+      const isLast = (i === bookings.length - 1);
+      html += '<tr class="' + subCls + '">';
+      html += renderVisiteCell(bookings[i], b, k, i, isLast);
+      html += '<td class="pax-cell' + ((bookings[i].pax||0)>=10?' pax-big':'') + '" data-col="pax">' + (bookings[i].pax||'') + '</td>';
+      html += '</tr>';
+    }
+
+    d = addDays(d, 1);
+  }
+
+  html += '</tbody>';
+  document.getElementById('planning-table').innerHTML = html;
+  applyColStyles();
+
+  // Alerts banner
+  document.getElementById('alerts-container').innerHTML = alertDaysList.map(a =>
+    '<div style="background:#fef2f2;border-left:3px solid #ef4444;padding:5px 14px;font-size:11px;color:#dc2626;font-weight:600">⚠ <strong>' +
+    DAYS_FR[a.d.getDay()] + ' ' + a.d.getDate() + ' ' + MONTHS_FR[a.d.getMonth()] +
+    '</strong> — 3+ absences + groupe 10+ pax</div>'
+  ).join('');
+}
+
+function renderVisiteCell(bk, b, k, idx, isLast) {
+  const isFH     = bk.source === 'fareharbor';
+  const fhCount  = b==='delorme' ? getGroupedFHBookings(k).length : 0;
+  const manualIdx = isFH ? idx : idx - fhCount;
+  const onclick  = isFH
+    ? 'openFHDetail(\'' + k + '\',' + idx + ')'
+    : 'openBookingModal(\'' + b + '\',\'' + k + '\',' + manualIdx + ')';
+
+  // Build the single line: "11h : Activité - 2pax FRA 🇫🇷 Manon ZITTE"
+  const timePart   = bk.time || '—';
+  let   label;
+
+  if (isFH) {
+    const activity = esc(bk.activity || 'Dégustation');
+    const participants = bk.participants || [{ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName }];
+    const partStr = participants.map(p => {
+      const parts = [];
+      if (p.pax)         parts.push(p.pax + 'pax');
+      if (p.langCode)    parts.push(p.langCode);
+      if (p.langFlag)    parts.push(p.langFlag);
+      if (p.clientName)  parts.push(esc(p.clientName));
+      return parts.join(' ');
+    }).join(' <span style="color:#64748b;font-weight:900"> + </span>');
+    label = '<strong>' + timePart + '</strong> : ' + activity + ' — ' + partStr + ' <span style="color:#9a3412;font-size:10px;font-weight:700">(FH)</span>';
+  } else {
+    const desc    = esc(bk.description || '');
+    const paxPart = bk.pax ? bk.pax + 'pax' : '';
+    const comm    = bk.comment ? esc(bk.comment.slice(0,40)) : '';
+    const priceTag = bk.price ? ' <span style="color:#475569;font-size:10px">(' + esc(bk.price) + ')</span>' : '';
+    const VIA_CSS = {'FH':'background:#fff7ed;color:#c2410c;border:1px solid #fed7aa','GYG':'background:#f0fdf4;color:#166534;border:1px solid #86efac','Viator':'background:#eff6ff;color:#1e40af;border:1px solid #93c5fd','RDV':'background:#faf5ff;color:#6d28d9;border:1px solid #c4b5fd'};
+    const via = bk.via || '';
+    const viaTag = via && VIA_CSS[via] ? ' <span style="font-size:9px;font-weight:800;padding:1px 5px;border-radius:3px;' + VIA_CSS[via] + '">' + via + '</span>' : '';
+    label = '<strong>' + timePart + '</strong>'
+      + (desc ? ' : ' + desc : '')
+      + (paxPart ? ' <span style="color:#94a3b8">— ' + paxPart + '</span>' : '')
+      + viaTag + priceTag
+      + (comm ? ' <span style="color:#94a3b8;font-size:10px"> · ' + comm + '</span>' : '');
+    if (bk.status==='option') label += ' <span class="visite-badge badge-option">option</span>';
+  }
+
+  const addBtn = isLast
+    ? '<div><span class="add-visite-btn" onclick="event.stopPropagation();openBookingModal(\'' + b + '\',\'' + k + '\',null)">+ ajouter</span></div>'
+    : '';
+
+  return '<td class="visite-cell" data-col="visite" onclick="' + onclick + '" style="cursor:pointer;line-height:1.6">'
+    + '<div class="visite-line">' + label + '</div>'
+    + addBtn + '</td>';
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+// ═══ COLUMN MANAGER ═══════════════════════════
+let hiddenCols = new Set(JSON.parse(localStorage.getItem('piffaut-hidden-cols') || '[]'));
+let colWidths  = JSON.parse(localStorage.getItem('piffaut-col-widths') || '{}');
+
+const COL_LABELS = {
+  rdv: 'RDV / Notes', visite: 'Visites', pax: 'Pax'
+};
+
+function getColLabels() {
+  const b    = state.currentBoutique;
+  const emps = state.boutiques[b].employees;
+  const labels = { ...COL_LABELS };
+  emps.forEach((e, i) => { labels['emp-' + i] = e.split(' ')[0]; });
+  labels['renfort-0'] = 'Renfort 1';
+  labels['renfort-1'] = 'Renfort 2';
+  return labels;
+}
+
+function applyColStyles() {
+  let css = '';
+  // Hidden columns
+  hiddenCols.forEach(col => {
+    css += `[data-col="${col}"] { display: none !important; }\n`;
+  });
+  // Column widths
+  Object.entries(colWidths).forEach(([col, w]) => {
+    css += `[data-col="${col}"] { width: ${w}px !important; min-width: ${w}px !important; max-width: ${w}px !important; }\n`;
+    css += `thead th[data-col="${col}"] { width: ${w}px !important; min-width: ${w}px !important; }\n`;
+  });
+  document.getElementById('col-styles').textContent = css;
+}
+
+function buildColPanel() {
+  const labels = getColLabels();
+  const b = state.currentBoutique;
+  const emps = state.boutiques[b].employees;
+  const allCols = ['rdv', 'visite', 'pax', ...emps.map((_,i) => 'emp-'+i), 'renfort-0', 'renfort-1'];
+  let html = '<div class="col-panel-title">Afficher / Masquer</div>';
+  allCols.forEach(col => {
+    const checked = !hiddenCols.has(col) ? 'checked' : '';
+    const lbl = esc(labels[col] || col);
+    html += `<label class="col-item"><input type="checkbox" ${checked} onchange="toggleCol('${col}',this.checked)"> <span>${lbl}</span></label>`;
+  });
+  document.getElementById('col-panel').innerHTML = html;
+}
+
+function toggleColPanel(e) {
+  if (e) e.stopPropagation();
+  const panel = document.getElementById('col-panel');
+  const isOpen = panel.style.display !== 'none';
+  if (isOpen) { panel.style.display = 'none'; return; }
+  buildColPanel();
+  panel.style.display = 'block';
+}
+
+function toggleCol(col, visible) {
+  if (visible) hiddenCols.delete(col);
+  else hiddenCols.add(col);
+  localStorage.setItem('piffaut-hidden-cols', JSON.stringify([...hiddenCols]));
+  applyColStyles();
+}
+
+document.addEventListener('click', e => {
+  const panel = document.getElementById('col-panel');
+  if (panel && !panel.contains(e.target) && !e.target.closest('.col-panel-wrap')) {
+    panel.style.display = 'none';
+  }
+});
+
+// ─── Column Resize ────────────────────────────
+let _resizeState = null;
+
+function startResize(e, col) {
+  e.stopPropagation();
+  e.preventDefault();
+  const th = e.target.closest('th');
+  if (!th) return;
+  const startX = e.clientX;
+  const startW = th.getBoundingClientRect().width;
+  _resizeState = { col, startX, startW };
+  e.target.classList.add('resizing');
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+}
+
+document.addEventListener('mousemove', e => {
+  if (!_resizeState) return;
+  const delta = e.clientX - _resizeState.startX;
+  const newW  = Math.max(30, _resizeState.startW + delta);
+  colWidths[_resizeState.col] = Math.round(newW);
+  applyColStyles();
+});
+
+document.addEventListener('mouseup', e => {
+  if (!_resizeState) return;
+  localStorage.setItem('piffaut-col-widths', JSON.stringify(colWidths));
+  document.querySelectorAll('.resize-handle.resizing').forEach(el => el.classList.remove('resizing'));
+  document.body.style.cursor = '';
+  document.body.style.userSelect = '';
+  _resizeState = null;
+});
+
+// ═══ NAVIGATION ════════════════════════════════
+function switchBoutique(b) { state.currentBoutique=b; render(); setTimeout(scrollToToday,100); }
+function prevYear() { state.currentYear--; render(); }
+function nextYear() { state.currentYear++; render(); }
+function scrollToToday() {
+  const el = document.getElementById('day-' + toKey(new Date()));
+  if (!el) return;
+  const wrap = document.querySelector('.table-wrap');
+  if (!wrap) { el.scrollIntoView({behavior:'smooth', block:'start'}); return; }
+  const elTop  = el.getBoundingClientRect().top;
+  const wrapTop = wrap.getBoundingClientRect().top;
+  wrap.scrollBy({ top: elTop - wrapTop - 8, behavior: 'smooth' });
+}
+
+// ═══ RENAME EMPLOYEE MODAL ════════════════════
+function openRenameEmpModal(b, empIdx) {
+  const emp = state.boutiques[b].employees[empIdx];
+  modalCtx = { type:'renameEmp', b, empIdx };
+  document.getElementById('modal-title').textContent = 'Renommer le poste';
+  document.getElementById('modal-body').innerHTML =
+    '<div class="form-group"><label class="form-label">Nom actuel</label>'
+    + '<div style="padding:5px 0;font-weight:600;color:#64748b">' + esc(emp) + '</div></div>'
+    + '<div class="form-group"><label class="form-label">Nouveau nom</label>'
+    + '<input id="f-empname" class="form-input" type="text" value="' + esc(emp) + '" placeholder="Prénom Nom" autofocus></div>'
+    + '<p style="font-size:10px;color:#94a3b8;margin-top:4px">💡 Le renommage met à jour toutes les cellules. Les statuts enregistrés sont conservés.</p>';
+  document.getElementById('modal-actions').innerHTML =
+    '<button class="btn-ms" onclick="closeModal()">Annuler</button>'
+    + '<button class="btn-mp" onclick="saveRenameEmp()">Renommer</button>';
+  openModal();
+  setTimeout(() => { const el=document.getElementById('f-empname'); if(el){el.focus();el.select();} }, 80);
+}
+function saveRenameEmp() {
+  if (!modalCtx || modalCtx.type !== 'renameEmp') return;
+  const { b, empIdx } = modalCtx;
+  const newName = document.getElementById('f-empname').value.trim();
+  if (!newName) return;
+  const oldName = state.boutiques[b].employees[empIdx];
+  if (newName === oldName) return closeModal();
+  // Migrate schedule entries from old name to new name
+  const sc = state.boutiques[b].schedule;
+  Object.keys(sc).forEach(k => {
+    if (sc[k][oldName] !== undefined) {
+      sc[k][newName] = sc[k][oldName];
+      delete sc[k][oldName];
+    }
+  });
+  state.boutiques[b].employees[empIdx] = newName;
+  scheduleSave();
+  closeModal();
+  render();
+}
+
+// ═══ RENFORT MODAL ════════════════════════════
+function getRenfort(b, k) { return state.boutiques[b].renforts?.[k] || ['','']; }
+function openRenfortModal(b, k, slot) {
+  modalCtx = { type:'renfort', b, k, slot };
+  const date = fromKey(k);
+  const rf   = getRenfort(b, k);
+  // Suggest the other boutique's employees as quick options
+  const otherB = b === 'delorme' ? 'bulle' : 'delorme';
+  const suggestions = state.boutiques[otherB].employees.filter(e => !e.toLowerCase().includes('poste'));
+  document.getElementById('modal-title').textContent = 'Renfort · ' + DAYS_FR[date.getDay()] + ' ' + date.getDate() + ' ' + MONTHS_FR[date.getMonth()];
+  document.getElementById('modal-body').innerHTML =
+    '<div class="form-group"><label class="form-label">Membre en renfort (slot ' + (slot+1) + ')</label>'
+    + '<input id="f-renfort" class="form-input" type="text" value="' + esc(rf[slot]||'') + '" placeholder="Prénom…" autofocus></div>'
+    + (suggestions.length ? '<div class="form-group"><label class="form-label">Suggestions</label><div style="display:flex;gap:5px;flex-wrap:wrap">'
+      + suggestions.map(s => '<span style="background:#fef9c3;border:1px solid #fcd34d;padding:3px 9px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:600;color:#78350f" onclick="document.getElementById(\'f-renfort\').value=\'' + esc(s) + '\'">' + esc(s) + '</span>').join('')
+      + '</div></div>' : '');
+  document.getElementById('modal-actions').innerHTML =
+    '<button class="btn-md" onclick="clearRenfort()">Effacer</button>'
+    + '<button class="btn-ms" onclick="closeModal()">Annuler</button>'
+    + '<button class="btn-mp" onclick="saveRenfort()">Enregistrer</button>';
+  openModal();
+  setTimeout(() => { const el=document.getElementById('f-renfort'); if(el){el.focus();el.select();} }, 80);
+}
+function saveRenfort() {
+  if (!modalCtx || modalCtx.type !== 'renfort') return;
+  const { b, k, slot } = modalCtx;
+  const val = document.getElementById('f-renfort').value.trim();
+  if (!state.boutiques[b].renforts) state.boutiques[b].renforts = {};
+  const rf = getRenfort(b, k).slice();
+  rf[slot] = val;
+  state.boutiques[b].renforts[k] = rf;
+  scheduleSave(); closeModal(); render();
+}
+function clearRenfort() {
+  if (!modalCtx || modalCtx.type !== 'renfort') return;
+  const { b, k, slot } = modalCtx;
+  if (!state.boutiques[b].renforts) state.boutiques[b].renforts = {};
+  const rf = getRenfort(b, k).slice();
+  rf[slot] = '';
+  state.boutiques[b].renforts[k] = rf;
+  scheduleSave(); closeModal(); render();
+}
+
+// ═══ NOTE MODAL ═══════════════════════════════
+function openNoteModal(b, k) {
+  modalCtx = { type:'note', b, k };
+  const date = fromKey(k);
+  document.getElementById('modal-title').textContent = 'Note · ' + DAYS_FR[date.getDay()] + ' ' + date.getDate() + ' ' + MONTHS_FR[date.getMonth()];
+  document.getElementById('modal-body').innerHTML = '<div class="form-group"><label class="form-label">RDV / Tâches / Infos du jour</label><textarea id="f-note" class="form-textarea" style="min-height:110px" placeholder="Livraison, commande, infos importantes…">' + getNote(b,k) + '</textarea></div>';
+  document.getElementById('modal-actions').innerHTML = '<button class="btn-md" onclick="clearNote()">Effacer</button><button class="btn-ms" onclick="closeModal()">Annuler</button><button class="btn-mp" onclick="saveNote()">Enregistrer</button>';
+  openModal();
+}
+function saveNote()  { const {b,k}=modalCtx; setNote(b,k,document.getElementById('f-note').value.trim()); scheduleSave(); closeModal(); render(); }
+function clearNote() { const {b,k}=modalCtx; setNote(b,k,''); scheduleSave(); closeModal(); render(); }
+
+// ═══ PRIORITÉ ABSENCE ═════════════════════════
+// Retourne le 1er collègue qui a priorité (CP ou REPOS+NPB) ce jour.
+// Exception : ÉCOLE (formation) ne compte pas et n'est pas bloqué.
+function getAbsencePriority(b, k, currentEmp) {
+  const emps = state.boutiques[b].employees;
+  for (const e of emps) {
+    if (e === currentEmp) continue;
+    const s = getStatus(b, k, e);
+    const n = getStatusNote(b, k, e);
+    const hasPriority = (s === 'conges') ||
+                        (s === 'repos' && n && n.toUpperCase().includes('NPB'));
+    if (hasPriority) return { emp: e, status: s, note: n };
+  }
+  return null;
+}
+
+function updatePriorityWarning() {
+  const warn = document.getElementById('priority-warning');
+  if (!warn || !modalCtx) return;
+  const { b, k, emp } = modalCtx;
+  const s = pendingStatus || getStatus(b, k, emp);
+  // Seulement pour CP et REPOS journée entière ou matin ; ÉCOLE exemptée
+  if (s !== 'conges' && s !== 'repos') { warn.style.display = 'none'; return; }
+  if (pendingPeriod === 'pm') { warn.style.display = 'none'; return; } // PM-only pas prioritaire
+  const conflict = getAbsencePriority(b, k, emp);
+  if (conflict) {
+    const label = conflict.status === 'conges'
+      ? 'Congés (CP)'
+      : 'REPOS' + (conflict.note ? ' ' + conflict.note.toUpperCase() : '');
+    warn.innerHTML = '⚠ <strong>' + esc(conflict.emp) + '</strong> a la priorité ce jour&nbsp;(' + label + ')';
+    warn.style.display = 'flex';
+  } else {
+    warn.style.display = 'none';
+  }
+}
+
+// ═══ STATUS MODAL ══════════════════════════════
+function openStatusModal(b, k, emp) {
+  modalCtx = { type:'status', b, k, emp };
+  pendingStatus = null;
+  const date    = fromKey(k);
+  const curAM   = getStatus(b, k, emp);
+  const curPM   = getStatusPM(b, k, emp);
+  const curNote = getStatusNote(b, k, emp);
+  const defWork = b === 'bulle' ? 'va' : 'ad';
+
+  // Déduire la période initiale
+  let initPeriod, initStatus;
+  if (curPM === null) {
+    initPeriod = 'full'; initStatus = curAM;
+  } else if (curPM === defWork) {
+    initPeriod = 'am';   initStatus = curAM;   // statut spécial le matin
+  } else if (curAM === defWork) {
+    initPeriod = 'pm';   initStatus = curPM;   // statut spécial l'après-midi
+  } else {
+    initPeriod = 'am';   initStatus = curAM;
+  }
+  pendingPeriod = initPeriod;
+  pendingStatus = initStatus;
+
+  document.getElementById('modal-title').textContent = emp + ' · ' + DAYS_FR[date.getDay()] + ' ' + date.getDate() + ' ' + MONTHS_FR[date.getMonth()];
+  document.getElementById('modal-body').innerHTML =
+    // Sélecteur de période
+    '<p style="font-size:11px;color:#64748b;margin-bottom:6px">Période :</p>' +
+    '<div style="display:flex;gap:6px;margin-bottom:12px">' +
+    '<div class="period-btn' + (initPeriod==='full'?' selected':'') + '" id="per-full" onclick="selectPeriod(\'full\')">☀ Journée</div>' +
+    '<div class="period-btn' + (initPeriod==='am'?' selected':'') + '" id="per-am"   onclick="selectPeriod(\'am\')">🌅 Matin</div>' +
+    '<div class="period-btn' + (initPeriod==='pm'?' selected':'') + '" id="per-pm"   onclick="selectPeriod(\'pm\')">🌆 Après-midi</div>' +
+    '</div>' +
+    // Sélecteur de statut
+    '<p style="font-size:11px;color:#64748b;margin-bottom:9px">Statut :</p>' +
+    '<div class="status-picker">' +
+    STATUSES.map(s => '<div class="status-option ' + SO_CLASSES[s] + (s===initStatus?' selected':'') + '" onclick="selectStatus(\'' + s + '\')" id="so-' + s + '">' + STATUS_LABELS[s] + '</div>').join('') +
+    '</div>' +
+    '<div class="form-group" style="margin-top:12px">' +
+    '<label class="form-label" style="font-size:11px">Note (ex : REPOS NPB)</label>' +
+    '<input id="f-status-note" class="form-input" type="text" placeholder="Note libre…" maxlength="40" value="' + esc(curNote) + '" oninput="updatePriorityWarning()">' +
+    '</div>' +
+    '<div id="priority-warning" style="display:none;margin-top:10px;padding:9px 12px;background:#fef3c7;border:1.5px solid #f59e0b;border-radius:8px;font-size:12px;color:#92400e;gap:6px;align-items:flex-start"></div>';
+  document.getElementById('modal-actions').innerHTML = '<button class="btn-ms" onclick="closeModal()">Annuler</button><button class="btn-mp" onclick="saveStatus()">Enregistrer</button>';
+  openModal();
+  updatePriorityWarning();
+}
+let pendingStatus = null;
+let pendingPeriod = 'full';
+function selectPeriod(p) {
+  pendingPeriod = p;
+  ['full','am','pm'].forEach(x => document.getElementById('per-'+x)?.classList.toggle('selected', x===p));
+  updatePriorityWarning();
+}
+function selectStatus(s) {
+  pendingStatus = s;
+  STATUSES.forEach(st => { const el = document.getElementById('so-'+st); if(el) el.classList.toggle('selected', st===s); });
+  updatePriorityWarning();
+}
+function saveStatus() {
+  const {b,k,emp} = modalCtx;
+  const note    = (document.getElementById('f-status-note')?.value || '').trim();
+  const period  = pendingPeriod || 'full';
+  const defWork = b === 'bulle' ? 'va' : 'ad';
+
+  if (pendingStatus) {
+    if (period === 'am') {
+      setStatus(b, k, emp, pendingStatus);  // AM = statut choisi (cross-sync inclus)
+      setStatusPM(b, k, emp, defWork);      // PM = présent à la boutique
+    } else if (period === 'pm') {
+      setStatus(b, k, emp, defWork);        // AM = présent à la boutique
+      setStatusPM(b, k, emp, pendingStatus);// PM = statut choisi
+    } else {
+      setStatus(b, k, emp, pendingStatus);  // Journée entière
+      clearStatusPM(b, k, emp);            // Supprimer toute demi-journée
+    }
+  }
+  setStatusNote(b, k, emp, note);
+  const other = b === 'bulle' ? 'delorme' : 'bulle';
+  if (state.boutiques[other].employees.includes(emp)) setStatusNote(other, k, emp, note);
+  scheduleSave(); closeModal(); render();
+}
+
+// ═══ BOOKING MODAL ════════════════════════════
+function openBookingModal(b, k, idx) {
+  const bks = getManualBookings(b, k);
+  const bk  = idx!==null && idx>=0 ? bks[idx] : {};
+  modalCtx  = { type:'booking', b, k, idx };
+  const date = fromKey(k);
+  const edit = idx!==null && idx>=0;
+  document.getElementById('modal-title').textContent = (edit?'Modifier':'Ajouter') + ' visite · ' + DAYS_FR[date.getDay()] + ' ' + date.getDate() + ' ' + MONTHS_FR[date.getMonth()];
+  document.getElementById('modal-body').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="form-group"><label class="form-label">Heure</label><input id="f-time" class="form-input" type="text" placeholder="10h30" value="${bk.time||''}"></div>
+      <div class="form-group"><label class="form-label">Pax</label><input id="f-pax" class="form-input" type="number" min="1" placeholder="10" value="${bk.pax||''}"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="form-group"><label class="form-label">Statut</label>
+        <select id="f-status" class="form-select">
+          <option value="confirmed" ${(!bk.status||bk.status==='confirmed')?'selected':''}>✓ Confirmée</option>
+          <option value="option" ${bk.status==='option'?'selected':''}>◌ Option</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Via</label>
+        <select id="f-via" class="form-select">
+          <option value="" ${!bk.via?'selected':''}>— Direct</option>
+          <option value="FH" ${bk.via==='FH'?'selected':''}>FareHarbor (FH)</option>
+          <option value="GYG" ${bk.via==='GYG'?'selected':''}>Get Your Guide (GYG)</option>
+          <option value="Viator" ${bk.via==='Viator'?'selected':''}>Viator</option>
+          <option value="RDV" ${bk.via==='RDV'?'selected':''}>Rue des Vignerons (RDV)</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Groupe / Client</label><input id="f-desc" class="form-input" type="text" placeholder="Famille Martin…" value="${esc(bk.description||'')}"></div>
+    <div class="form-group"><label class="form-label">Commentaire</label><textarea id="f-comment" class="form-textarea" placeholder="Notes internes…">${bk.comment||''}</textarea></div>
+    <div class="form-group"><label class="form-label">Tarif à régler</label><input id="f-price" class="form-input" type="text" placeholder="9,50€/pax ou 45€" value="${bk.price||''}"></div>`;
+  document.getElementById('modal-actions').innerHTML = edit
+    ? '<button class="btn-md" onclick="deleteBooking()">Supprimer</button><button class="btn-ms" onclick="closeModal()">Annuler</button><button class="btn-mp" onclick="saveBooking()">Enregistrer</button>'
+    : '<button class="btn-ms" onclick="closeModal()">Annuler</button><button class="btn-mp" onclick="saveBooking()">Ajouter</button>';
+  openModal();
+}
+function saveBooking() {
+  const {b,k,idx}=modalCtx;
+  const bk={time:document.getElementById('f-time').value.trim(), pax:parseInt(document.getElementById('f-pax').value)||0, status:document.getElementById('f-status').value, via:document.getElementById('f-via').value, description:document.getElementById('f-desc').value.trim(), comment:document.getElementById('f-comment').value.trim(), price:document.getElementById('f-price').value.trim()};
+  if(!state.boutiques[b].bookings[k]) state.boutiques[b].bookings[k]=[];
+  if(idx!==null&&idx>=0) state.boutiques[b].bookings[k][idx]=bk;
+  else state.boutiques[b].bookings[k].push(bk);
+  scheduleSave(); closeModal(); render();
+}
+function deleteBooking() { const {b,k,idx}=modalCtx; state.boutiques[b].bookings[k].splice(idx,1); scheduleSave(); closeModal(); render(); }
+
+// ═══ FH DETAIL MODAL ══════════════════════════
+function openFHDetail(k, idx) {
+  const all = getAllBookings(state.currentBoutique, k);
+  const bk = all[idx]; if(!bk || bk.source !== 'fareharbor') return;
+  const date = fromKey(k);
+  const participants = bk.participants || [bk];
+  document.getElementById('modal-title').textContent = 'FareHarbor · ' + DAYS_FR[date.getDay()] + ' ' + date.getDate() + ' ' + MONTHS_FR[date.getMonth()];
+
+  let partHtml = '';
+  if (participants.length > 1) {
+    partHtml = '<div class="form-group"><label class="form-label">Groupes (' + participants.length + ')</label>';
+    participants.forEach(p => {
+      partHtml += '<div style="padding:5px 0;border-bottom:1px solid #f1f5f9;display:flex;gap:8px;align-items:center">'
+        + (p.langFlag ? '<span style="font-size:16px">' + p.langFlag + '</span>' : '')
+        + '<div><strong>' + (p.pax||0) + ' pers.</strong>'
+        + (p.clientName ? ' · <span style="color:#7c3aed">' + esc(p.clientName) + '</span>' : '')
+        + (p.status==='option' ? ' <span style="font-size:10px;background:#fef9c3;color:#92400e;padding:1px 5px;border-radius:3px">option</span>' : '')
+        + '</div></div>';
+    });
+    partHtml += '</div>';
+  } else {
+    const p = participants[0];
+    partHtml = (p.clientName ? '<div class="form-group"><label class="form-label">Client</label><div style="padding:5px;font-weight:700;color:#7c3aed">' + (p.langFlag||'') + ' ' + esc(p.clientName) + '</div></div>' : '');
+  }
+
+  document.getElementById('modal-body').innerHTML =
+    '<div class="fh-note">📥 Réservation FareHarbor — lecture seule.</div>'
+    + '<div class="form-group"><label class="form-label">Activité</label><div style="padding:5px;font-weight:600">' + esc(bk.activity||'–') + '</div></div>'
+    + partHtml
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    + '<div class="form-group"><label class="form-label">Heure</label><div style="padding:5px;font-weight:600">' + (bk.time||'–') + '</div></div>'
+    + '<div class="form-group"><label class="form-label">Total pax</label><div style="padding:5px;font-weight:800;color:' + ((bk.pax||0)>=10?'#dc2626':'#1e293b') + '">' + bk.pax + '</div></div></div>';
+  document.getElementById('modal-actions').innerHTML =
+    '<button class="btn-mfh" onclick="window.open(\'https://fareharbor.com/andre-delorme/dashboard/\',\'_blank\')">Ouvrir FareHarbor</button>'
+    + '<button class="btn-ms" onclick="closeModal()">Fermer</button>';
+  openModal();
+}
+
+// ═══ MODAL HELPERS ════════════════════════════
+function openModal()  { pendingStatus=null; document.getElementById('modal-overlay').style.display='flex'; }
+function closeModal() { document.getElementById('modal-overlay').style.display='none'; modalCtx=null; }
+function overlayClick(e) { if(e.target===document.getElementById('modal-overlay')) closeModal(); }
+
+// ═══ EXPORT / IMPORT ══════════════════════════
+function exportData() {
+  const json=JSON.stringify({version:2,exportedAt:new Date().toISOString(),boutiques:state.boutiques},null,2);
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([json],{type:'application/json'})); a.download='planning-piffaut-'+toKey(new Date())+'.json'; a.click();
+}
+function importData(e) {
+  const file=e.target.files[0]; if(!file) return;
+  const r=new FileReader(); r.onload=ev=>{
+    try {
+      const data=JSON.parse(ev.target.result);
+      if(data.boutiques){ Object.keys(data.boutiques).forEach(k=>{ if(state.boutiques[k]){ state.boutiques[k].schedule=data.boutiques[k].schedule||{}; state.boutiques[k].bookings=data.boutiques[k].bookings||{}; state.boutiques[k].notes=data.boutiques[k].notes||{}; } }); scheduleSave(); render(); toast('✅ Importé !','#16a34a'); }
+    } catch{ toast('❌ Erreur JSON','#dc2626'); }
+  }; r.readAsText(file); e.target.value='';
+}
+function toast(msg, col) { const t=document.createElement('div'); t.style.cssText='position:fixed;bottom:60px;right:20px;background:white;color:'+col+';border:2px solid '+col+';border-radius:9px;padding:8px 14px;font-weight:700;font-size:12px;box-shadow:0 4px 16px rgba(0,0,0,0.1);z-index:9999'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),3000); }
+
+// ═══ KEYBOARD ════════════════════════════════
+document.addEventListener('keydown', e => {
+  if(document.getElementById('modal-overlay').style.display==='flex'){if(e.key==='Escape')closeModal();return;}
+  if(e.key==='t'||e.key==='T') scrollToToday();
+  if(e.key==='r'||e.key==='R') syncFareHarbor();
+});
+
+// ═══ INIT ════════════════════════════════════
+function init() {
+  if (!initFirebaseCore()) {
+    // Offline mode
+    document.getElementById('auth-overlay').style.display = 'none';
+    currentUser = localStorage.getItem('piffaut-user') || 'Anonyme';
+    document.getElementById('user-avatar').textContent = currentUser.substring(0,2).toUpperCase();
+    document.getElementById('user-name-label').textContent = currentUser;
+    render(); setTimeout(scrollToToday, 200);
+    return;
+  }
+
+  firebase.auth().onAuthStateChanged(async user => {
+    if (!user) {
+      document.getElementById('auth-overlay').style.display = 'flex';
+      document.getElementById('auth-submit-btn').disabled = false;
+      return;
+    }
+
+    // Vérifier l'autorisation (sauf admin)
+    const isAdmin = user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+    if (!isAdmin) {
+      try {
+        const snap = await db.ref(ACL_PATH + '/' + emailKey(user.email)).once('value');
+        if (!snap.exists()) {
+          await firebase.auth().signOut();
+          document.getElementById('auth-overlay').style.display = 'flex';
+          showAuthErr("Votre email n'est pas autorisé. Contactez mfverdot@gmail.com.");
+          return;
+        }
+      } catch(e) { /* Si règles pas encore configurées, on laisse passer */ }
+    }
+
+    authUser = user;
+    document.getElementById('auth-overlay').style.display = 'none';
+    updateUserChip(user);
+    initFirebaseData();
+    initPresence(user);
+    render();
+    setTimeout(scrollToToday, 200);
+    syncFareHarbor();
+  });
+}
+init();
+
+// ══════════════════════════════════════════════════════
+// ═══ IMPORT CSV 2026 ═══════════════════════════════
+// ══════════════════════════════════════════════════════
+
+function openImportCSVModal() {
+  modalCtx = { type:'importCSV' };
+  document.getElementById('modal-title').textContent = '📋 Importer Planning CSV 2026';
+  document.getElementById('modal-body').innerHTML =
+    '<p style="font-size:12px;color:#64748b;margin-bottom:10px">Sélectionnez le fichier <strong>Planning VA & AD(2026).csv</strong> pour importer les statuts et notes de toute l\'année.</p>' +
+    '<div class="form-group"><label class="form-label">Fichier CSV (séparateur ;)</label>' +
+    '<input type="file" id="f-csv" accept=".csv,.txt" class="form-input" style="padding:5px"></div>' +
+    '<div style="margin-top:10px;display:flex;align-items:center;gap:8px">' +
+    '<input type="checkbox" id="csv-overwrite" checked style="cursor:pointer">' +
+    '<label for="csv-overwrite" style="font-size:12px;color:#374151;cursor:pointer">Écraser les statuts déjà enregistrés</label></div>' +
+    '<div id="csv-progress" style="margin-top:12px;font-size:12px;color:#64748b;min-height:20px"></div>';
+  document.getElementById('modal-actions').innerHTML =
+    '<button class="btn-ms" onclick="closeModal()">Annuler</button>' +
+    '<button class="btn-mp" onclick="runCSVImport()">Importer</button>';
+  openModal();
+}
+
+function runCSVImport() {
+  const file = document.getElementById('f-csv')?.files?.[0];
+  if (!file) { document.getElementById('csv-progress').textContent = '⚠ Aucun fichier sélectionné.'; return; }
+  const overwrite = document.getElementById('csv-overwrite')?.checked !== false;
+  document.getElementById('csv-progress').textContent = '⏳ Lecture du fichier…';
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const result = parseAndImportCSV(e.target.result, overwrite);
+      document.getElementById('csv-progress').innerHTML =
+        '✅ Terminé — <strong>' + result.rows + '</strong> jours · ' +
+        '<strong>' + result.statuses + '</strong> statuts · ' +
+        '<strong>' + result.notes + '</strong> notes importées.';
+      scheduleSave();
+      render();
+    } catch(err) {
+      document.getElementById('csv-progress').textContent = '❌ Erreur : ' + err.message;
+      console.error(err);
+    }
+  };
+  reader.onerror = () => { document.getElementById('csv-progress').textContent = '❌ Impossible de lire le fichier.'; };
+  // Try windows-1252 first (typical French Excel CSV)
+  reader.readAsText(file, 'windows-1252');
+}
+
+// ── Parseur CSV (séparateur ; , champs entre guillemets) ──
+function parseCSVSemi(text) {
+  const rows = []; let row = []; let field = ''; let inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"') { if (text[i+1]==='"') { field+='"'; i++; } else inQ=false; }
+      else field += c;
+    } else {
+      if      (c==='"')  inQ = true;
+      else if (c===';')  { row.push(field); field=''; }
+      else if (c==='\n') { row.push(field); field=''; rows.push(row); row=[]; }
+      else if (c!=='\r') field += c;
+    }
+  }
+  if (field || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+// ── Convertit "3 mars" / "15 août" → "2026-03-15" ──
+const CSV_MONTHS = {
+  'janvier':1,'février':2,'fevrier':2,'mars':3,'avril':4,'mai':5,'juin':6,
+  'juillet':7,'août':8,'aout':8,'septembre':9,'octobre':10,'novembre':11,'décembre':12,'decembre':12
+};
+function csvDateToKey(str) {
+  const parts = str.trim().toLowerCase().split(/\s+/);
+  if (parts.length < 2) return null;
+  const d = parseInt(parts[0]), m = CSV_MONTHS[parts[1]];
+  if (!d || !m) return null;
+  return '2026-' + String(m).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+}
+
+// ── Travailleurs temporaires (leur nom dans une colonne = l'employé permanent est absent) ──
+const CSV_TEMPS = new Set([
+  'mallau','juliette','timéo','timeo','tim','gabriel','joanne','alex','oscar',
+  'clémentin','clementine','fanny','tom','aline','bareth','joanne ad','oscar ad','alex ad',
+  'ct','carolina','chantal','kevin','timée','agathe ad' // ne pas confondre avec status "AD"
+]);
+
+// ── Décode le contenu d'une cellule en statut ──
+// defaultWork : 'va' pour Bulle, 'ad' pour Delorme
+function csvCell(cell, defaultWork) {
+  const raw = (cell || '').trim();
+  if (!raw || raw === '-') return raw === '-' ? { s:'repos', n:'' } : null;
+
+  // Normalise pour comparaisons (sans accents pour robustesse)
+  const up = raw.toUpperCase().replace(/\n/g,' ').replace(/\s+/g,' ');
+
+  if (up === 'OFF' || up.startsWith('OFF ')) return { s:'off', n:'' };
+  if (/\bNPB\b/.test(up)) return { s:'repos', n:'NPB' };
+  if (/\b(ECOLE|ÉCOLE|RÉVISION|REVISION|SOUTENANCE|EXAMEN|RECYCLAGE|SST|FORMATION)\b/.test(up)) return { s:'formation', n:'' };
+  if (/\bCSA\b/.test(up)) return { s:'csa', n:'' };
+  if (/\bAD\b/.test(up)) return { s:'ad', n:'' };
+  if (/\bVA\b/.test(up) && defaultWork === 'ad') return { s:'va', n:'' };
+  if (/\bJF\b/.test(up)) return { s:'jf', n:'' };
+  if (/\bCP\b/.test(up)) return { s:'conges', n:'' };
+
+  // Vérifie si c'est un travailleur temporaire (pas l'employé permanent)
+  const firstWord = raw.split(/[\s\n,]/)[0].toLowerCase();
+  if (CSV_TEMPS.has(firstWord)) return null;
+
+  // Tout autre texte non vide = présent à la boutique par défaut
+  return { s: defaultWork, n:'' };
+}
+
+// ── Import principal ──
+function parseAndImportCSV(text, overwrite) {
+  const rows = parseCSVSemi(text);
+  let statCnt = 0, noteCnt = 0, rowCnt = 0;
+
+  // Colonnes employés Bulle (index CSV → nom dans l'app)
+  const BULLE_EMPS = [
+    { col:5, emp:'Loic',    dw:'va' },
+    { col:6, emp:'Estelle', dw:'va' },
+    { col:7, emp:'Alice',   dw:'va' },
+    { col:8, emp:'Agathe',  dw:'va' },
+  ];
+  // Colonnes employés Delorme
+  const DELORME_EMPS = [
+    { col:12, emp:'Julie',   dw:'ad' },
+    { col:14, emp:'Monique', dw:'ad' },
+  ];
+
+  const initDay = (b, k) => {
+    if (!state.boutiques[b].schedule[k])    state.boutiques[b].schedule[k]    = {};
+    if (!state.boutiques[b].statusNotes[k]) state.boutiques[b].statusNotes[k] = {};
+  };
+
+  const setS = (b, k, emp, s, note, overwrite) => {
+    const cur = state.boutiques[b].schedule[k]?.[emp] || 'off';
+    if (!overwrite && cur !== 'off') return false;
+    state.boutiques[b].schedule[k][emp] = s;
+    if (note) state.boutiques[b].statusNotes[k][emp] = note;
+    else if (state.boutiques[b].statusNotes[k]) delete state.boutiques[b].statusNotes[k][emp];
+    return true;
+  };
+
+  for (const row of rows) {
+    if (row.length < 2) continue;
+    const k = csvDateToKey(row[1]);
+    if (!k) continue;
+    rowCnt++;
+
+    initDay('bulle', k);
+    initDay('delorme', k);
+
+    // ── Notes de la journée ──
+    // Bulle : col 2 (RDV/rappels)
+    const rdv = (row[2]||'').trim();
+    if (rdv && rdv.length > 2 && !state.boutiques.bulle.notes[k]) {
+      state.boutiques.bulle.notes[k] = rdv.substring(0, 400);
+      noteCnt++;
+    }
+    // Delorme : col 11 (Visites/Dégustations AD)
+    const visAD = (row[11]||'').trim();
+    if (visAD && visAD.length > 2 && !state.boutiques.delorme.notes[k]) {
+      state.boutiques.delorme.notes[k] = visAD.substring(0, 400);
+      noteCnt++;
+    }
+
+    // ── Statuts Bulle ──
+    for (const { col, emp, dw } of BULLE_EMPS) {
+      const parsed = csvCell(row[col], dw);
+      if (!parsed) continue;
+      if (setS('bulle', k, emp, parsed.s, parsed.n, overwrite)) {
+        statCnt++;
+        // Sync croisé pour Agathe et Monique
+        if (state.boutiques.delorme.employees.includes(emp)) {
+          initDay('delorme', k);
+          setS('delorme', k, emp, parsed.s, parsed.n, overwrite);
+        }
+      }
+    }
+
+    // ── Statuts Delorme ──
+    for (const { col, emp, dw } of DELORME_EMPS) {
+      if (col >= row.length) continue;
+      const parsed = csvCell(row[col], dw);
+      if (!parsed) continue;
+      if (setS('delorme', k, emp, parsed.s, parsed.n, overwrite)) {
+        statCnt++;
+        // Sync croisé pour Monique
+        if (emp === 'Monique' && state.boutiques.bulle.employees.includes(emp)) {
+          initDay('bulle', k);
+          setS('bulle', k, emp, parsed.s, parsed.n, overwrite);
+        }
+      }
+    }
+  }
+
+  return { rows: rowCnt, statuses: statCnt, notes: noteCnt };
+}
+</script>
+</body>
+</html>
