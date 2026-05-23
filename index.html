@@ -254,12 +254,12 @@ td.emp-cell { padding: 3px 3px; text-align: center; vertical-align: middle !impo
 .s-ad       { background: #fef9c3; color: #a16207; border-color: #fcd34d; }
 .s-csa      { background: #e8d4b0; color: #5c2800; border-color: #c49a50; }
 .s-jf       { background: #f1f5f9; color: #94a3b8; border-color: #e2e8f0; }
-.s-repos    { background: #e0f2f0; color: #094848; border-color: #7bc4bc; }
+.s-repos    { background: #ede9fe; color: #6d28d9; border-color: #c4b5fd; }
 .s-conges   { background: #dcfce7; color: #15803d; border-color: #86efac; }
 .s-formation{ background: #fce7f3; color: #9d174d; border-color: #f9a8d4; }
 .s-maladie  { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
-.s-off      { background: #f1f5f9; color: #94a3b8; border-color: #e2e8f0; }
-.s-off:hover { background: #e2e8f0; color: #64748b; }
+.s-off      { background: #fef08a; color: #a16207; border-color: #fcd34d; }
+.s-off:hover { background: #fde047; color: #92400e; }
 .cell-alert { outline: 2px solid #ef4444; outline-offset: 1px; border-radius: 5px; }
 
 /* RENFORT cells */
@@ -339,11 +339,11 @@ thead th { position: sticky; top: 0; z-index: 200; }
 .so-ad       { background: #fef9c3; color: #a16207; }
 .so-csa      { background: #e8d4b0; color: #5c2800; }
 .so-jf       { background: #f1f5f9; color: #94a3b8; }
-.so-repos    { background: #e0f2f0; color: #094848; border: 1px solid #7bc4bc; }
+.so-repos    { background: #ede9fe; color: #6d28d9; border: 1px solid #c4b5fd; }
 .so-conges   { background: #dcfce7; color: #15803d; }
 .so-formation{ background: #fce7f3; color: #9d174d; }
 .so-maladie  { background: #fee2e2; color: #991b1b; }
-.so-off      { background: #f1f5f9; color: #94a3b8; }
+.so-off      { background: #fef08a; color: #a16207; }
 .modal-actions { display: flex; gap: 7px; justify-content: flex-end; margin-top: 14px; padding-top: 12px; border-top: 1px solid #f1f5f9; }
 .btn-mp  { padding: 7px 16px; background: #0e5c5c; color: white; border-radius: 7px; font-weight: 700; cursor: pointer; border: none; font-size: 12px; }
 .btn-ms  { padding: 7px 12px; background: #f1f5f9; color: #374151; border-radius: 7px; font-weight: 600; cursor: pointer; border: 1px solid #e2e8f0; font-size: 12px; }
@@ -602,7 +602,8 @@ thead th { position: sticky; top: 0; z-index: 200; }
   <div class="leg-item"><div class="leg-dot" style="background:#dbeafe;border-color:#93c5fd"></div>VA</div>
   <div class="leg-item"><div class="leg-dot" style="background:#fef9c3;border-color:#fcd34d"></div>AD</div>
   <div class="leg-item"><div class="leg-dot" style="background:#e8d4b0;border-color:#c49a50"></div>CSA</div>
-  <div class="leg-item"><div class="leg-dot" style="background:#e0f2f0;border-color:#7bc4bc"></div>Repos</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#ede9fe;border-color:#c4b5fd"></div>Repos</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#fef08a;border-color:#fcd34d"></div>Off</div>
   <div class="leg-item"><div class="leg-dot" style="background:#dcfce7;border-color:#86efac"></div>Congés</div>
   <div class="leg-item"><div class="leg-dot" style="background:#fce7f3;border-color:#f9a8d4"></div>École</div>
   <div class="leg-item"><div class="leg-dot" style="background:#fee2e2;border-color:#fca5a5"></div>Maladie</div>
@@ -636,7 +637,7 @@ thead th { position: sticky; top: 0; z-index: 200; }
 const DAYS_FR   = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
 const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 const STATUSES       = ['va','ad','csa','repos','conges','formation','maladie','off'];
-const STATUS_LABELS  = { va:'Veuve Ambal', ad:'André Delorme', csa:'CSA', repos:'Repos', conges:'Congés', formation:'École', maladie:'Maladie', jf:'Jour Férié', off:'–' };
+const STATUS_LABELS  = { va:'Veuve Ambal', ad:'André Delorme', csa:'CSA', repos:'Repos', conges:'Congés', formation:'École', maladie:'Maladie', jf:'Jour Férié', off:'Off' };
 const STATUS_ABBR    = { va:'VA', ad:'AD', csa:'CSA', repos:'REPOS', conges:'CP', formation:'ÉCOLE', maladie:'MAL', jf:'JF', off:'+' };
 const STATUS_CLASSES = { va:'s-va', ad:'s-ad', csa:'s-csa', repos:'s-repos', conges:'s-conges', formation:'s-formation', maladie:'s-maladie', jf:'s-jf', off:'s-off' };
 const SO_CLASSES     = { va:'so-va', ad:'so-ad', csa:'so-csa', repos:'so-repos', conges:'so-conges', formation:'so-formation', maladie:'so-maladie', jf:'so-jf', off:'so-off' };
