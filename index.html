@@ -126,7 +126,10 @@ tr.row-ferie .s-off { background: #fef08a !important; color: #a16207 !important;
 tr.row-today  td { background: #f0f8f7 !important; }
 tr.row-sunday td { background: #fffbf5; }
 tr.row-saturday td { background: #fffbf5; }
-tr.week-end td { border-bottom: 2px solid #94a3b8 !important; }
+/* Séparateur de semaine : moldura complète dim→sam */
+tr.row-sunday.day-first td          { border-top: 2px solid #64748b !important; }
+tr.row-saturday.day-first td        { border-bottom: 2px solid #64748b !important; }
+tr.week-end td                      { border-bottom: 2px solid #64748b !important; }
 tr.row-alert td { background: #fff5f5 !important; }
 .ferie-label { display: block; font-size: 10px; font-weight: 800; color: #a16207; text-transform: uppercase; letter-spacing: 0.04em; line-height: 1.2; margin-top: 2px; }
 
