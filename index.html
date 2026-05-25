@@ -667,6 +667,7 @@ let fhBookings   = {};
 let fhChannelMap = {};   // bookingPk → via code (from FH API)
 let fhTags       = {};   // bookingPk → via code (manuel, persisté Firebase)
 let fhNotes      = {};   // bookingPk → note interne (persisté Firebase)
+let fhOverrides  = {};   // bookingPk → {clientName, langFlag} (persisté Firebase)
 let modalCtx     = null;
 let firstDataLoad = true;
 let db          = null;
@@ -1322,13 +1323,15 @@ async function syncFareHarbor() {
   // Load manual tags + internal notes from Firebase
   if (db) {
     try {
-      const [tagsSnap, notesSnap] = await Promise.all([
+      const [tagsSnap, notesSnap, overridesSnap] = await Promise.all([
         db.ref('piffaut-fh-tags').once('value'),
-        db.ref('piffaut-fh-notes').once('value')
+        db.ref('piffaut-fh-notes').once('value'),
+        db.ref('piffaut-fh-overrides').once('value')
       ]);
-      fhTags  = tagsSnap.val()  || {};
-      fhNotes = notesSnap.val() || {};
-    } catch(e) { fhTags = {}; fhNotes = {}; }
+      fhTags      = tagsSnap.val()      || {};
+      fhNotes     = notesSnap.val()     || {};
+      fhOverrides = overridesSnap.val() || {};
+    } catch(e) { fhTags = {}; fhNotes = {}; fhOverrides = {}; }
   }
   allEvents.forEach(ev => { if (!ev.via && ev.bookingPk && fhTags[ev.bookingPk]) ev.via = fhTags[ev.bookingPk]; });
 
@@ -1365,7 +1368,6 @@ async function saveFHTag(bookingPk, via) {
   Object.values(fhBookings).forEach(dayEvs => dayEvs.forEach(ev => {
     if (ev.bookingPk === bookingPk) ev.via = via || '';
   }));
-  closeModal();
   render();
   toast('✅ ' + (via ? '(' + via + ') enregistré' : 'Tag retiré'), '#16a34a');
 }
@@ -1383,6 +1385,18 @@ async function saveFHNote(bookingPk, note) {
   }
   render();
   toast('✅ Note enregistrée', '#16a34a');
+}
+
+async function saveFHOverride(bookingPk, fields) {
+  if (!db || !bookingPk) return;
+  bookingPk = parseInt(bookingPk);
+  const cur = fhOverrides[bookingPk] || {};
+  const merged = { ...cur, ...fields };
+  Object.keys(merged).forEach(k => { if (merged[k] === undefined) delete merged[k]; });
+  fhOverrides[bookingPk] = merged;
+  await db.ref('piffaut-fh-overrides/' + bookingPk).set(merged);
+  render();
+  toast('✅ Enregistré', '#16a34a');
 }
 
 // ═══ FH CSV AFFILIATE IMPORT ══════════════════
@@ -1790,15 +1804,17 @@ function buildVisiteLabel(bk) {
   const timePart = bk.time || '—';
   let label;
   if (isFH) {
-    const activity = esc(bk.activity || 'Dégustation');
-    const participants = bk.participants || [{ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, via: bk.via }];
+    const isBulle = state.currentBoutique === 'bulle';
+    const participants = bk.participants || [{ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, via: bk.via, bookingPk: bk.bookingPk }];
     const fhBadge = '<span style="color:#dc2626;font-size:13px;font-weight:900">(FH)</span>';
     const partStr = participants.map(p => {
+      const ov = (p.bookingPk && fhOverrides[p.bookingPk]) || {};
+      const clientName = ov.clientName !== undefined ? ov.clientName : (p.clientName || '');
+      const langFlag   = ov.langFlag   !== undefined ? ov.langFlag   : (p.langFlag   || '');
       const parts = [];
-      if (p.pax)        parts.push(p.pax + 'pax');
-      if (p.langCode)   parts.push(p.langCode);
-      if (p.langFlag)   parts.push(p.langFlag);
-      if (p.clientName) parts.push(esc(p.clientName));
+      if (p.pax)      parts.push(p.pax + 'pax');
+      if (langFlag)   parts.push(langFlag);
+      if (clientName) parts.push(esc(clientName));
       parts.push(p.via ? viaLabel(p.via) : fhBadge);
       const internalNote = p.bookingPk && fhNotes[p.bookingPk];
       if (internalNote) {
@@ -1809,7 +1825,13 @@ function buildVisiteLabel(bk) {
       }
       return parts.join(' ');
     }).join(' <span style="color:#64748b;font-weight:900"> + </span>');
-    label = '<strong>' + timePart + '</strong> : ' + activity + ' — ' + partStr;
+    if (isBulle) {
+      // ADB : une seule activité → pas besoin d'afficher le nom de la prestation
+      label = '<strong>' + timePart + '</strong> : ' + partStr;
+    } else {
+      const activity = esc(bk.activity || 'Dégustation');
+      label = '<strong>' + timePart + '</strong> : ' + activity + ' — ' + partStr;
+    }
   } else {
     const desc     = esc(bk.description || '');
     const paxPart  = bk.pax ? bk.pax + 'pax' : '';
@@ -2367,18 +2389,19 @@ function deleteBooking() { const {b,k,idx}=modalCtx; state.boutiques[b].bookings
 function openFHDetail(k, idx) {
   const all = getAllBookings(state.currentBoutique, k);
   const bk = all[idx]; if(!bk || bk.source !== 'fareharbor') return;
+  const b = state.currentBoutique;
+  const isBulle = b === 'bulle';
   const date = fromKey(k);
-  const participants = bk.participants || [bk];
+  const participants = bk.participants || [{ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, via: bk.via, comment: bk.comment, bookingPk: bk.bookingPk, status: bk.status }];
   document.getElementById('modal-title').textContent = 'FareHarbor · ' + DAYS_FR[date.getDay()] + ' ' + date.getDate() + ' ' + MONTHS_FR[date.getMonth()];
 
-  const VIA_FH = {'GE':'background:#e8f5f4;color:#0a4a4a;border:1px solid #a8d4d0','GYG':'background:#f0fdf4;color:#166534;border:1px solid #86efac','Viator':'background:#eff6ff;color:#1e40af;border:1px solid #93c5fd','RDV':'background:#f0f8f7;color:#094848;border:1px solid #c4956a'};
   const VIA_OPTIONS = ['', 'RDV', 'GYG', 'Viator', 'GE', 'FrenchTour', 'Challanges', 'Go Côté Saône', 'Winalist', 'OT', 'BFC', 'À REGLER'];
   const VIA_LABELS  = {
-    '':              '— Aucun',
+    '':              '— Aucun canal',
     'RDV':           '(RDV) Rue des Vignerons',
     'GYG':           '(GYG) GetYourGuide',
     'Viator':        '(Viator) Viator',
-    'GE':            '(Grape Escapes)',
+    'GE':            '(GE) Grape Escapes',
     'FrenchTour':    '(FrenchTour) MyFrenchTour',
     'Challanges':    '(Challanges) Château de Challanges',
     'Go Côté Saône': '(Go Côté Saône) Go Côté Saône',
@@ -2387,66 +2410,97 @@ function openFHDetail(k, idx) {
     'BFC':           '(BFC) Bourgogne Franche-Comté Tourisme',
     'À REGLER':      '(À REGLER) Règlement sur place',
   };
+  const LANG_OPTIONS = [
+    ['', '— Aucune'],
+    ['🇫🇷', '🇫🇷 Français'],
+    ['🇬🇧', '🇬🇧 Anglais'],
+    ['🇩🇪', '🇩🇪 Allemand'],
+    ['🇯🇵', '🇯🇵 Japonais'],
+    ['🇳🇱', '🇳🇱 Néerlandais'],
+    ['🇨🇳', '🇨🇳 Chinois'],
+    ['🇪🇸', '🇪🇸 Espagnol'],
+    ['🇺🇸', '🇺🇸 English (US)'],
+  ];
 
   const tagSelect = (p) => {
     if (!p.bookingPk) return '';
-    const cur = fhTags[p.bookingPk] || p.via || '';
+    const cur = fhTags[p.bookingPk] !== undefined ? fhTags[p.bookingPk] : (p.via || '');
     let opts = VIA_OPTIONS.map(v => '<option value="'+v+'"'+(cur===v?' selected':'')+'>'+VIA_LABELS[v]+'</option>').join('');
-    return '<div style="margin-top:5px;display:flex;align-items:center;gap:6px">'
-      + '<span style="font-size:10px;color:#64748b;white-space:nowrap">Canal :</span>'
-      + '<select onchange="saveFHTag('+p.bookingPk+',this.value)" style="font-size:11px;padding:2px 5px;border:1px solid #cbd5e1;border-radius:4px;color:#1e293b;cursor:pointer">'
+    return '<div class="form-group"><label class="form-label">Canal / Partenaire</label>'
+      + '<select onchange="saveFHTag('+p.bookingPk+',this.value)" style="font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:4px;color:#1e293b;cursor:pointer;width:100%">'
+      + opts + '</select></div>';
+  };
+
+  const nameField = (p) => {
+    if (!p.bookingPk) return '';
+    const ov = fhOverrides[p.bookingPk] || {};
+    const cur = ov.clientName !== undefined ? ov.clientName : (p.clientName || '');
+    return '<div class="form-group"><label class="form-label">👤 Nom client</label>'
+      + '<div style="display:flex;gap:5px">'
+      + '<input id="fh-name-'+p.bookingPk+'" type="text" value="'+esc(cur)+'" placeholder="Nom du client…" style="flex:1;font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:4px;color:#1e293b;font-family:inherit">'
+      + '<button onclick="saveFHOverride('+p.bookingPk+',{clientName:document.getElementById(\'fh-name-'+p.bookingPk+'\').value})" style="font-size:11px;padding:5px 9px;background:#0e5c5c;color:white;border:none;border-radius:4px;cursor:pointer;white-space:nowrap">💾</button>'
+      + '</div></div>';
+  };
+
+  const langField = (p) => {
+    if (!p.bookingPk || !isBulle) return '';
+    const ov = fhOverrides[p.bookingPk] || {};
+    const cur = ov.langFlag !== undefined ? ov.langFlag : (p.langFlag || '');
+    let opts = LANG_OPTIONS.map(([v,l]) => '<option value="'+v+'"'+(cur===v?' selected':'')+'>'+l+'</option>').join('');
+    return '<div class="form-group"><label class="form-label">🎧 Audioguide</label>'
+      + '<select onchange="saveFHOverride('+p.bookingPk+',{langFlag:this.value})" style="font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:4px;color:#1e293b;cursor:pointer;width:100%">'
       + opts + '</select></div>';
   };
 
   const noteField = (p) => {
     if (!p.bookingPk) return '';
     const cur = fhNotes[p.bookingPk] || '';
-    return '<div style="margin-top:6px">'
-      + '<div style="font-size:10px;color:#64748b;margin-bottom:3px">📝 Note interne :</div>'
+    return '<div class="form-group"><label class="form-label">📝 Note interne</label>'
       + '<div style="display:flex;gap:5px;align-items:flex-start">'
-      + '<textarea id="fh-note-'+p.bookingPk+'" rows="2" style="flex:1;font-size:11px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:4px;resize:vertical;font-family:inherit;color:#1e293b" placeholder="Allergies, préférences, infos équipe…">'+esc(cur)+'</textarea>'
-      + '<button onclick="saveFHNote('+p.bookingPk+',document.getElementById(\'fh-note-'+p.bookingPk+'\').value)" style="font-size:10px;padding:4px 7px;background:#0e5c5c;color:white;border:none;border-radius:4px;cursor:pointer;white-space:nowrap">💾</button>'
+      + '<textarea id="fh-note-'+p.bookingPk+'" rows="2" style="flex:1;font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:4px;resize:vertical;font-family:inherit;color:#1e293b" placeholder="Allergies, préférences, infos équipe…">'+esc(cur)+'</textarea>'
+      + '<button onclick="saveFHNote('+p.bookingPk+',document.getElementById(\'fh-note-'+p.bookingPk+'\').value)" style="font-size:11px;padding:5px 9px;background:#0e5c5c;color:white;border:none;border-radius:4px;cursor:pointer;white-space:nowrap">💾</button>'
       + '</div></div>';
+  };
+
+  const statusBadge = (p) => {
+    if (p.status === 'option')   return '<span style="font-size:10px;background:#fef9c3;color:#92400e;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:4px">option</span>';
+    if (p.status === 'a_regler') return '<span style="font-size:10px;background:#fef2f2;color:#b91c1c;padding:1px 6px;border-radius:3px;font-weight:800;border:1px solid #fca5a5;margin-left:4px">À RÉGLER</span>';
+    return '';
   };
 
   let partHtml = '';
   if (participants.length > 1) {
-    partHtml = '<div class="form-group"><label class="form-label">Groupes (' + participants.length + ')</label>';
-    participants.forEach(p => {
-      partHtml += '<div style="padding:6px 0;border-bottom:1px solid #f1f5f9">'
-        + '<div style="display:flex;gap:8px;align-items:center">'
-        + (p.langFlag ? '<span style="font-size:16px">' + p.langFlag + '</span>' : '')
-        + '<div><strong>' + (p.pax||0) + ' pers.</strong>'
-        + (p.clientName ? ' · <span style="color:#0e5c5c">' + esc(p.clientName) + '</span>' : '')
-        + (p.via && VIA_FH[p.via] ? ' <span style="font-size:9px;font-weight:800;padding:1px 4px;border-radius:3px;'+VIA_FH[p.via]+'">('+esc({'GE':'Grape Escapes'}[p.via]||p.via)+')</span>' : '')
-        + (p.status==='option'   ? ' <span style="font-size:10px;background:#fef9c3;color:#92400e;padding:1px 5px;border-radius:3px">option</span>'   : '')
-        + (p.status==='a_regler' ? ' <span style="font-size:10px;background:#fef2f2;color:#b91c1c;padding:1px 5px;border-radius:3px;font-weight:800">À RÉGLER</span>' : '')
-        + '</div></div>'
-        + (p.comment ? '<div style="font-size:11px;color:#64748b;margin-top:3px;padding-left:24px">💬 ' + esc(p.comment) + '</div>' : '')
-        + tagSelect(p)
-        + noteField(p)
+    participants.forEach((p, i) => {
+      const ov = (p.bookingPk && fhOverrides[p.bookingPk]) || {};
+      const displayLang = ov.langFlag !== undefined ? ov.langFlag : (p.langFlag || '');
+      partHtml += '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-bottom:8px">'
+        + '<div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:8px">Groupe ' + (i+1) + ' · <strong style="color:#1e293b">' + (p.pax||0) + ' pers.</strong>'
+        + (displayLang ? ' ' + displayLang : '') + statusBadge(p) + '</div>'
+        + (p.comment ? '<div style="font-size:11px;color:#64748b;font-style:italic;margin-bottom:6px">💬 ' + esc(p.comment) + '</div>' : '')
+        + nameField(p) + langField(p) + tagSelect(p) + noteField(p)
         + '</div>';
     });
-    partHtml += '</div>';
   } else {
     const p = participants[0];
-    partHtml = (p.clientName ? '<div class="form-group"><label class="form-label">Client</label><div style="padding:5px;font-weight:700;color:#0e5c5c">' + (p.langFlag||'') + ' ' + esc(p.clientName)
-      + (p.via && VIA_FH[p.via] ? ' <span style="font-size:9px;font-weight:800;padding:1px 4px;border-radius:3px;'+VIA_FH[p.via]+'">'+esc(p.via)+'</span>' : '')
-      + '</div></div>' : '')
-      + (p.comment ? '<div class="form-group"><label class="form-label">Commentaire client</label><div style="padding:5px;font-size:12px;color:#475569;font-style:italic">💬 ' + esc(p.comment) + '</div></div>' : '')
-      + '<div class="form-group">' + tagSelect(p) + '</div>'
-      + '<div class="form-group">' + noteField(p) + '</div>';
+    partHtml = (p.comment ? '<div class="form-group"><label class="form-label">💬 Commentaire client</label><div style="padding:5px;font-size:12px;color:#475569;font-style:italic">' + esc(p.comment) + '</div></div>' : '')
+      + (p.status && p.status !== 'confirmed' ? '<div class="form-group">' + statusBadge(p).replace('margin-left:4px','') + '</div>' : '')
+      + nameField(p) + langField(p) + tagSelect(p) + noteField(p);
   }
 
+  // Show activity name only for AD (Delorme has multiple activities)
+  const activityRow = !isBulle
+    ? '<div class="form-group"><label class="form-label">Prestation</label><div style="padding:5px;font-weight:600;color:#1e293b">' + esc(bk.activity||'–') + '</div></div>'
+    : '';
+
   document.getElementById('modal-body').innerHTML =
-    '<div class="fh-note">📥 Réservation FareHarbor — lecture seule.</div>'
-    + '<div class="form-group"><label class="form-label">Activité</label><div style="padding:5px;font-weight:600">' + esc(bk.activity||'–') + '</div></div>'
-    + partHtml
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
-    + '<div class="form-group"><label class="form-label">Heure</label><div style="padding:5px;font-weight:600">' + (bk.time||'–') + '</div></div>'
-    + '<div class="form-group"><label class="form-label">Total pax</label><div style="padding:5px;font-weight:800;color:' + ((bk.pax||0)>=10?'#dc2626':'#1e293b') + '">' + bk.pax + '</div></div></div>';
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px">'
+    + '<div class="form-group"><label class="form-label">Heure</label><div style="padding:5px;font-weight:700;font-size:15px;color:#0e5c5c">' + (bk.time||'–') + '</div></div>'
+    + '<div class="form-group"><label class="form-label">Total pax</label><div style="padding:5px;font-weight:800;font-size:15px;color:' + ((bk.pax||0)>=10?'#dc2626':'#1e293b') + '">' + (bk.pax||0) + '</div></div>'
+    + '</div>'
+    + activityRow
+    + partHtml;
   document.getElementById('modal-actions').innerHTML =
-    '<button class="btn-mfh" onclick="window.open(\'https://fareharbor.com/\'+(state.currentBoutique===\'bulle\'?\'les-petits-veuve-ambal\':\'andre-delorme\')+\'/dashboard/\',\'_blank\')">Ouvrir FareHarbor</button>'
+    '<button class="btn-mfh" onclick="window.open(\'https://fareharbor.com/\'+(state.currentBoutique===\'bulle\'?\'les-petits-veuve-ambal\':\'andre-delorme\')+\'/dashboard/\',\'_blank\')">🌐 FareHarbor</button>'
     + '<button class="btn-ms" onclick="closeModal()">Fermer</button>';
   openModal();
 }
