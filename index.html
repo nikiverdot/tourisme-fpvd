@@ -2119,8 +2119,15 @@ function openBookingModal(b, k, idx) {
   // New bookings default to "à régler"; existing use saved status (fallback: confirmed)
   const defStatus = edit ? (bk.status || 'confirmed') : 'a_regler';
   document.getElementById('modal-title').textContent = (edit?'Modifier':'Ajouter') + ' visite · ' + DAYS_FR[date.getDay()] + ' ' + date.getDate() + ' ' + MONTHS_FR[date.getMonth()];
-  // Build activity datalist from fhBookings
-  const fhActs = new Set();
+  // Build activity datalist: hardcoded AD prestations + dynamic from fhBookings
+  const fhActs = new Set([
+    'Dégustation Découverte de la Côte Chalonnaise',
+    'Dégustation Découverte Effervescente',
+    'Visite & Dégustation : de la Cave à la Coupe',
+    'Visite & Dégustation : Bouchées du Terroir',
+    'Visite & Dégustation : Saveurs du Terroir (Mâchon)',
+    'Visite & Dégustation : Accords Vins & Mets du Chef',
+  ]);
   Object.values(fhBookings).forEach(evs => evs.forEach(ev => { if(ev.activity) fhActs.add(ev.activity); }));
   const actListOpts = [...fhActs].sort().map(a => `<option value="${esc(a)}">`).join('');
   const langList = [
