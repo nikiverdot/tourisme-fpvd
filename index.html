@@ -1198,6 +1198,8 @@ function getEffectiveStatus(b, k, emp, ferme) {
   if (emp === 'Monique' || emp.includes('CDD')) return null;
   // Julie : par défaut André Delorme dans les deux boutiques
   if (emp === 'Julie' && !ferme) return 'ad';
+  // Agathe : VA jusqu'à fin février 2027, puis cellule vide (contrat terminé)
+  if (emp === 'Agathe' && b === 'bulle' && k > '2027-02-28') return null;
   // Bulle : VA par défaut (en vente à l'ADB) ; Delorme et autres : OFF
   return b === 'bulle' ? 'va' : 'off';
 }
