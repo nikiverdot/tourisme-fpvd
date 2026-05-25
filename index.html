@@ -18,6 +18,7 @@ const FIREBASE_CONFIG = {
   appId:             "1:546018620268:web:043de99203b72cb9e27949"
 };
 const FAREHARBOR_ICS_DELORME = "https://fareharbor.com/integrations/ics/andre-delorme/calendar/?token=cc1ce7f0-f5f4-43d8-b6ec-b0d86f86f062";
+const FAREHARBOR_ICS_BULLE   = "https://fareharbor.com/integrations/ics/les-petits-veuve-ambal/calendar/?token=b2355683-6798-4049-8de9-46fdf9311166";
 </script>
 <style>
 :root { color-scheme: light; }
@@ -1085,7 +1086,10 @@ function setStatusNote(b,k,e,v) {
   else delete state.boutiques[b].statusNotes[k][e];
 }
 function getManualBookings(b,k) { return state.boutiques[b].bookings?.[k] || []; }
-function getFHBookings(k) { return fhBookings[k] || []; }
+function getFHBookings(k) {
+  const b = state.currentBoutique;
+  return (fhBookings[k] || []).filter(ev => !ev.boutique || ev.boutique === b);
+}
 function timeToSort(t) {
   if (!t) return 9999;
   const m = t.match(/(\d{1,2})[h:](\d{0,2})/);
@@ -1095,7 +1099,8 @@ function timeToSort(t) {
 
 // Regroupe les réservations FH du même créneau (heure + activité) sur 1 ligne
 function getGroupedFHBookings(k) {
-  const raw = fhBookings[k] || [];
+  const b = state.currentBoutique;
+  const raw = (fhBookings[k] || []).filter(ev => !ev.boutique || ev.boutique === b);
   const groups = [];
   const keyMap = {};
   for (const bk of raw) {
@@ -1177,6 +1182,26 @@ async function fetchWithTimeout(url, ms) {
   });
 }
 
+// Fetch an ICS calendar through multiple CORS proxies; returns raw text or null
+async function fetchICS(url) {
+  const sources = [
+    () => fetchWithTimeout(url, 7000),
+    () => fetchWithTimeout('https://corsproxy.io/?' + url, 10000),
+    () => fetchWithTimeout('https://api.allorigins.win/raw?url=' + encodeURIComponent(url), 10000),
+    () => fetchWithTimeout('https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url), 10000),
+    () => fetchWithTimeout('https://thingproxy.freeboard.io/fetch/' + url, 10000)
+  ];
+  for (const src of sources) {
+    try {
+      const resp = await src();
+      if (!resp.ok) continue;
+      const txt = await resp.text();
+      if (txt.includes('BEGIN:VEVENT')) return txt;
+    } catch(e) { /* try next proxy */ }
+  }
+  return null;
+}
+
 // Fetch booking channels (affiliate/partner) from FH API
 // Returns { bookingPk → via_code } map
 async function fetchFHChannels(year) {
@@ -1245,57 +1270,57 @@ async function syncFareHarbor() {
   const btn = document.getElementById('btn-ics');
   const msg = document.getElementById('ics-status');
   btn.disabled = true; btn.textContent = '⏳…';
-  msg.textContent = '';
+  msg.style.color = '#64748b'; msg.textContent = '⏳ Récupération des calendriers…';
 
-  const icsUrl = FAREHARBOR_ICS_DELORME;
-  const sources = [
-    () => fetchWithTimeout(icsUrl, 7000),
-    () => fetchWithTimeout('https://corsproxy.io/?' + icsUrl, 10000),
-    () => fetchWithTimeout('https://api.allorigins.win/raw?url=' + encodeURIComponent(icsUrl), 10000),
-    () => fetchWithTimeout('https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(icsUrl), 10000),
-    () => fetchWithTimeout('https://thingproxy.freeboard.io/fetch/' + icsUrl, 10000)
-  ];
+  // Fetch both boutiques in parallel
+  const [txtDelorme, txtBulle] = await Promise.all([
+    fetchICS(FAREHARBOR_ICS_DELORME),
+    fetchICS(FAREHARBOR_ICS_BULLE)
+  ]);
 
-  let ok = false;
-  for (const src of sources) {
-    try {
-      const resp = await src();
-      if (!resp.ok) continue;
-      const txt = await resp.text();
-      if (!txt.includes('BEGIN:VEVENT')) continue;
-      const events = parseICS(txt);
-
-      // Enrich with partner/channel from FH API (if keys configured)
-      msg.style.color='#64748b'; msg.textContent='⏳ Récupération des canaux…';
-      const channelMap = await fetchFHChannels(state.currentYear);
-      const channelCnt = Object.keys(channelMap).length;
-      events.forEach(ev => { if (!ev.via && ev.bookingPk && channelMap[ev.bookingPk]) ev.via = channelMap[ev.bookingPk]; });
-
-      // Load manual tags + internal notes from Firebase
-      if (db) {
-        try {
-          const [tagsSnap, notesSnap] = await Promise.all([
-            db.ref('piffaut-fh-tags').once('value'),
-            db.ref('piffaut-fh-notes').once('value')
-          ]);
-          fhTags  = tagsSnap.val()  || {};
-          fhNotes = notesSnap.val() || {};
-        } catch(e) { fhTags = {}; fhNotes = {}; }
-      }
-      events.forEach(ev => { if (!ev.via && ev.bookingPk && fhTags[ev.bookingPk]) ev.via = fhTags[ev.bookingPk]; });
-
-      fhBookings = {};
-      events.forEach(ev => { if(!fhBookings[ev.dateKey]) fhBookings[ev.dateKey]=[]; fhBookings[ev.dateKey].push(ev); });
-      const cnt = events.length;
-      const tagCnt = Object.keys(fhTags).length;
-      msg.style.color='#16a34a';
-      msg.textContent = '✓ ' + cnt + ' réservation' + (cnt!==1?'s':'') + ' importée' + (cnt!==1?'s':'')
-        + (channelCnt > 0 ? ' · ' + channelCnt + ' canal' + (channelCnt>1?'x':'') + ' identifié' + (channelCnt>1?'s':'') : '')
-        + (tagCnt > 0 ? ' · ' + tagCnt + ' tag' + (tagCnt>1?'s':'') + ' manuel' + (tagCnt>1?'s':'') : '');
-      ok = true; break;
-    } catch(e) { /* try next */ }
+  if (!txtDelorme && !txtBulle) {
+    msg.style.color = '#dc2626'; msg.textContent = '⚠ FareHarbor inaccessible (CORS). Fonctionne depuis un serveur web.';
+    btn.disabled = false; btn.textContent = '🔄 Sync FareHarbor';
+    return;
   }
-  if (!ok) { msg.style.color='#dc2626'; msg.textContent='⚠ FareHarbor inaccessible (CORS). Fonctionne depuis un serveur web.'; }
+
+  // Parse each ICS and tag with boutique
+  const eventsDelorme = txtDelorme ? parseICS(txtDelorme).map(ev => ({ ...ev, boutique: 'delorme' })) : [];
+  const eventsBulle   = txtBulle   ? parseICS(txtBulle).map(ev =>   ({ ...ev, boutique: 'bulle'   })) : [];
+  const allEvents     = [...eventsDelorme, ...eventsBulle];
+
+  // Enrich with partner/channel from FH API (if keys configured)
+  msg.style.color = '#64748b'; msg.textContent = '⏳ Récupération des canaux…';
+  const channelMap = await fetchFHChannels(state.currentYear);
+  allEvents.forEach(ev => { if (!ev.via && ev.bookingPk && channelMap[ev.bookingPk]) ev.via = channelMap[ev.bookingPk]; });
+
+  // Load manual tags + internal notes from Firebase
+  if (db) {
+    try {
+      const [tagsSnap, notesSnap] = await Promise.all([
+        db.ref('piffaut-fh-tags').once('value'),
+        db.ref('piffaut-fh-notes').once('value')
+      ]);
+      fhTags  = tagsSnap.val()  || {};
+      fhNotes = notesSnap.val() || {};
+    } catch(e) { fhTags = {}; fhNotes = {}; }
+  }
+  allEvents.forEach(ev => { if (!ev.via && ev.bookingPk && fhTags[ev.bookingPk]) ev.via = fhTags[ev.bookingPk]; });
+
+  // Store merged result
+  fhBookings = {};
+  allEvents.forEach(ev => { if (!fhBookings[ev.dateKey]) fhBookings[ev.dateKey] = []; fhBookings[ev.dateKey].push(ev); });
+
+  // Status message
+  const cntD = eventsDelorme.length, cntB = eventsBulle.length, cntTotal = cntD + cntB;
+  const channelCnt = Object.keys(channelMap).length;
+  const tagCnt     = Object.keys(fhTags).length;
+  const sourceParts = [cntD > 0 ? cntD + ' AD' : '', cntB > 0 ? cntB + ' ADB' : ''].filter(Boolean).join(' + ');
+  msg.style.color = '#16a34a';
+  msg.textContent = '✓ ' + sourceParts + ' réservation' + (cntTotal !== 1 ? 's' : '') + ' importée' + (cntTotal !== 1 ? 's' : '')
+    + (channelCnt > 0 ? ' · ' + channelCnt + ' canal' + (channelCnt > 1 ? 'x' : '') : '')
+    + (tagCnt     > 0 ? ' · ' + tagCnt     + ' tag'   + (tagCnt     > 1 ? 's' : '') : '');
+
   btn.disabled = false; btn.textContent = '🔄 Sync FareHarbor';
   render();
 }
@@ -2280,7 +2305,7 @@ function openFHDetail(k, idx) {
     + '<div class="form-group"><label class="form-label">Heure</label><div style="padding:5px;font-weight:600">' + (bk.time||'–') + '</div></div>'
     + '<div class="form-group"><label class="form-label">Total pax</label><div style="padding:5px;font-weight:800;color:' + ((bk.pax||0)>=10?'#dc2626':'#1e293b') + '">' + bk.pax + '</div></div></div>';
   document.getElementById('modal-actions').innerHTML =
-    '<button class="btn-mfh" onclick="window.open(\'https://fareharbor.com/andre-delorme/dashboard/\',\'_blank\')">Ouvrir FareHarbor</button>'
+    '<button class="btn-mfh" onclick="window.open(\'https://fareharbor.com/\'+(state.currentBoutique===\'bulle\'?\'les-petits-veuve-ambal\':\'andre-delorme\')+\'/dashboard/\',\'_blank\')">Ouvrir FareHarbor</button>'
     + '<button class="btn-ms" onclick="closeModal()">Fermer</button>';
   openModal();
 }
