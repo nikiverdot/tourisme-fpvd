@@ -419,7 +419,7 @@ thead th { position: sticky; top: 0; z-index: 200; }
   .app-logo    { font-size: 13px; }
   .tab-btn     { padding: 5px 11px; font-size: 12px; }
   .col-panel-wrap { display: none !important; }
-  .btn-export, label.btn-import { display: none !important; }
+  #btn-export, #btn-import-json { display: none !important; }
   col.col-rdv    { width: 120px; }
   col.col-visite { width: 200px; }
   col.col-emp    { width: 60px; }
@@ -441,7 +441,7 @@ thead th { position: sticky; top: 0; z-index: 200; }
   /* Masqués sur mobile */
   #presence-bar  { display: none !important; }
   .col-panel-wrap { display: none !important; }
-  .btn-export, label.btn-import { display: none !important; }
+  #btn-export, #btn-import-json { display: none !important; }
   #sync-label  { display: none; }
 
   /* Bouton admin et import CSV : compacts sur mobile */
@@ -582,10 +582,10 @@ thead th { position: sticky; top: 0; z-index: 200; }
   <button class="btn btn-today"  onclick="scrollToToday()">📍 Aujourd'hui</button>
   <button class="btn btn-ics"    onclick="syncFareHarbor()" id="btn-ics">🔄 Sync FareHarbor</button>
   <button class="btn btn-ics"    onclick="openFHSettings()" title="Configuration API FareHarbor" style="padding:4px 8px;font-size:14px;min-width:0">⚙️</button>
-  <label  class="btn btn-ics"    title="Importer CSV FareHarbor (Rapports → Réservations → Exporter)" style="cursor:pointer;font-size:11px">📊 CSV FH<input type="file" accept=".csv,.txt" onchange="importFHAffiliatesCSV(event)" style="display:none"></label>
+  <label  id="btn-csv-fh" class="btn btn-ics" title="Importer CSV FareHarbor (Rapports → Réservations → Exporter)" style="cursor:pointer;font-size:11px;display:none">📊 CSV FH<input type="file" accept=".csv,.txt" onchange="importFHAffiliatesCSV(event)" style="display:none"></label>
   <span   class="ics-msg"        id="ics-status"></span>
-  <button class="btn btn-export" onclick="exportData()">⬇ Exporter</button>
-  <label  class="btn btn-import">⬆ Importer<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
+  <button id="btn-export" class="btn btn-export" onclick="exportData()" style="display:none">⬇ Exporter</button>
+  <label  id="btn-import-json" class="btn btn-import" style="display:none">⬆ Importer<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
   <button id="btn-csv-import" class="btn btn-import" onclick="openImportCSVModal()" style="display:none;background:#f0fdf4;color:#15803d;border-color:#86efac">📋 Import CSV 2026</button>
   <div class="col-panel-wrap" style="margin-left:auto">
     <button class="btn" style="background:#f8fafc;border-color:#e2e8f0;color:#475569" onclick="toggleColPanel(event)">⊞ Colonnes</button>
@@ -951,10 +951,10 @@ function updateUserChip(user) {
   if (av) av.textContent = name.substring(0,2).toUpperCase();
   if (nl) nl.textContent = name;
   const isAdmin = user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-  const btn = document.getElementById('btn-admin');
-  if (btn) btn.style.display = isAdmin ? '' : 'none';
-  const btnCsv = document.getElementById('btn-csv-import');
-  if (btnCsv) btnCsv.style.display = isAdmin ? '' : 'none';
+  ['btn-admin','btn-export','btn-import-json','btn-csv-import','btn-csv-fh'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = isAdmin ? '' : 'none';
+  });
 }
 
 function logoutUser() {
