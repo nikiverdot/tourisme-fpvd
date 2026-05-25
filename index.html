@@ -1866,12 +1866,12 @@ function buildVisiteBody(bk) {
   const isFH = bk.source === 'fareharbor';
   const isBulle = state.currentBoutique === 'bulle';
   const VIA_DISPLAY = { 'GE':'Grape Escapes' };
-  const viaLabel = v => '<span style="font-size:13px;font-weight:900;color:#dc2626">('+esc(VIA_DISPLAY[v]||v)+')</span>';
+  const viaLabel = v => '<span style="font-size:13px;font-weight:900;color:#0000ff">('+esc(VIA_DISPLAY[v]||v)+')</span>';
   const regler = '<span style="font-size:10px;font-weight:800;color:#b91c1c;background:#fef2f2;padding:1px 5px;border-radius:3px;border:1px solid #fca5a5">(À RÉGLER)</span>';
 
   if (isFH) {
     const participants = bk.participants || [{ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, via: bk.via, bookingPk: bk.bookingPk }];
-    const fhBadge = '<span style="color:#dc2626;font-size:13px;font-weight:900">(FH)</span>';
+    const fhBadge = '<span style="color:#0000ff;font-size:13px;font-weight:900">(FH)</span>';
     const partStr = participants.map(p => {
       const ov = (p.bookingPk && fhOverrides[p.bookingPk]) || {};
       const clientName = ov.clientName !== undefined ? ov.clientName : (p.clientName || '');
@@ -1906,7 +1906,7 @@ function buildVisiteBody(bk) {
         + (desc     ? ' ' + desc : '')
         + (via      ? ' ' + viaLabel(via) : '')
         + priceTag
-        + (comm     ? ' <span style="color:#94a3b8;font-size:10px"> · ' + comm + '</span>' : '');
+        + (comm     ? ' <span style="color:#94a3b8;font-size:12px"> · ' + comm + '</span>' : '');
     } else {
       // Bulle (ou sans prestation) : format court — pax + langue + description + via
       body = (paxPart ? paxPart : '')
@@ -1914,7 +1914,7 @@ function buildVisiteBody(bk) {
         + (desc     ? (paxPart || langPart ? ' ' : '') + desc : '')
         + (via      ? ' ' + viaLabel(via) : '')
         + priceTag
-        + (comm     ? ' <span style="color:#94a3b8;font-size:10px"> · ' + comm + '</span>' : '');
+        + (comm     ? ' <span style="color:#94a3b8;font-size:12px"> · ' + comm + '</span>' : '');
     }
     if (bk.status==='option')   body += ' <span class="visite-badge badge-option">(OPTION)</span>';
     if (bk.status==='a_regler') body += ' ' + regler;
