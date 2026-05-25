@@ -1184,6 +1184,8 @@ function getEffectiveStatus(b, k, emp, ferme) {
   const raw = state.boutiques[b].schedule?.[k]?.[emp];
   if (raw !== undefined) return raw;                   // valeur explicite → priorité
   if (b === 'delorme' && !ferme && emp === 'Julie') return 'ad'; // auto AD
+  // Monique et postes CDD : pas de statut par défaut (cellule vide, comme Renfort)
+  if (emp === 'Monique' || emp.includes('CDD')) return null;
   return 'off';
 }
 
@@ -1700,15 +1702,21 @@ function render() {
       const noteHtml = sn ? '<span class="status-note">' + esc(sn) + '</span>' : '';
       const consecHtml = consec>=6 ? '<span style="font-size:7px;opacity:.8">'+consec+'j</span>' : '';
       const sPM = getStatusPM(b, k, emp);
+      const sClass  = STATUS_CLASSES[s]  || '';
+      const sAbbr   = STATUS_ABBR[s]     || '';
+      const sLabel  = STATUS_LABELS[s]   || '—';
       if (sPM !== null && !ferme) {
         // Cellule demi-journée : AM en haut, PM en bas
+        const sPMClass = STATUS_CLASSES[sPM] || '';
+        const sPMAbbr  = STATUS_ABBR[sPM]    || '';
+        const sPMLabel = STATUS_LABELS[sPM]  || '—';
         html += '<td class="emp-cell" data-col="emp-' + empIdx + '" rowspan="' + rows + '">' +
-          '<div class="status-cell' + warnCls + '" style="padding:0;gap:0;overflow:hidden;border-color:#94a3b8" ' + clickEvt + ' title="Matin: ' + STATUS_LABELS[s] + ' · Après-midi: ' + STATUS_LABELS[sPM] + warnTip + '">' +
-          '<div class="status-half ' + STATUS_CLASSES[s]  + '" style="border-bottom:1px solid rgba(0,0,0,.08)">' + STATUS_ABBR[s]  + '<span class="half-tag">M</span></div>' +
-          '<div class="status-half ' + STATUS_CLASSES[sPM] + '">' + STATUS_ABBR[sPM] + '<span class="half-tag">A</span>' + noteHtml + '</div>' +
+          '<div class="status-cell' + warnCls + '" style="padding:0;gap:0;overflow:hidden;border-color:#94a3b8" ' + clickEvt + ' title="Matin: ' + sLabel + ' · Après-midi: ' + sPMLabel + warnTip + '">' +
+          '<div class="status-half ' + sClass   + '" style="border-bottom:1px solid rgba(0,0,0,.08)">' + sAbbr   + '<span class="half-tag">M</span></div>' +
+          '<div class="status-half ' + sPMClass + '">' + sPMAbbr + '<span class="half-tag">A</span>' + noteHtml + '</div>' +
           '</div></td>';
       } else {
-        html += '<td class="emp-cell" data-col="emp-' + empIdx + '" rowspan="' + rows + '"><div class="status-cell ' + STATUS_CLASSES[s] + (alert?' cell-alert':'') + warnCls + '" ' + clickEvt + ' title="' + STATUS_LABELS[s] + warnTip + '">' + STATUS_ABBR[s] + consecHtml + noteHtml + '</div></td>';
+        html += '<td class="emp-cell" data-col="emp-' + empIdx + '" rowspan="' + rows + '"><div class="status-cell ' + sClass + (alert?' cell-alert':'') + warnCls + '" ' + clickEvt + ' title="' + sLabel + warnTip + '">' + sAbbr + consecHtml + noteHtml + '</div></td>';
       }
     });
 
@@ -2488,7 +2496,8 @@ function runCSVImport() {
       document.getElementById('csv-progress').innerHTML =
         '✅ Terminé — <strong>' + result.rows + '</strong> jours · ' +
         '<strong>' + result.statuses + '</strong> statuts · ' +
-        '<strong>' + result.notes + '</strong> notes importées.';
+        '<strong>' + result.notes + '</strong> notes · ' +
+        '<strong>' + result.bookings + '</strong> réservations importées.';
       scheduleSave();
       render();
     } catch(err) {
@@ -2566,10 +2575,55 @@ function csvCell(cell, defaultWork) {
   return { s: defaultWork, n:'' };
 }
 
+// ── Parse les lignes de visites CSV (col D / col L) → objets booking ──
+// Retourne { bookings: [...], noteText: '...' }
+// Les lignes qui commencent par une heure (10h30, 14:30…) deviennent des bookings.
+// Les lignes qui ne commencent pas par une heure mais contiennent > 2 mots deviennent noteText.
+function parseCSVVisites(text, defaultActivity) {
+  if (!text || !text.trim()) return { bookings: [], noteText: '' };
+  const lines = text.replace(/\r/g,'').split(/\n+/).map(l=>l.trim()).filter(l=>l && l!=='-');
+  const bookings=[], extras=[];
+  for (const line of lines) {
+    const tm = line.match(/^(\d{1,2})[Hh:](\d{2})/);
+    if (!tm) {
+      // Entrée sans heure : si plus de 2 mots, on la garde comme note
+      if (line.split(/\s+/).length > 2) extras.push(line);
+      continue;
+    }
+    const time = String(parseInt(tm[1])).padStart(2,'0') + 'h' + tm[2];
+    const rest = line.slice(tm[0].length).replace(/^\s*[:\s]\s*/,'').trim();
+    // Pax
+    const paxM = rest.match(/(\d+)\s*(?:pax|pers(?:onnes?)?|adultes?|participants?)\b/i);
+    const pax  = paxM ? parseInt(paxM[1]) : 0;
+    // Canal de réservation
+    let via = '';
+    if      (/\bFH\b/.test(rest))                        via = 'FH';
+    else if (/\bGYG\b/i.test(rest))                      via = 'GYG';
+    else if (/\bWinalist\b/i.test(rest))                  via = 'Winalist';
+    else if (/\btripadvisor\b/i.test(rest))               via = 'TripAdvisor';
+    else if (/\bChallanges?\b/i.test(rest))               via = 'Challanges';
+    else if (/\bOT\b/.test(rest))                         via = 'OT';
+    else if (/\binvitation\b/i.test(rest))                via = 'invitation';
+    else if (/\bRDV\b/i.test(rest))                       via = 'RDV';
+    else if (/Vignoble[^)]{0,20}Découverte/i.test(rest))  via = 'V&D';
+    else if (/Go\s*C[oô]t[eé]/i.test(rest))              via = 'Go Côté Saône';
+    // Langue
+    let langCode='', langFlag='';
+    if      (/\bANG\b|\bEnglish\b/i.test(rest))              langFlag='🇬🇧';
+    else if (/\bFRA\b|\bFrançais?\b|\bFrench\b/i.test(rest)) langFlag='🇫🇷';
+    // Statut
+    const status = /à\s*r[eé]gler/i.test(rest) ? 'a_regler' : 'confirmed';
+    bookings.push({ time, pax, via, langCode, langFlag,
+      activity: defaultActivity, description: rest.substring(0,400),
+      status, comment:'', guide:'', guideLanguage:'', price:'' });
+  }
+  return { bookings, noteText: extras.join(' · ') };
+}
+
 // ── Import principal ──
 function parseAndImportCSV(text, overwrite) {
   const rows = parseCSVSemi(text);
-  let statCnt = 0, noteCnt = 0, rowCnt = 0;
+  let statCnt = 0, noteCnt = 0, bkCnt = 0, rowCnt = 0;
 
   // Colonnes employés Bulle (index CSV → nom dans l'app)
   const BULLE_EMPS = [
@@ -2608,18 +2662,29 @@ function parseAndImportCSV(text, overwrite) {
     initDay('delorme', k);
 
     // ── Notes de la journée ──
-    // Bulle : col 2 (RDV/rappels) + col 3 (Visites/Réservations)
-    const rdv    = (row[2]||'').trim();
-    const visites = (row[3]||'').trim();
-    const bulleNote = [rdv, visites].filter(s => s && s.length > 2).join('\n──────\n');
+    // Bulle : col 2 (RDV/rappels) → note ; col 3 (Visites) → bookings
+    const rdv = (row[2]||'').trim();
+    const { bookings: bulleBks, noteText: bulleExtra } = parseCSVVisites(row[3]||'', 'Visite/Dégustation');
+    const bulleNote = [rdv.length > 2 ? rdv : '', bulleExtra].filter(Boolean).join('\n');
     if (bulleNote && (overwrite || !state.boutiques.bulle.notes[k])) {
       state.boutiques.bulle.notes[k] = bulleNote.substring(0, 800);
       noteCnt++;
     }
-    // Delorme : col 11 (Visites/Dégustations AD)
-    const visAD = (row[11]||'').trim();
-    if (visAD && visAD.length > 2 && !state.boutiques.delorme.notes[k]) {
-      state.boutiques.delorme.notes[k] = visAD.substring(0, 400);
+    if (bulleBks.length > 0 && (overwrite || !state.boutiques.bulle.bookings[k]?.length)) {
+      if (!state.boutiques.bulle.bookings) state.boutiques.bulle.bookings = {};
+      state.boutiques.bulle.bookings[k] = bulleBks;
+      bkCnt += bulleBks.length;
+    }
+
+    // Delorme : col 11 (Visites AD) → bookings ; texte non-horaire → note
+    const { bookings: delormeBks, noteText: delormeExtra } = parseCSVVisites(row[11]||'', '');
+    if (delormeBks.length > 0 && (overwrite || !state.boutiques.delorme.bookings[k]?.length)) {
+      if (!state.boutiques.delorme.bookings) state.boutiques.delorme.bookings = {};
+      state.boutiques.delorme.bookings[k] = delormeBks;
+      bkCnt += delormeBks.length;
+    }
+    if (delormeExtra && (overwrite || !state.boutiques.delorme.notes[k])) {
+      state.boutiques.delorme.notes[k] = delormeExtra.substring(0, 400);
       noteCnt++;
     }
 
@@ -2653,7 +2718,7 @@ function parseAndImportCSV(text, overwrite) {
     }
   }
 
-  return { rows: rowCnt, statuses: statCnt, notes: noteCnt };
+  return { rows: rowCnt, statuses: statCnt, notes: noteCnt, bookings: bkCnt };
 }
 </script>
 </body>
