@@ -1004,6 +1004,22 @@ async function saveMyName() {
 
 // ═══ CONSECUTIVE WORK DAYS ════════════════════
 const WORK_STATUSES = new Set(['va','ad','formation']);
+const CP_TOTAL = 25;
+function cpYearBounds(k) {
+  const d = fromKey(k);
+  const yr = d.getMonth() >= 5 ? d.getFullYear() : d.getFullYear() - 1; // année CP : juin→mai
+  return { start: yr + '-06-01', end: (yr + 1) + '-05-31' };
+}
+function countCPUsed(b, emp, k) {
+  const { start, end } = cpYearBounds(k);
+  const sched = state.boutiques[b].schedule || {};
+  let count = 0;
+  for (const dk in sched) {
+    if (dk < start || dk > end || dk > k) continue;
+    if (sched[dk]?.[emp] === 'conges') count++;
+  }
+  return count;
+}
 function consecutiveWorkDays(b, k, emp) {
   const d0 = fromKey(k);
   if (!WORK_STATUSES.has(getEffectiveStatus(b, k, emp, isDayFerme(b, k, d0)))) return 0;
@@ -1770,6 +1786,7 @@ function render() {
       const sn = getStatusNote(b, k, emp);
       const noteHtml = sn ? '<span class="status-note">' + esc(sn) + '</span>' : '';
       const consecHtml = consec>=6 ? '<span style="font-size:7px;opacity:.8">'+consec+'j</span>' : '';
+      const cpHtml = s === 'conges' ? '<span style="font-size:7px;font-weight:700;opacity:.85">' + (CP_TOTAL - countCPUsed(b, emp, k)) + 'j</span>' : '';
       const sPM   = getStatusPM(b, k, emp);
       const sSoir = getStatusSoir(b, k, emp);
       const sClass  = STATUS_CLASSES[s]  || '';
@@ -1800,7 +1817,7 @@ function render() {
           '<div class="status-half ' + sPMClass + '">' + sPMAbbr + '<span class="half-tag">A</span>' + noteHtml + '</div>' +
           '</div></td>';
       } else {
-        html += '<td class="emp-cell" data-col="emp-' + empIdx + '" rowspan="' + rows + '"><div class="status-cell ' + sClass + (alert?' cell-alert':'') + warnCls + '" ' + clickEvt + ' title="' + sLabel + warnTip + '">' + sAbbr + consecHtml + noteHtml + '</div></td>';
+        html += '<td class="emp-cell" data-col="emp-' + empIdx + '" rowspan="' + rows + '"><div class="status-cell ' + sClass + (alert?' cell-alert':'') + warnCls + '" ' + clickEvt + ' title="' + sLabel + warnTip + '">' + sAbbr + cpHtml + consecHtml + noteHtml + '</div></td>';
       }
     });
 
