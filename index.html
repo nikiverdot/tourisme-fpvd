@@ -1078,6 +1078,12 @@ function clearStatusPM(b,k,e) {
   if (state.boutiques[other].employees.includes(e) && state.boutiques[other].schedulePM?.[k])
     delete state.boutiques[other].schedulePM[k][e];
 }
+function clearStatus(b,k,e) {
+  if (state.boutiques[b].schedule?.[k]) delete state.boutiques[b].schedule[k][e];
+  const other = b==='bulle'?'delorme':'bulle';
+  if (state.boutiques[other].employees.includes(e) && state.boutiques[other].schedule?.[k])
+    delete state.boutiques[other].schedule[k][e];
+}
 function getStatusNote(b,k,e) { return state.boutiques[b].statusNotes?.[k]?.[e] || ''; }
 function setStatusNote(b,k,e,v) {
   if(!state.boutiques[b].statusNotes) state.boutiques[b].statusNotes={};
@@ -2123,6 +2129,9 @@ function openStatusModal(b, k, emp) {
     '<div class="status-picker">' +
     STATUSES.map(s => '<div class="status-option ' + SO_CLASSES[s] + (s===initStatus?' selected':'') + '" onclick="selectStatus(\'' + s + '\')" id="so-' + s + '">' + STATUS_LABELS[s] + '</div>').join('') +
     '</div>' +
+    '<div style="text-align:right;margin-top:6px">' +
+    '<span id="so-clear" onclick="selectStatus(null)" style="cursor:pointer;font-size:11px;font-weight:700;color:#dc2626;border:1px solid #fca5a5;background:#fef2f2;border-radius:20px;padding:2px 9px;opacity:' + (initStatus===null?'1':'0.45') + ';transition:opacity .15s">✕ Effacer</span>' +
+    '</div>' +
     '<div class="form-group" style="margin-top:12px">' +
     '<label class="form-label" style="font-size:11px">Note (ex : REPOS NPB)</label>' +
     '<input id="f-status-note" class="form-input" type="text" placeholder="Note libre…" maxlength="40" value="' + esc(curNote) + '" oninput="updatePriorityWarning()">' +
@@ -2140,8 +2149,11 @@ function selectPeriod(p) {
   updatePriorityWarning();
 }
 function selectStatus(s) {
-  pendingStatus = s;
-  STATUSES.forEach(st => { const el = document.getElementById('so-'+st); if(el) el.classList.toggle('selected', st===s); });
+  // null = effacement explicite ; sinon toggle si on reclique sur l'option déjà sélectionnée
+  pendingStatus = (s === null || pendingStatus === s) ? null : s;
+  STATUSES.forEach(st => { const el = document.getElementById('so-'+st); if(el) el.classList.toggle('selected', st===pendingStatus); });
+  const clrEl = document.getElementById('so-clear');
+  if (clrEl) clrEl.style.opacity = pendingStatus === null ? '1' : '0.45';
   updatePriorityWarning();
 }
 function saveStatus() {
@@ -2150,7 +2162,7 @@ function saveStatus() {
   const period  = pendingPeriod || 'full';
   const defWork = b === 'bulle' ? 'va' : 'ad';
 
-  if (pendingStatus) {
+  if (pendingStatus !== null) {
     if (period === 'am') {
       setStatus(b, k, emp, pendingStatus);  // AM = statut choisi (cross-sync inclus)
       setStatusPM(b, k, emp, defWork);      // PM = présent à la boutique
@@ -2161,6 +2173,10 @@ function saveStatus() {
       setStatus(b, k, emp, pendingStatus);  // Journée entière
       clearStatusPM(b, k, emp);            // Supprimer toute demi-journée
     }
+  } else {
+    // Effacer : supprimer le statut explicite (retour à la valeur par défaut de l'employé)
+    clearStatus(b, k, emp);
+    clearStatusPM(b, k, emp);
   }
   setStatusNote(b, k, emp, note);
   const other = b === 'bulle' ? 'delorme' : 'bulle';
