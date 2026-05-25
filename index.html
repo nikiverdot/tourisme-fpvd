@@ -2433,7 +2433,7 @@ function openBookingModal(b, k, idx) {
     </div>
     <div class="form-group"><label class="form-label">Groupe / Client</label><input id="f-desc" class="form-input" type="text" placeholder="Famille Martin…" value="${esc(bk.description||'')}"></div>
     <div class="form-group"><label class="form-label">Commentaire</label><textarea id="f-comment" class="form-textarea" placeholder="Notes internes…">${bk.comment||''}</textarea></div>
-    <div class="form-group"><label class="form-label">Tarif</label><input id="f-price" class="form-input" type="text" placeholder="9,50€/pax ou 45€" value="${bk.price||''}"></div>`;
+    <div class="form-group"><label class="form-label">Tarif</label><input id="f-price" class="form-input" type="text" inputmode="decimal" placeholder="9,50 ou 45 ou 9,50/pax" value="${bk.price||''}" onblur="fmtPrice(this)"></div>`;
   document.getElementById('modal-actions').innerHTML = edit
     ? '<button class="btn-md" onclick="deleteBooking()">Supprimer</button><button class="btn-ms" onclick="closeModal()">Annuler</button><button class="btn-mp" onclick="saveBooking()">Enregistrer</button>'
     : '<button class="btn-ms" onclick="closeModal()">Annuler</button><button class="btn-mp" onclick="saveBooking()">Ajouter</button>';
@@ -2448,13 +2448,21 @@ function fmtTime(inp) {
   h = Math.min(h, 23); m = Math.min(m, 59);
   inp.value = h + 'h' + String(m).padStart(2, '0');
 }
+function fmtPrice(inp) {
+  let v = inp.value.trim();
+  if (!v) return;
+  const hasPax = /\/\s*pax/i.test(v);
+  const num = parseFloat(v.replace(/[^\d.,]/g, '').replace(',', '.'));
+  if (isNaN(num)) return;
+  inp.value = num.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €' + (hasPax ? '/pax' : '');
+}
 function onViaChange() {
   const via = (document.getElementById('f-via')?.value || '').trim().toLowerCase();
   if (via === 'challanges' || via === 'invitation') {
     const st = document.getElementById('f-status');
     const pr = document.getElementById('f-price');
     if (st) st.value = 'confirmed';
-    if (pr) pr.value = '0,00€';
+    if (pr) pr.value = '0,00 €';
   }
 }
 function toggleGuideRow() {
