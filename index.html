@@ -1339,10 +1339,13 @@ async function saveFHNote(bookingPk, note) {
 function mapFHAffiliate(raw) {
   if (!raw) return '';
   const n = raw.toLowerCase().replace(/[-\s_]+/g,'');
-  if (n.includes('vignerons')||n.includes('ruedes')||n==='rdv') return 'RDV';
-  if (n.includes('getyourguide')||n.includes('gyg'))            return 'GYG';
-  if (n.includes('viator'))                                      return 'Viator';
-  if (n.includes('grapeescapes')||n.includes('grapes'))          return 'GE';
+  if (n.includes('vignerons')||n.includes('ruedes')||n==='rdv')      return 'RDV';
+  if (n.includes('getyourguide')||n.includes('gyg'))                  return 'GYG';
+  if (n.includes('viator'))                                            return 'Viator';
+  if (n.includes('grapeescapes')||n.includes('grapes'))               return 'GE';
+  if (n.includes('frenchcour')||n.includes('myfrench'))               return 'FrenchTour';
+  if (n.includes('challanges')||n.includes('chalange'))               return 'Challanges';
+  if (n.includes('cotesaone')||n.includes('côtesaône')||n.includes('gosao')) return 'Go Côté Saône';
   return raw.trim().slice(0,30); // keep unknown affiliates as-is
 }
 
@@ -2150,8 +2153,18 @@ function openFHDetail(k, idx) {
   document.getElementById('modal-title').textContent = 'FareHarbor · ' + DAYS_FR[date.getDay()] + ' ' + date.getDate() + ' ' + MONTHS_FR[date.getMonth()];
 
   const VIA_FH = {'GE':'background:#e8f5f4;color:#0a4a4a;border:1px solid #a8d4d0','GYG':'background:#f0fdf4;color:#166534;border:1px solid #86efac','Viator':'background:#eff6ff;color:#1e40af;border:1px solid #93c5fd','RDV':'background:#f0f8f7;color:#094848;border:1px solid #c4956a'};
-  const VIA_OPTIONS = ['', 'RDV', 'GYG', 'Viator', 'GE'];
-  const VIA_LABELS  = { '':'— Aucun', 'RDV':'(RDV) Rue des Vignerons', 'GYG':'(GYG) GetYourGuide', 'Viator':'(Viator) Viator', 'GE':'(Grape Escapes)' };
+  const VIA_OPTIONS = ['', 'RDV', 'GYG', 'Viator', 'GE', 'FrenchTour', 'Challanges', 'Go Côté Saône', 'À REGLER'];
+  const VIA_LABELS  = {
+    '':              '— Aucun',
+    'RDV':           '(RDV) Rue des Vignerons',
+    'GYG':           '(GYG) GetYourGuide',
+    'Viator':        '(Viator) Viator',
+    'GE':            '(Grape Escapes)',
+    'FrenchTour':    '(FrenchTour) MyFrenchTour',
+    'Challanges':    '(Challanges) Château de Challanges',
+    'Go Côté Saône': '(Go Côté Saône) Go Côté Saône',
+    'À REGLER':      '(À REGLER) Règlement sur place',
+  };
 
   const tagSelect = (p) => {
     if (!p.bookingPk) return '';
