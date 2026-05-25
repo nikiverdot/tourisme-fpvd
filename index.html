@@ -2322,7 +2322,7 @@ function openBookingModal(b, k, idx) {
     langOpts  = langList.map(([v,l]) => `<option value="${v}" ${curLang===v?'selected':''}>${l}</option>`).join('');
   }
 
-  const viaList = ['RDV','GYG','Viator','Grape Escapes','FrenchTour','Challanges','Go Côté Saône','Winalist','OT','BFC','À REGLER'];
+  const viaList = ['RDV','GYG','Viator','TripAdvisor','Grape Escapes','FrenchTour','Challanges','Go Côté Saône','Winalist','OT','BFC','À REGLER'];
   document.getElementById('modal-body').innerHTML = `
     <datalist id="dl-act">${actListOpts}</datalist>
     <div class="form-group"><label class="form-label">Prestation</label>
@@ -2404,12 +2404,13 @@ function openFHDetail(k, idx) {
   const participants = bk.participants || [{ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, via: bk.via, comment: bk.comment, bookingPk: bk.bookingPk, status: bk.status }];
   document.getElementById('modal-title').textContent = 'FareHarbor · ' + DAYS_FR[date.getDay()] + ' ' + date.getDate() + ' ' + MONTHS_FR[date.getMonth()];
 
-  const VIA_OPTIONS = ['', 'RDV', 'GYG', 'Viator', 'GE', 'FrenchTour', 'Challanges', 'Go Côté Saône', 'Winalist', 'OT', 'BFC', 'À REGLER'];
+  const VIA_OPTIONS = ['', 'RDV', 'GYG', 'Viator', 'TripAdvisor', 'GE', 'FrenchTour', 'Challanges', 'Go Côté Saône', 'Winalist', 'OT', 'BFC', 'À REGLER'];
   const VIA_LABELS  = {
     '':              '— Aucun canal',
     'RDV':           '(RDV) Rue des Vignerons',
     'GYG':           '(GYG) GetYourGuide',
     'Viator':        '(Viator) Viator',
+    'TripAdvisor':   '(TripAdvisor) TripAdvisor',
     'GE':            '(GE) Grape Escapes',
     'FrenchTour':    '(FrenchTour) MyFrenchTour',
     'Challanges':    '(Challanges) Château de Challanges',
