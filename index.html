@@ -1146,16 +1146,18 @@ function isCaveauFermeDefault(d) {
   return (m <= 1) ? (dow === 6 || dow === 0) : (dow === 0 || dow === 1);
 }
 function isDayFerme(b, k, d) {
-  if (b !== 'delorme') return false;
   const exc = state.boutiques[b].exceptions?.[k];
-  if (exc === 'ouvert') return false;
-  if (exc === 'ferme')  return true;
-  return isCaveauFermeDefault(d);
+  if (b === 'delorme') {
+    if (exc === 'ouvert') return false;
+    if (exc === 'ferme')  return true;
+    return isCaveauFermeDefault(d);
+  }
+  // bulle : ouvert par défaut, sauf exception manuelle
+  return exc === 'ferme';
 }
 function toggleException(b, k) {
-  if (b !== 'delorme') return;
   const d   = fromKey(k);
-  const def = isCaveauFermeDefault(d);
+  const def = b === 'delorme' ? isCaveauFermeDefault(d) : false; // bulle : jamais fermé par défaut
   if (!state.boutiques[b].exceptions) state.boutiques[b].exceptions = {};
   const exc = state.boutiques[b].exceptions[k];
   if (exc) {
@@ -1620,7 +1622,7 @@ function render() {
     const note     = getNote(b, k);
     const rows     = Math.max(bookings.length, 1);
     const ferme    = isDayFerme(b, k, d);
-    const exc      = b === 'delorme' ? (state.boutiques[b].exceptions?.[k] || null) : null;
+    const exc      = state.boutiques[b].exceptions?.[k] || null;
     const ferie    = isFerie(d);
 
     if (alert) alertDaysList.push({ d: new Date(d), k });
@@ -1646,9 +1648,9 @@ function render() {
     // ── FIRST ROW ──
     html += '<tr class="' + rowCls + '" id="day-' + k + '">';
 
-    // Jour (rowspan) + bouton exception pour Delorme
+    // Jour (rowspan) + bouton exception (toutes boutiques)
     let jourContent = DAYS_FR[dow];
-    if (b === 'delorme') {
+    {
       const excTitle = exc
         ? 'Annuler l\'exception (retour au défaut)'
         : (ferme ? 'Marquer comme ouvert (exception)' : 'Marquer comme fermé (exception)');
