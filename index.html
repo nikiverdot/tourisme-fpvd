@@ -1227,6 +1227,8 @@ function getEffectiveStatus(b, k, emp, ferme) {
   if (emp === 'Monique' || emp.includes('CDD')) return null;
   // Julie : par défaut André Delorme dans les deux boutiques
   if (emp === 'Julie' && !ferme) return 'ad';
+  // Dimanche fermé : REPOS par défaut (pas de travail)
+  if (ferme && fromKey(k).getDay() === 0) return 'repos';
   // Bulle : VA par défaut (en vente à l'ADB) ; Delorme et autres : OFF
   return b === 'bulle' ? 'va' : 'off';
 }
