@@ -240,6 +240,11 @@ td.emp-cell { padding: 3px 3px; text-align: center; vertical-align: middle !impo
   font-size: 10px; font-weight: 800; letter-spacing: 0.03em; gap: 2px;
   min-height: 17px; width: 100%;
 }
+.status-third {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 800; letter-spacing: 0.03em; gap: 2px;
+  min-height: 11px; width: 100%;
+}
 .half-tag { font-size: 7px; opacity: 0.65; font-weight: 600; }
 /* Boutons période dans la modale */
 .period-btn {
@@ -1079,6 +1084,24 @@ function clearStatusPM(b,k,e) {
   if (state.boutiques[other].employees.includes(e) && state.boutiques[other].schedulePM?.[k])
     delete state.boutiques[other].schedulePM[k][e];
 }
+function getStatusSoir(b,k,e) { return state.boutiques[b].scheduleSoir?.[k]?.[e] ?? null; }
+function setStatusSoir(b,k,e,s) {
+  if (!state.boutiques[b].scheduleSoir) state.boutiques[b].scheduleSoir = {};
+  if (!state.boutiques[b].scheduleSoir[k]) state.boutiques[b].scheduleSoir[k] = {};
+  state.boutiques[b].scheduleSoir[k][e] = s;
+  const other = b==='bulle'?'delorme':'bulle';
+  if (state.boutiques[other].employees.includes(e)) {
+    if (!state.boutiques[other].scheduleSoir) state.boutiques[other].scheduleSoir = {};
+    if (!state.boutiques[other].scheduleSoir[k]) state.boutiques[other].scheduleSoir[k] = {};
+    state.boutiques[other].scheduleSoir[k][e] = s;
+  }
+}
+function clearStatusSoir(b,k,e) {
+  if (state.boutiques[b].scheduleSoir?.[k]) delete state.boutiques[b].scheduleSoir[k][e];
+  const other = b==='bulle'?'delorme':'bulle';
+  if (state.boutiques[other].employees.includes(e) && state.boutiques[other].scheduleSoir?.[k])
+    delete state.boutiques[other].scheduleSoir[k][e];
+}
 function clearStatus(b,k,e) {
   if (state.boutiques[b].schedule?.[k]) delete state.boutiques[b].schedule[k][e];
   const other = b==='bulle'?'delorme':'bulle';
@@ -1192,16 +1215,18 @@ function toggleException(b, k) {
 }
 // Retourne le statut effectif : Julie = AD automatique sur jours ouverts
 function getEffectiveStatus(b, k, emp, ferme) {
+  // Dates d'entrée/sortie : priorité absolue, ignorent les données Firebase
+  if (emp === 'Estelle' && k < '2026-01-21') return null;
+  if (emp === 'Agathe'  && k < '2026-02-02') return null;
+  if (emp === 'Agathe'  && b === 'bulle' && k > '2027-02-28') return null;
+  if (emp === 'Alice'   && b === 'bulle' && k > '2026-12-31') return null;
+
   const raw = state.boutiques[b].schedule?.[k]?.[emp];
   if (raw !== undefined) return raw;                   // valeur explicite → priorité
   // Monique et postes CDD : pas de statut par défaut (cellule vide, comme Renfort)
   if (emp === 'Monique' || emp.includes('CDD')) return null;
   // Julie : par défaut André Delorme dans les deux boutiques
   if (emp === 'Julie' && !ferme) return 'ad';
-  // Agathe : VA jusqu'à fin février 2027, puis cellule vide (contrat terminé)
-  if (emp === 'Agathe' && b === 'bulle' && k > '2027-02-28') return null;
-  // Alice : VA jusqu'au 31 déc 2026, puis cellule vide (contrat terminé)
-  if (emp === 'Alice' && b === 'bulle' && k > '2026-12-31') return null;
   // Bulle : VA par défaut (en vente à l'ADB) ; Delorme et autres : OFF
   return b === 'bulle' ? 'va' : 'off';
 }
@@ -1743,11 +1768,26 @@ function render() {
       const sn = getStatusNote(b, k, emp);
       const noteHtml = sn ? '<span class="status-note">' + esc(sn) + '</span>' : '';
       const consecHtml = consec>=6 ? '<span style="font-size:7px;opacity:.8">'+consec+'j</span>' : '';
-      const sPM = getStatusPM(b, k, emp);
+      const sPM   = getStatusPM(b, k, emp);
+      const sSoir = getStatusSoir(b, k, emp);
       const sClass  = STATUS_CLASSES[s]  || '';
       const sAbbr   = STATUS_ABBR[s]     || '';
       const sLabel  = STATUS_LABELS[s]   || '—';
-      if (sPM !== null && !ferme) {
+      if (sSoir !== null && !ferme) {
+        // Cellule trois-tiers : AM / PM / Soir
+        const sPMClass   = STATUS_CLASSES[sPM   ?? s] || '';
+        const sPMAbbr    = STATUS_ABBR[sPM       ?? s] || '';
+        const sPMLabel   = STATUS_LABELS[sPM     ?? s] || '—';
+        const sSoirClass = STATUS_CLASSES[sSoir] || '';
+        const sSoirAbbr  = STATUS_ABBR[sSoir]    || '';
+        const sSoirLabel = STATUS_LABELS[sSoir]  || '—';
+        html += '<td class="emp-cell" data-col="emp-' + empIdx + '" rowspan="' + rows + '">' +
+          '<div class="status-cell' + warnCls + '" style="padding:0;gap:0;overflow:hidden;border-color:#94a3b8" ' + clickEvt + ' title="Matin: ' + sLabel + ' · Après-midi: ' + sPMLabel + ' · Soir: ' + sSoirLabel + warnTip + '">' +
+          '<div class="status-third ' + sClass      + '" style="border-bottom:1px solid rgba(0,0,0,.08)">' + sAbbr     + '<span class="half-tag">M</span></div>' +
+          '<div class="status-third ' + sPMClass    + '" style="border-bottom:1px solid rgba(0,0,0,.08)">' + sPMAbbr   + '<span class="half-tag">A</span></div>' +
+          '<div class="status-third ' + sSoirClass  + '">' + sSoirAbbr + '<span class="half-tag">S</span>' + noteHtml + '</div>' +
+          '</div></td>';
+      } else if (sPM !== null && !ferme) {
         // Cellule demi-journée : AM en haut, PM en bas
         const sPMClass = STATUS_CLASSES[sPM] || '';
         const sPMAbbr  = STATUS_ABBR[sPM]    || '';
@@ -2173,12 +2213,15 @@ function openStatusModal(b, k, emp) {
   const date    = fromKey(k);
   const curAM   = getStatus(b, k, emp);
   const curPM   = getStatusPM(b, k, emp);
+  const curSoir = getStatusSoir(b, k, emp);
   const curNote = getStatusNote(b, k, emp);
   const defWork = b === 'bulle' ? 'va' : 'ad';
 
   // Déduire la période initiale
   let initPeriod, initStatus;
-  if (curPM === null) {
+  if (curSoir !== null) {
+    initPeriod = 'soir'; initStatus = curSoir; // statut spécial le soir
+  } else if (curPM === null) {
     initPeriod = 'full'; initStatus = curAM;
   } else if (curPM === defWork) {
     initPeriod = 'am';   initStatus = curAM;   // statut spécial le matin
@@ -2198,6 +2241,7 @@ function openStatusModal(b, k, emp) {
     '<div class="period-btn' + (initPeriod==='full'?' selected':'') + '" id="per-full" onclick="selectPeriod(\'full\')">☀ Journée</div>' +
     '<div class="period-btn' + (initPeriod==='am'?' selected':'') + '" id="per-am"   onclick="selectPeriod(\'am\')">🌅 Matin</div>' +
     '<div class="period-btn' + (initPeriod==='pm'?' selected':'') + '" id="per-pm"   onclick="selectPeriod(\'pm\')">🌆 Après-midi</div>' +
+    '<div class="period-btn' + (initPeriod==='soir'?' selected':'') + '" id="per-soir" onclick="selectPeriod(\'soir\')">🌙 Soir</div>' +
     '</div>' +
     // Sélecteur de statut
     '<p style="font-size:11px;color:#64748b;margin-bottom:9px">Statut :</p>' +
@@ -2220,7 +2264,7 @@ let pendingStatus = null;
 let pendingPeriod = 'full';
 function selectPeriod(p) {
   pendingPeriod = p;
-  ['full','am','pm'].forEach(x => document.getElementById('per-'+x)?.classList.toggle('selected', x===p));
+  ['full','am','pm','soir'].forEach(x => document.getElementById('per-'+x)?.classList.toggle('selected', x===p));
   updatePriorityWarning();
 }
 function selectStatus(s) {
@@ -2241,17 +2285,25 @@ function saveStatus() {
     if (period === 'am') {
       setStatus(b, k, emp, pendingStatus);  // AM = statut choisi (cross-sync inclus)
       setStatusPM(b, k, emp, defWork);      // PM = présent à la boutique
+      clearStatusSoir(b, k, emp);
     } else if (period === 'pm') {
       setStatus(b, k, emp, defWork);        // AM = présent à la boutique
       setStatusPM(b, k, emp, pendingStatus);// PM = statut choisi
+      clearStatusSoir(b, k, emp);
+    } else if (period === 'soir') {
+      setStatus(b, k, emp, defWork);        // AM = présent
+      setStatusPM(b, k, emp, defWork);      // PM = présent
+      setStatusSoir(b, k, emp, pendingStatus); // Soir = statut choisi
     } else {
       setStatus(b, k, emp, pendingStatus);  // Journée entière
-      clearStatusPM(b, k, emp);            // Supprimer toute demi-journée
+      clearStatusPM(b, k, emp);
+      clearStatusSoir(b, k, emp);
     }
   } else {
     // Effacer : supprimer le statut explicite (retour à la valeur par défaut de l'employé)
     clearStatus(b, k, emp);
     clearStatusPM(b, k, emp);
+    clearStatusSoir(b, k, emp);
   }
   setStatusNote(b, k, emp, note);
   const other = b === 'bulle' ? 'delorme' : 'bulle';
@@ -2427,8 +2479,6 @@ function openFHDetail(k, idx) {
     ['🇩🇪', '🇩🇪 Allemand'],
     ['🇯🇵', '🇯🇵 Japonais'],
     ['🇳🇱', '🇳🇱 Néerlandais'],
-    ['🇨🇳', '🇨🇳 Chinois'],
-    ['🇪🇸', '🇪🇸 Espagnol'],
     ['🇺🇸', '🇺🇸 English (US)'],
   ];
 
