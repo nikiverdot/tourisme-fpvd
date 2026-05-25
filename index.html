@@ -1133,7 +1133,11 @@ function getAllBookings(b,k) {
 function maxGroupPax(b,k) { return getAllBookings(b,k).reduce((m,bk)=>Math.max(m,bk.pax||0),0); }
 function absentCount(b,k) {
   const sc = state.boutiques[b].schedule?.[k]||{};
-  return state.boutiques[b].employees.filter(e=>['repos','conges','formation','maladie'].includes(sc[e]||'off')).length;
+  // Monique et postes CDD ne comptent pas dans le seuil d'alerte (postes optionnels)
+  return state.boutiques[b].employees
+    .filter(e => e !== 'Monique' && !e.includes('CDD'))
+    .filter(e => ['repos','conges','formation','maladie'].includes(sc[e]||'off'))
+    .length;
 }
 function isAlert(b,k) { return absentCount(b,k)>=3 && maxGroupPax(b,k)>=10; }
 
@@ -2539,7 +2543,7 @@ function csvDateToKey(str) {
   if (parts.length < 2) return null;
   const d = parseInt(parts[0]), m = CSV_MONTHS[parts[1]];
   if (!d || !m) return null;
-  return '2026-' + String(m).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+  return state.currentYear + '-' + String(m).padStart(2,'0') + '-' + String(d).padStart(2,'0');
 }
 
 // ── Travailleurs temporaires (leur nom dans une colonne = l'employé permanent est absent) ──
