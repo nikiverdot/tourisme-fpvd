@@ -1782,7 +1782,7 @@ function renderVisiteCell(bk, b, k, idx, isLast) {
     const priceTag = bk.price ? ' <span style="color:#475569;font-size:10px">(' + esc(bk.price) + ')</span>' : '';
     const via      = bk.via || '';
     let langPart = [bk.langCode, bk.langFlag].filter(Boolean).join(' ');
-    if (bk.langCode === 'GUIDÉE') langPart = '👤 GUIDÉE' + (bk.guide ? ' · ' + esc(bk.guide) : '');
+    if (bk.langCode === 'GUIDÉE') langPart = '👤 GUIDÉE' + (bk.guideLanguage ? ' ' + bk.guideLanguage : '') + (bk.guide ? ' · ' + esc(bk.guide) : '');
     if (bk.activity) {
       // Format identique FH: "10h30 : Activité FRA 🇫🇷 — 30pax Client (RDV)"
       label = '<strong>' + timePart + '</strong> : ' + esc(bk.activity)
@@ -2215,12 +2215,20 @@ function openBookingModal(b, k, idx) {
       <div class="form-group"><label class="form-label">Heure</label><input id="f-time" class="form-input" type="text" inputmode="numeric" placeholder="10h00" value="${bk.time||''}" onblur="fmtTime(this)"></div>
       <div class="form-group"><label class="form-label">${langLabel}</label><select id="f-lang" class="form-select" onchange="toggleGuideRow()">${langOpts}</select></div>
     </div>
-    ${b === 'bulle' ? `<div id="guide-row" class="form-group" style="${bk.langCode==='GUIDÉE'?'':'display:none'}">
-      <label class="form-label">👤 Guide</label>
-      <select id="f-guide" class="form-select">
-        <option value="">— Choisir le guide</option>
-        ${state.boutiques.bulle.employees.map(e => `<option value="${esc(e)}" ${(bk.guide||'')===e?'selected':''}>${esc(e)}</option>`).join('')}
-      </select>
+    ${b === 'bulle' ? `<div id="guide-row" style="${bk.langCode==='GUIDÉE'?'display:grid':'display:none'};grid-template-columns:1fr 1fr;gap:8px">
+      <div class="form-group"><label class="form-label">👤 Guide</label>
+        <select id="f-guide" class="form-select">
+          <option value="">— Choisir le guide</option>
+          ${state.boutiques.bulle.employees.map(e => `<option value="${esc(e)}" ${(bk.guide||'')===e?'selected':''}>${esc(e)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Langue</label>
+        <select id="f-guide-lang" class="form-select">
+          <option value="">— Langue</option>
+          <option value="🇫🇷" ${(bk.guideLanguage||'')==='🇫🇷'?'selected':''}>Français 🇫🇷</option>
+          <option value="🇬🇧" ${(bk.guideLanguage||'')==='🇬🇧'?'selected':''}>Anglais 🇬🇧</option>
+        </select>
+      </div>
     </div>` : ''}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <div class="form-group"><label class="form-label">Pax</label><input id="f-pax" class="form-input" type="number" min="1" placeholder="10" value="${bk.pax||''}"></div>
@@ -2254,15 +2262,15 @@ function fmtTime(inp) {
   inp.value = h + 'h' + String(m).padStart(2, '0');
 }
 function toggleGuideRow() {
-  const langEl    = document.getElementById('f-lang');
-  const guideRow  = document.getElementById('guide-row');
-  if (guideRow) guideRow.style.display = (langEl && langEl.value === 'GUIDÉE|') ? '' : 'none';
+  const langEl   = document.getElementById('f-lang');
+  const guideRow = document.getElementById('guide-row');
+  if (guideRow) guideRow.style.display = (langEl && langEl.value === 'GUIDÉE|') ? 'grid' : 'none';
 }
 function saveBooking() {
   const {b,k,idx}=modalCtx;
   const timeInp = document.getElementById('f-time'); fmtTime(timeInp);
   const langVal = (document.getElementById('f-lang').value||'').split('|');
-  const bk={time:timeInp.value, pax:parseInt(document.getElementById('f-pax').value)||0, status:document.getElementById('f-status').value, via:document.getElementById('f-via').value.trim(), activity:document.getElementById('f-activity').value.trim(), langCode:langVal[0]||'', langFlag:langVal[1]||'', guide:(document.getElementById('f-guide')?.value||'').trim(), description:document.getElementById('f-desc').value.trim(), comment:document.getElementById('f-comment').value.trim(), price:document.getElementById('f-price').value.trim()};
+  const bk={time:timeInp.value, pax:parseInt(document.getElementById('f-pax').value)||0, status:document.getElementById('f-status').value, via:document.getElementById('f-via').value.trim(), activity:document.getElementById('f-activity').value.trim(), langCode:langVal[0]||'', langFlag:langVal[1]||'', guide:(document.getElementById('f-guide')?.value||'').trim(), guideLanguage:(document.getElementById('f-guide-lang')?.value||'').trim(), description:document.getElementById('f-desc').value.trim(), comment:document.getElementById('f-comment').value.trim(), price:document.getElementById('f-price').value.trim()};
   if(!state.boutiques[b].bookings[k]) state.boutiques[b].bookings[k]=[];
   if(idx!==null&&idx>=0) state.boutiques[b].bookings[k][idx]=bk;
   else state.boutiques[b].bookings[k].push(bk);
