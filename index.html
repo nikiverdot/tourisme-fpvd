@@ -1243,16 +1243,15 @@ function getEffectiveStatus(b, k, emp, ferme) {
   // Règles absolues — priorité sur les données Firebase
   if (emp === 'Estelle' && k < '2026-01-21') return null;
   if (emp === 'Agathe'  && k < '2026-02-02') return null;
-  if (emp === 'Agathe'  && b === 'bulle' && k > '2027-02-28') return null;
+  if (emp === 'Agathe'  && k > '2027-02-28') return null;   // fin contrat toutes boutiques
   if (emp === 'Alice'   && b === 'bulle' && k > '2026-12-31') return null;
+  if (emp === 'Julie'   && !ferme) return 'ad';              // AD par défaut toujours
   if (ferme && fromKey(k).getDay() === 0 && emp !== 'Monique' && !emp.includes('CDD')) return 'repos'; // dimanche fermé → REPOS (sauf Monique/CDD)
 
   const raw = state.boutiques[b].schedule?.[k]?.[emp];
   if (raw !== undefined) return raw;                   // valeur explicite → priorité
   // Monique et postes CDD : pas de statut par défaut (cellule vide, comme Renfort)
   if (emp === 'Monique' || emp.includes('CDD')) return null;
-  // Julie : par défaut André Delorme dans les deux boutiques
-  if (emp === 'Julie' && !ferme) return 'ad';
   // Bulle : VA par défaut (en vente à l'ADB) ; Delorme et autres : OFF
   return b === 'bulle' ? 'va' : 'off';
 }
