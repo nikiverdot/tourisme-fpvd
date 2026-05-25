@@ -2149,35 +2149,70 @@ function openBookingModal(b, k, idx) {
   modalCtx  = { type:'booking', b, k, idx };
   const date = fromKey(k);
   const edit = idx!==null && idx>=0;
-  // New bookings default to "à régler"; existing use saved status (fallback: confirmed)
   const defStatus = edit ? (bk.status || 'confirmed') : 'a_regler';
   document.getElementById('modal-title').textContent = (edit?'Modifier':'Ajouter') + ' visite · ' + DAYS_FR[date.getDay()] + ' ' + date.getDate() + ' ' + MONTHS_FR[date.getMonth()];
-  // Build activity datalist: hardcoded AD prestations + dynamic from fhBookings
-  const fhActs = new Set([
-    'Dégustation Découverte de la Côte Chalonnaise',
-    'Dégustation Découverte Effervescente',
-    'Visite & Dégustation : de la Cave à la Coupe',
-    'Visite & Dégustation : Bouchées du Terroir',
-    'Visite & Dégustation : Saveurs du Terroir (Mâchon)',
-    'Visite & Dégustation : Accords Vins & Mets du Chef',
-  ]);
-  Object.values(fhBookings).forEach(evs => evs.forEach(ev => { if(ev.activity) fhActs.add(ev.activity); }));
-  const actListOpts = [...fhActs].sort().map(a => `<option value="${esc(a)}">`).join('');
-  const langList = [
-    ['','— Langue'],['FRA|🇫🇷','Français 🇫🇷'],['ENG|🇬🇧','English 🇬🇧'],['USA|🇺🇸','English 🇺🇸'],
-    ['DEU|🇩🇪','Deutsch 🇩🇪'],['ESP|🇪🇸','Español 🇪🇸'],['ITA|🇮🇹','Italiano 🇮🇹'],
-    ['NLD|🇳🇱','Nederlands 🇳🇱'],['PRT|🇵🇹','Português 🇵🇹'],['CHN|🇨🇳','中文 🇨🇳'],['JPN|🇯🇵','日本語 🇯🇵']
-  ];
-  const curLang = (bk.langCode&&bk.langFlag) ? bk.langCode+'|'+bk.langFlag : '';
-  const langOpts = langList.map(([v,l]) => `<option value="${v}" ${curLang===v?'selected':''}>${l}</option>`).join('');
+
+  // ── Activity datalist : boutique-specific ──────────────────────────
+  let actListOpts, actPlaceholder, actDefaultVal;
+  if (b === 'bulle') {
+    // ADB : une seule prestation
+    actListOpts   = '<option value="Visite/Dégustation">';
+    actPlaceholder = 'Visite/Dégustation';
+    actDefaultVal  = bk.activity || 'Visite/Dégustation';
+  } else {
+    // AD : prestations fixes + dynamiques depuis FH Delorme
+    const fhActs = new Set([
+      'Dégustation Découverte de la Côte Chalonnaise',
+      'Dégustation Découverte Effervescente',
+      'Visite & Dégustation : de la Cave à la Coupe',
+      'Visite & Dégustation : Bouchées du Terroir',
+      'Visite & Dégustation : Saveurs du Terroir (Mâchon)',
+      'Visite & Dégustation : Accords Vins & Mets du Chef',
+    ]);
+    Object.values(fhBookings).forEach(evs => evs.forEach(ev => {
+      if (ev.activity && ev.boutique === 'delorme') fhActs.add(ev.activity);
+    }));
+    actListOpts   = [...fhActs].sort().map(a => `<option value="${esc(a)}">`).join('');
+    actPlaceholder = 'Visite & Dégustation…';
+    actDefaultVal  = bk.activity || '';
+  }
+
+  // ── Language field : boutique-specific ────────────────────────────
+  let langLabel, langOpts;
+  if (b === 'bulle') {
+    // ADB : AudioGuide ou Visite Guidée
+    const bulleVisites = [
+      ['',          '— Visite libre (sans guide)'],
+      ['🎧 FR|',    '🎧 AudioGuide Français'],
+      ['🎧 EN|',    '🎧 AudioGuide Anglais'],
+      ['🎧 DE|',    '🎧 AudioGuide Allemand'],
+      ['🎧 JA|',    '🎧 AudioGuide Japonais'],
+      ['🎧 NL|',    '🎧 AudioGuide Néerlandais'],
+      ['GUIDÉE|',   '👤 Visite GUIDÉE'],
+    ];
+    const curBulle = bk.langCode ? bk.langCode + '|' : '';
+    langLabel = 'Type de visite';
+    langOpts  = bulleVisites.map(([v,l]) => `<option value="${v}" ${curBulle===v?'selected':''}>${l}</option>`).join('');
+  } else {
+    // AD : sélection de langue
+    const langList = [
+      ['','— Langue'],['FRA|🇫🇷','Français 🇫🇷'],['ENG|🇬🇧','English 🇬🇧'],['USA|🇺🇸','English 🇺🇸'],
+      ['DEU|🇩🇪','Deutsch 🇩🇪'],['ESP|🇪🇸','Español 🇪🇸'],['ITA|🇮🇹','Italiano 🇮🇹'],
+      ['NLD|🇳🇱','Nederlands 🇳🇱'],['PRT|🇵🇹','Português 🇵🇹'],['CHN|🇨🇳','中文 🇨🇳'],['JPN|🇯🇵','日本語 🇯🇵']
+    ];
+    const curLang = (bk.langCode&&bk.langFlag) ? bk.langCode+'|'+bk.langFlag : '';
+    langLabel = 'Langue';
+    langOpts  = langList.map(([v,l]) => `<option value="${v}" ${curLang===v?'selected':''}>${l}</option>`).join('');
+  }
+
   const viaList = ['RDV','GYG','Viator','Grape Escapes','FrenchTour','Challanges','Go Côté Saône','Winalist','OT','BFC','À REGLER'];
   document.getElementById('modal-body').innerHTML = `
     <datalist id="dl-act">${actListOpts}</datalist>
     <div class="form-group"><label class="form-label">Prestation</label>
-      <input id="f-activity" class="form-input" list="dl-act" placeholder="Visite & Dégustation…" value="${esc(bk.activity||'')}"></div>
+      <input id="f-activity" class="form-input" list="dl-act" placeholder="${actPlaceholder}" value="${esc(actDefaultVal)}"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <div class="form-group"><label class="form-label">Heure</label><input id="f-time" class="form-input" type="text" inputmode="numeric" placeholder="10h00" value="${bk.time||''}" onblur="fmtTime(this)"></div>
-      <div class="form-group"><label class="form-label">Langue</label><select id="f-lang" class="form-select">${langOpts}</select></div>
+      <div class="form-group"><label class="form-label">${langLabel}</label><select id="f-lang" class="form-select">${langOpts}</select></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <div class="form-group"><label class="form-label">Pax</label><input id="f-pax" class="form-input" type="number" min="1" placeholder="10" value="${bk.pax||''}"></div>
