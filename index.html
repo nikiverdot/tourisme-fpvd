@@ -665,6 +665,7 @@ let state = {
 let fhBookings   = {};
 let fhChannelMap = {};   // bookingPk → via code (from FH API)
 let fhTags       = {};   // bookingPk → via code (manuel, persisté Firebase)
+let fhNotes      = {};   // bookingPk → note interne (persisté Firebase)
 let modalCtx     = null;
 let firstDataLoad = true;
 let db          = null;
@@ -1270,12 +1271,16 @@ async function syncFareHarbor() {
       const channelCnt = Object.keys(channelMap).length;
       events.forEach(ev => { if (!ev.via && ev.bookingPk && channelMap[ev.bookingPk]) ev.via = channelMap[ev.bookingPk]; });
 
-      // Load manual tags from Firebase and apply
+      // Load manual tags + internal notes from Firebase
       if (db) {
         try {
-          const tagsSnap = await db.ref('piffaut-fh-tags').once('value');
-          fhTags = tagsSnap.val() || {};
-        } catch(e) { fhTags = {}; }
+          const [tagsSnap, notesSnap] = await Promise.all([
+            db.ref('piffaut-fh-tags').once('value'),
+            db.ref('piffaut-fh-notes').once('value')
+          ]);
+          fhTags  = tagsSnap.val()  || {};
+          fhNotes = notesSnap.val() || {};
+        } catch(e) { fhTags = {}; fhNotes = {}; }
       }
       events.forEach(ev => { if (!ev.via && ev.bookingPk && fhTags[ev.bookingPk]) ev.via = fhTags[ev.bookingPk]; });
 
@@ -1313,6 +1318,21 @@ async function saveFHTag(bookingPk, via) {
   closeModal();
   render();
   toast('✅ ' + (via ? '(' + via + ') enregistré' : 'Tag retiré'), '#16a34a');
+}
+
+async function saveFHNote(bookingPk, note) {
+  if (!db || !bookingPk) return;
+  bookingPk = parseInt(bookingPk);
+  note = (note || '').trim();
+  if (note) {
+    fhNotes[bookingPk] = note;
+    await db.ref('piffaut-fh-notes/' + bookingPk).set(note);
+  } else {
+    delete fhNotes[bookingPk];
+    await db.ref('piffaut-fh-notes/' + bookingPk).remove();
+  }
+  render();
+  toast('✅ Note enregistrée', '#16a34a');
 }
 
 // ═══ FH CSV AFFILIATE IMPORT ══════════════════
@@ -1706,6 +1726,8 @@ function renderVisiteCell(bk, b, k, idx, isLast) {
       if (p.langFlag)   parts.push(p.langFlag);
       if (p.clientName) parts.push(esc(p.clientName));
       parts.push(p.via ? viaLabel(p.via) : fhBadge);  // badge par participant
+      const internalNote = p.bookingPk && fhNotes[p.bookingPk];
+      if (internalNote) parts.push('<span style="font-size:10px;color:#64748b;font-style:italic">📝 ' + esc(internalNote.slice(0,40)) + '</span>');
       return parts.join(' ');
     }).join(' <span style="color:#64748b;font-weight:900"> + </span>');
     label = '<strong>' + timePart + '</strong> : ' + activity + ' — ' + partStr;
@@ -2141,6 +2163,17 @@ function openFHDetail(k, idx) {
       + opts + '</select></div>';
   };
 
+  const noteField = (p) => {
+    if (!p.bookingPk) return '';
+    const cur = fhNotes[p.bookingPk] || '';
+    return '<div style="margin-top:6px">'
+      + '<div style="font-size:10px;color:#64748b;margin-bottom:3px">📝 Note interne :</div>'
+      + '<div style="display:flex;gap:5px;align-items:flex-start">'
+      + '<textarea id="fh-note-'+p.bookingPk+'" rows="2" style="flex:1;font-size:11px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:4px;resize:vertical;font-family:inherit;color:#1e293b" placeholder="Allergies, préférences, infos équipe…">'+esc(cur)+'</textarea>'
+      + '<button onclick="saveFHNote('+p.bookingPk+',document.getElementById(\'fh-note-'+p.bookingPk+'\').value)" style="font-size:10px;padding:4px 7px;background:#0e5c5c;color:white;border:none;border-radius:4px;cursor:pointer;white-space:nowrap">💾</button>'
+      + '</div></div>';
+  };
+
   let partHtml = '';
   if (participants.length > 1) {
     partHtml = '<div class="form-group"><label class="form-label">Groupes (' + participants.length + ')</label>';
@@ -2156,6 +2189,7 @@ function openFHDetail(k, idx) {
         + '</div></div>'
         + (p.comment ? '<div style="font-size:11px;color:#64748b;margin-top:3px;padding-left:24px">💬 ' + esc(p.comment) + '</div>' : '')
         + tagSelect(p)
+        + noteField(p)
         + '</div>';
     });
     partHtml += '</div>';
@@ -2165,7 +2199,8 @@ function openFHDetail(k, idx) {
       + (p.via && VIA_FH[p.via] ? ' <span style="font-size:9px;font-weight:800;padding:1px 4px;border-radius:3px;'+VIA_FH[p.via]+'">'+esc(p.via)+'</span>' : '')
       + '</div></div>' : '')
       + (p.comment ? '<div class="form-group"><label class="form-label">Commentaire client</label><div style="padding:5px;font-size:12px;color:#475569;font-style:italic">💬 ' + esc(p.comment) + '</div></div>' : '')
-      + '<div class="form-group">' + tagSelect(p) + '</div>';
+      + '<div class="form-group">' + tagSelect(p) + '</div>'
+      + '<div class="form-group">' + noteField(p) + '</div>';
   }
 
   document.getElementById('modal-body').innerHTML =
