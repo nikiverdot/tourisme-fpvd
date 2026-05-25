@@ -1796,43 +1796,35 @@ function render() {
   ).join('');
 }
 
-// ── Construit le texte d'une réservation (sans wrapper <td>) ──
-function buildVisiteLabel(bk) {
+// ── Corps d'une réservation sans le préfixe horaire ──
+function buildVisiteBody(bk) {
   const isFH = bk.source === 'fareharbor';
+  const isBulle = state.currentBoutique === 'bulle';
   const VIA_DISPLAY = { 'GE':'Grape Escapes' };
   const viaLabel = v => '<span style="font-size:13px;font-weight:900;color:#dc2626">('+esc(VIA_DISPLAY[v]||v)+')</span>';
-  const timePart = bk.time || '—';
-  let label;
+  const regler = '<span style="font-size:10px;font-weight:800;color:#b91c1c;background:#fef2f2;padding:1px 5px;border-radius:3px;border:1px solid #fca5a5">(À RÉGLER)</span>';
+
   if (isFH) {
-    const isBulle = state.currentBoutique === 'bulle';
     const participants = bk.participants || [{ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, via: bk.via, bookingPk: bk.bookingPk }];
     const fhBadge = '<span style="color:#dc2626;font-size:13px;font-weight:900">(FH)</span>';
     const partStr = participants.map(p => {
       const ov = (p.bookingPk && fhOverrides[p.bookingPk]) || {};
       const clientName = ov.clientName !== undefined ? ov.clientName : (p.clientName || '');
       const langFlag   = ov.langFlag   !== undefined ? ov.langFlag   : (p.langFlag   || '');
+      const status     = ov.status     !== undefined ? ov.status     : (p.status     || 'confirmed');
       const parts = [];
       if (p.pax)      parts.push(p.pax + 'pax');
       if (langFlag)   parts.push(langFlag);
       if (clientName) parts.push(esc(clientName));
       parts.push(p.via ? viaLabel(p.via) : fhBadge);
       const internalNote = p.bookingPk && fhNotes[p.bookingPk];
-      if (internalNote) {
-        const isRegler = /r[eé]gler/i.test(internalNote);
-        parts.push(isRegler
-          ? '<span style="font-size:10px;font-weight:800;color:#b91c1c;background:#fef2f2;padding:1px 5px;border-radius:3px;border:1px solid #fca5a5">' + esc(internalNote.slice(0,40).toUpperCase()) + '</span>'
-          : '<span style="font-size:10px;color:#64748b;font-style:italic">📝 ' + esc(internalNote.slice(0,40)) + '</span>');
-      }
+      if (internalNote) parts.push('<span style="font-size:10px;color:#64748b;font-style:italic">📝 ' + esc(internalNote.slice(0,40)) + '</span>');
+      if (status === 'a_regler') parts.push(regler);
       return parts.join(' ');
     }).join(' <span style="color:#64748b;font-weight:900"> + </span>');
-    if (isBulle) {
-      // ADB : une seule activité → pas besoin d'afficher le nom de la prestation
-      label = '<strong>' + timePart + '</strong> : ' + partStr;
-    } else {
-      const activity = esc(bk.activity || 'Dégustation');
-      label = '<strong>' + timePart + '</strong> : ' + activity + ' — ' + partStr;
-    }
+    return isBulle ? partStr : esc(bk.activity || 'Dégustation') + ' — ' + partStr;
   } else {
+    // Réservation manuelle
     const desc     = esc(bk.description || '');
     const paxPart  = bk.pax ? bk.pax + 'pax' : '';
     const comm     = bk.comment ? esc(bk.comment.slice(0,40)) : '';
@@ -1840,8 +1832,10 @@ function buildVisiteLabel(bk) {
     const via      = bk.via || '';
     let langPart = [bk.langCode, bk.langFlag].filter(Boolean).join(' ');
     if (bk.langCode === 'GUIDÉE') langPart = '👤 GUIDÉE' + (bk.guide ? ' (' + esc(bk.guide).toUpperCase() + ')' : '') + (bk.guideLanguage ? ' ' + bk.guideLanguage : '');
-    if (bk.activity) {
-      label = '<strong>' + timePart + '</strong> : ' + esc(bk.activity)
+    let body;
+    if (bk.activity && !isBulle) {
+      // Delorme : afficher le nom de la prestation
+      body = esc(bk.activity)
         + (langPart ? ' <span style="color:#64748b">' + langPart + '</span>' : '')
         + (paxPart  ? ' — ' + paxPart : '')
         + (desc     ? ' ' + desc : '')
@@ -1849,17 +1843,25 @@ function buildVisiteLabel(bk) {
         + priceTag
         + (comm     ? ' <span style="color:#94a3b8;font-size:10px"> · ' + comm + '</span>' : '');
     } else {
-      label = '<strong>' + timePart + '</strong>'
-        + (desc     ? ' : ' + desc : '')
-        + (paxPart  ? ' <span style="color:#94a3b8">— ' + paxPart + '</span>' : '')
+      // Bulle (ou sans prestation) : format court — pax + langue + description + via
+      body = (paxPart ? paxPart : '')
+        + (langPart ? ' <span style="color:#64748b">' + langPart + '</span>' : '')
+        + (desc     ? (paxPart || langPart ? ' ' : '') + desc : '')
         + (via      ? ' ' + viaLabel(via) : '')
         + priceTag
         + (comm     ? ' <span style="color:#94a3b8;font-size:10px"> · ' + comm + '</span>' : '');
     }
-    if (bk.status==='option')   label += ' <span class="visite-badge badge-option">option</span>';
-    if (bk.status==='a_regler') label += ' <span style="font-size:10px;font-weight:800;color:#b91c1c;background:#fef2f2;padding:1px 5px;border-radius:3px;border:1px solid #fca5a5">(À RÉGLER)</span>';
+    if (bk.status==='option')   body += ' <span class="visite-badge badge-option">option</span>';
+    if (bk.status==='a_regler') body += ' ' + regler;
+    return body;
   }
-  return label;
+}
+
+// ── Construit le label complet d'une réservation (avec préfixe horaire) ──
+function buildVisiteLabel(bk, showTime = true) {
+  const timePart = bk.time || '—';
+  const body = buildVisiteBody(bk);
+  return showTime ? '<strong>' + timePart + '</strong> : ' + body : body;
 }
 
 // ── Cellule d'un groupe horaire (1 ou plusieurs réservations à la même heure) ──
@@ -1879,20 +1881,21 @@ function renderGroupCell(group, b, k, isLast) {
       + '<div class="visite-line">' + buildVisiteLabel(bk) + '</div>'
       + addBtn + '</td>';
   }
-  // Plusieurs réservations au même horaire → empilées dans une seule cellule
-  let inner = '';
-  group.items.forEach((bk, i) => {
+  // Plusieurs réservations au même horaire → une seule ligne inline : "time : p1 + p2 + p3"
+  const timePart = group.time || '—';
+  const partsHtml = group.items.map((bk, i) => {
     const globalIdx = group.startIdx + i;
     const isFH = bk.source === 'fareharbor';
     const manualIdx = isFH ? globalIdx : (bk._manualIdx !== undefined ? bk._manualIdx : globalIdx);
     const onclick = isFH
       ? 'openFHDetail(\'' + k + '\',' + globalIdx + ')'
       : 'openBookingModal(\'' + b + '\',\'' + k + '\',' + manualIdx + ')';
-    inner += '<div class="visite-line" onclick="event.stopPropagation();' + onclick + '" style="cursor:pointer'
-      + (i > 0 ? ';border-top:1px dashed #e2e8f0;padding-top:3px;margin-top:2px' : '') + '">'
-      + buildVisiteLabel(bk) + '</div>';
-  });
-  return '<td class="visite-cell" data-col="visite" style="line-height:1.6">' + inner + addBtn + '</td>';
+    return '<span onclick="event.stopPropagation();' + onclick + '" style="cursor:pointer;white-space:nowrap">'
+      + buildVisiteBody(bk) + '</span>';
+  }).join(' <span style="color:#94a3b8;font-weight:700;padding:0 1px"> + </span> ');
+  return '<td class="visite-cell" data-col="visite" style="line-height:1.6">'
+    + '<div class="visite-line"><strong>' + timePart + '</strong> : ' + partsHtml + '</div>'
+    + addBtn + '</td>';
 }
 
 // ── Cellule d'une seule réservation (appelée depuis renderGroupCell) ──
@@ -2431,6 +2434,18 @@ function openFHDetail(k, idx) {
       + opts + '</select></div>';
   };
 
+  const reglerField = (p) => {
+    if (!p.bookingPk) return '';
+    const ov = fhOverrides[p.bookingPk] || {};
+    const cur = ov.status !== undefined ? ov.status : (p.status || 'confirmed');
+    const isRegler = cur === 'a_regler';
+    return '<div class="form-group">'
+      + '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0">'
+      + '<input type="checkbox"' + (isRegler ? ' checked' : '') + ' onchange="saveFHOverride(' + p.bookingPk + ',{status:this.checked?\'a_regler\':\'confirmed\'})" style="width:16px;height:16px;cursor:pointer;accent-color:#dc2626">'
+      + '<span style="font-size:12px;font-weight:600;color:' + (isRegler ? '#b91c1c' : '#64748b') + '">💳 Règlement sur place (À RÉGLER)</span>'
+      + '</label></div>';
+  };
+
   const nameField = (p) => {
     if (!p.bookingPk) return '';
     const ov = fhOverrides[p.bookingPk] || {};
@@ -2477,14 +2492,13 @@ function openFHDetail(k, idx) {
         + '<div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:8px">Groupe ' + (i+1) + ' · <strong style="color:#1e293b">' + (p.pax||0) + ' pers.</strong>'
         + (displayLang ? ' ' + displayLang : '') + statusBadge(p) + '</div>'
         + (p.comment ? '<div style="font-size:11px;color:#64748b;font-style:italic;margin-bottom:6px">💬 ' + esc(p.comment) + '</div>' : '')
-        + nameField(p) + langField(p) + tagSelect(p) + noteField(p)
+        + nameField(p) + langField(p) + reglerField(p) + tagSelect(p) + noteField(p)
         + '</div>';
     });
   } else {
     const p = participants[0];
     partHtml = (p.comment ? '<div class="form-group"><label class="form-label">💬 Commentaire client</label><div style="padding:5px;font-size:12px;color:#475569;font-style:italic">' + esc(p.comment) + '</div></div>' : '')
-      + (p.status && p.status !== 'confirmed' ? '<div class="form-group">' + statusBadge(p).replace('margin-left:4px','') + '</div>' : '')
-      + nameField(p) + langField(p) + tagSelect(p) + noteField(p);
+      + nameField(p) + langField(p) + reglerField(p) + tagSelect(p) + noteField(p);
   }
 
   // Show activity name only for AD (Delorme has multiple activities)
