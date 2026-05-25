@@ -1643,7 +1643,18 @@ function render() {
     const alert    = isAlert(b, k);
     const bookings = getAllBookings(b, k);
     const note     = getNote(b, k);
-    const rows     = Math.max(bookings.length, 1);
+    // Regrouper par horaire : plusieurs réservations à la même heure → une seule ligne
+    const timeGroups = [];
+    { let offset = 0;
+      for (const bk of bookings) {
+        const t = bk.time || '—';
+        const last = timeGroups[timeGroups.length - 1];
+        if (last && last.time === t) { last.items.push(bk); last.totalPax += (bk.pax||0); }
+        else { timeGroups.push({ time: t, items: [bk], totalPax: bk.pax||0, startIdx: offset }); }
+        offset++;
+      }
+    }
+    const rows     = Math.max(timeGroups.length, 1);
     const ferme    = isDayFerme(b, k, d);
     const exc      = state.boutiques[b].exceptions?.[k] || null;
     const ferie    = isFerie(d);
@@ -1693,12 +1704,13 @@ function render() {
     html += '</td>';
 
     // First visite (or empty + add btn)
-    if (bookings.length === 0) {
+    if (timeGroups.length === 0) {
       html += '<td class="visite-cell" data-col="visite"><span class="visite-empty">—</span><br><span class="add-visite-btn" onclick="openBookingModal(\'' + b + '\',\'' + k + '\',null)">+ ajouter</span></td>';
       html += '<td class="pax-cell" data-col="pax"></td>';
     } else {
-      html += renderVisiteCell(bookings[0], b, k, 0, bookings.length === 1);
-      html += '<td class="pax-cell' + ((bookings[0].pax||0)>=10?' pax-big':'') + '" data-col="pax">' + (bookings[0].pax||'') + '</td>';
+      const g0 = timeGroups[0];
+      html += renderGroupCell(g0, b, k, timeGroups.length === 1);
+      html += '<td class="pax-cell' + (g0.totalPax>=10?' pax-big':'') + '" data-col="pax">' + (g0.totalPax||'') + '</td>';
     }
 
     // Employee cells (rowspan)
@@ -1745,12 +1757,13 @@ function render() {
     }
     html += '</tr>';
 
-    // ── ADDITIONAL ROWS (one per extra booking) ──
-    for (let i = 1; i < bookings.length; i++) {
-      const isLast = (i === bookings.length - 1);
+    // ── ADDITIONAL ROWS (one per time group, not per booking) ──
+    for (let gi = 1; gi < timeGroups.length; gi++) {
+      const g = timeGroups[gi];
+      const isLast = (gi === timeGroups.length - 1);
       html += '<tr class="' + subCls + '">';
-      html += renderVisiteCell(bookings[i], b, k, i, isLast);
-      html += '<td class="pax-cell' + ((bookings[i].pax||0)>=10?' pax-big':'') + '" data-col="pax">' + (bookings[i].pax||'') + '</td>';
+      html += renderGroupCell(g, b, k, isLast);
+      html += '<td class="pax-cell' + (g.totalPax>=10?' pax-big':'') + '" data-col="pax">' + (g.totalPax||'') + '</td>';
       html += '</tr>';
     }
 
@@ -1769,22 +1782,13 @@ function render() {
   ).join('');
 }
 
-function renderVisiteCell(bk, b, k, idx, isLast) {
-  const isFH     = bk.source === 'fareharbor';
-  // After chronological sort, use the pre-tagged _manualIdx to reference the stored array
-  const manualIdx = isFH ? idx : (bk._manualIdx !== undefined ? bk._manualIdx : idx);
-  const onclick  = isFH
-    ? 'openFHDetail(\'' + k + '\',' + idx + ')'
-    : 'openBookingModal(\'' + b + '\',\'' + k + '\',' + manualIdx + ')';
-
-  // Build the single line: "11h : Activité - 2pax FRA 🇫🇷 Manon ZITTE"
-  const timePart   = bk.time || '—';
-  let   label;
-
-  // Canal badge — rouge, légèrement plus grand que le nom du client
+// ── Construit le texte d'une réservation (sans wrapper <td>) ──
+function buildVisiteLabel(bk) {
+  const isFH = bk.source === 'fareharbor';
   const VIA_DISPLAY = { 'GE':'Grape Escapes' };
   const viaLabel = v => '<span style="font-size:13px;font-weight:900;color:#dc2626">('+esc(VIA_DISPLAY[v]||v)+')</span>';
-
+  const timePart = bk.time || '—';
+  let label;
   if (isFH) {
     const activity = esc(bk.activity || 'Dégustation');
     const participants = bk.participants || [{ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, via: bk.via }];
@@ -1795,7 +1799,7 @@ function renderVisiteCell(bk, b, k, idx, isLast) {
       if (p.langCode)   parts.push(p.langCode);
       if (p.langFlag)   parts.push(p.langFlag);
       if (p.clientName) parts.push(esc(p.clientName));
-      parts.push(p.via ? viaLabel(p.via) : fhBadge);  // badge par participant
+      parts.push(p.via ? viaLabel(p.via) : fhBadge);
       const internalNote = p.bookingPk && fhNotes[p.bookingPk];
       if (internalNote) {
         const isRegler = /r[eé]gler/i.test(internalNote);
@@ -1815,7 +1819,6 @@ function renderVisiteCell(bk, b, k, idx, isLast) {
     let langPart = [bk.langCode, bk.langFlag].filter(Boolean).join(' ');
     if (bk.langCode === 'GUIDÉE') langPart = '👤 GUIDÉE' + (bk.guide ? ' (' + esc(bk.guide).toUpperCase() + ')' : '') + (bk.guideLanguage ? ' ' + bk.guideLanguage : '');
     if (bk.activity) {
-      // Format identique FH: "10h30 : Activité FRA 🇫🇷 — 30pax Client (RDV)"
       label = '<strong>' + timePart + '</strong> : ' + esc(bk.activity)
         + (langPart ? ' <span style="color:#64748b">' + langPart + '</span>' : '')
         + (paxPart  ? ' — ' + paxPart : '')
@@ -1834,13 +1837,54 @@ function renderVisiteCell(bk, b, k, idx, isLast) {
     if (bk.status==='option')   label += ' <span class="visite-badge badge-option">option</span>';
     if (bk.status==='a_regler') label += ' <span style="font-size:10px;font-weight:800;color:#b91c1c;background:#fef2f2;padding:1px 5px;border-radius:3px;border:1px solid #fca5a5">(À RÉGLER)</span>';
   }
+  return label;
+}
 
+// ── Cellule d'un groupe horaire (1 ou plusieurs réservations à la même heure) ──
+function renderGroupCell(group, b, k, isLast) {
   const addBtn = isLast
     ? '<div><span class="add-visite-btn" onclick="event.stopPropagation();openBookingModal(\'' + b + '\',\'' + k + '\',null)">+ ajouter</span></div>'
     : '';
+  if (group.items.length === 1) {
+    // Cas simple : une seule réservation → comportement identique à avant
+    const bk = group.items[0];
+    const isFH = bk.source === 'fareharbor';
+    const manualIdx = isFH ? group.startIdx : (bk._manualIdx !== undefined ? bk._manualIdx : group.startIdx);
+    const onclick = isFH
+      ? 'openFHDetail(\'' + k + '\',' + group.startIdx + ')'
+      : 'openBookingModal(\'' + b + '\',\'' + k + '\',' + manualIdx + ')';
+    return '<td class="visite-cell" data-col="visite" onclick="' + onclick + '" style="cursor:pointer;line-height:1.6">'
+      + '<div class="visite-line">' + buildVisiteLabel(bk) + '</div>'
+      + addBtn + '</td>';
+  }
+  // Plusieurs réservations au même horaire → empilées dans une seule cellule
+  let inner = '';
+  group.items.forEach((bk, i) => {
+    const globalIdx = group.startIdx + i;
+    const isFH = bk.source === 'fareharbor';
+    const manualIdx = isFH ? globalIdx : (bk._manualIdx !== undefined ? bk._manualIdx : globalIdx);
+    const onclick = isFH
+      ? 'openFHDetail(\'' + k + '\',' + globalIdx + ')'
+      : 'openBookingModal(\'' + b + '\',\'' + k + '\',' + manualIdx + ')';
+    inner += '<div class="visite-line" onclick="event.stopPropagation();' + onclick + '" style="cursor:pointer'
+      + (i > 0 ? ';border-top:1px dashed #e2e8f0;padding-top:3px;margin-top:2px' : '') + '">'
+      + buildVisiteLabel(bk) + '</div>';
+  });
+  return '<td class="visite-cell" data-col="visite" style="line-height:1.6">' + inner + addBtn + '</td>';
+}
 
+// ── Cellule d'une seule réservation (appelée depuis renderGroupCell) ──
+function renderVisiteCell(bk, b, k, idx, isLast) {
+  const isFH = bk.source === 'fareharbor';
+  const manualIdx = isFH ? idx : (bk._manualIdx !== undefined ? bk._manualIdx : idx);
+  const onclick = isFH
+    ? 'openFHDetail(\'' + k + '\',' + idx + ')'
+    : 'openBookingModal(\'' + b + '\',\'' + k + '\',' + manualIdx + ')';
+  const addBtn = isLast
+    ? '<div><span class="add-visite-btn" onclick="event.stopPropagation();openBookingModal(\'' + b + '\',\'' + k + '\',null)">+ ajouter</span></div>'
+    : '';
   return '<td class="visite-cell" data-col="visite" onclick="' + onclick + '" style="cursor:pointer;line-height:1.6">'
-    + '<div class="visite-line">' + label + '</div>'
+    + '<div class="visite-line">' + buildVisiteLabel(bk) + '</div>'
     + addBtn + '</td>';
 }
 
