@@ -1932,7 +1932,7 @@ function buildVisiteLabel(bk, showTime = true) {
 // ── Cellule d'un groupe horaire (1 ou plusieurs réservations à la même heure) ──
 function renderGroupCell(group, b, k, isLast) {
   const addBtn = isLast
-    ? '<div><span class="add-visite-btn" onclick="event.stopPropagation();openBookingModal(\'' + b + '\',\'' + k + '\',null)">+ ajouter</span></div>'
+    ? '<div onclick="event.stopPropagation();openBookingModal(\'' + b + '\',\'' + k + '\',null)" style="display:inline-block"><span class="add-visite-btn">+ ajouter</span></div>'
     : '';
   if (group.items.length === 1) {
     // Cas simple : une seule réservation → comportement identique à avant
@@ -1971,7 +1971,7 @@ function renderVisiteCell(bk, b, k, idx, isLast) {
     ? 'openFHDetail(\'' + k + '\',' + idx + ')'
     : 'openBookingModal(\'' + b + '\',\'' + k + '\',' + manualIdx + ')';
   const addBtn = isLast
-    ? '<div><span class="add-visite-btn" onclick="event.stopPropagation();openBookingModal(\'' + b + '\',\'' + k + '\',null)">+ ajouter</span></div>'
+    ? '<div onclick="event.stopPropagation();openBookingModal(\'' + b + '\',\'' + k + '\',null)" style="display:inline-block"><span class="add-visite-btn">+ ajouter</span></div>'
     : '';
   return '<td class="visite-cell" data-col="visite" onclick="' + onclick + '" style="cursor:pointer;line-height:1.6">'
     + '<div class="visite-line">' + buildVisiteLabel(bk) + '</div>'
