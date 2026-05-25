@@ -1138,12 +1138,17 @@ function absentCount(b,k) {
 function isAlert(b,k) { return absentCount(b,k)>=3 && maxGroupPax(b,k)>=10; }
 
 // ═══ CAVEAU FERME ═════════════════════════════
-// Normale : fermé Dim (0) + Lun (1)
-// Jan & Fév (mois 0-1) : fermé Sam (6) + Dim (0)
+// Caveau André Delorme : fermé Dim (0) + Lun (1) ; Jan+Fév : fermé Sam (6) + Dim (0)
 function isCaveauFermeDefault(d) {
   const dow = d.getDay();
   const m   = d.getMonth();
   return (m <= 1) ? (dow === 6 || dow === 0) : (dow === 0 || dow === 1);
+}
+// Atelier de la Bulle : fermé les dimanches sauf avril (3) → octobre (9)
+function isBulleFermeDefault(d) {
+  if (d.getDay() !== 0) return false; // seuls les dimanches
+  const m = d.getMonth();
+  return m <= 2 || m >= 10; // fermé : jan(0) fév(1) mar(2) nov(10) déc(11)
 }
 function isDayFerme(b, k, d) {
   const exc = state.boutiques[b].exceptions?.[k];
@@ -1152,12 +1157,18 @@ function isDayFerme(b, k, d) {
     if (exc === 'ferme')  return true;
     return isCaveauFermeDefault(d);
   }
-  // bulle : ouvert par défaut, sauf exception manuelle
-  return exc === 'ferme';
+  if (b === 'bulle') {
+    if (exc === 'ouvert') return false;
+    if (exc === 'ferme')  return true;
+    return isBulleFermeDefault(d);
+  }
+  return false;
 }
 function toggleException(b, k) {
   const d   = fromKey(k);
-  const def = b === 'delorme' ? isCaveauFermeDefault(d) : false; // bulle : jamais fermé par défaut
+  const def = b === 'delorme' ? isCaveauFermeDefault(d)
+            : b === 'bulle'   ? isBulleFermeDefault(d)
+            : false;
   if (!state.boutiques[b].exceptions) state.boutiques[b].exceptions = {};
   const exc = state.boutiques[b].exceptions[k];
   if (exc) {
