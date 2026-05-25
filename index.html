@@ -2148,7 +2148,7 @@ function saveRenfort() {
   const rf = getRenfort(b, k).slice();
   rf[slot] = val;
   state.boutiques[b].renforts[k] = rf;
-  scheduleSave(); closeModal(); render();
+  clearDraft(); scheduleSave(); closeModal(); render();
 }
 function clearRenfort() {
   if (!modalCtx || modalCtx.type !== 'renfort') return;
@@ -2157,7 +2157,7 @@ function clearRenfort() {
   const rf = getRenfort(b, k).slice();
   rf[slot] = '';
   state.boutiques[b].renforts[k] = rf;
-  scheduleSave(); closeModal(); render();
+  clearDraft(); scheduleSave(); closeModal(); render();
 }
 
 // ═══ NOTE MODAL ═══════════════════════════════
@@ -2169,8 +2169,8 @@ function openNoteModal(b, k) {
   document.getElementById('modal-actions').innerHTML = '<button class="btn-md" onclick="clearNote()">Effacer</button><button class="btn-ms" onclick="closeModal()">Annuler</button><button class="btn-mp" onclick="saveNote()">Enregistrer</button>';
   openModal();
 }
-function saveNote()  { const {b,k}=modalCtx; setNote(b,k,document.getElementById('f-note').value.trim()); scheduleSave(); closeModal(); render(); }
-function clearNote() { const {b,k}=modalCtx; setNote(b,k,''); scheduleSave(); closeModal(); render(); }
+function saveNote()  { const {b,k}=modalCtx; setNote(b,k,document.getElementById('f-note').value.trim()); clearDraft(); scheduleSave(); closeModal(); render(); }
+function clearNote() { const {b,k}=modalCtx; setNote(b,k,''); clearDraft(); scheduleSave(); closeModal(); render(); }
 
 // ═══ PRIORITÉ ABSENCE ═════════════════════════
 // Retourne le 1er collègue qui a priorité (CP ou REPOS+NPB) ce jour.
@@ -2310,7 +2310,7 @@ function saveStatus() {
   setStatusNote(b, k, emp, note);
   const other = b === 'bulle' ? 'delorme' : 'bulle';
   if (state.boutiques[other].employees.includes(emp)) setStatusNote(other, k, emp, note);
-  scheduleSave(); closeModal(); render();
+  clearDraft(); scheduleSave(); closeModal(); render();
 }
 
 // ═══ BOOKING MODAL ════════════════════════════
@@ -2444,9 +2444,9 @@ function saveBooking() {
   if(!state.boutiques[b].bookings[k]) state.boutiques[b].bookings[k]=[];
   if(idx!==null&&idx>=0) state.boutiques[b].bookings[k][idx]=bk;
   else state.boutiques[b].bookings[k].push(bk);
-  scheduleSave(); closeModal(); render();
+  clearDraft(); scheduleSave(); closeModal(); render();
 }
-function deleteBooking() { const {b,k,idx}=modalCtx; state.boutiques[b].bookings[k].splice(idx,1); scheduleSave(); closeModal(); render(); }
+function deleteBooking() { const {b,k,idx}=modalCtx; state.boutiques[b].bookings[k].splice(idx,1); clearDraft(); scheduleSave(); closeModal(); render(); }
 
 // ═══ FH DETAIL MODAL ══════════════════════════
 function openFHDetail(k, idx) {
@@ -2579,9 +2579,42 @@ function openFHDetail(k, idx) {
 }
 
 // ═══ MODAL HELPERS ════════════════════════════
-function openModal()  { pendingStatus=null; document.getElementById('modal-overlay').style.display='flex'; }
-function closeModal() { document.getElementById('modal-overlay').style.display='none'; modalCtx=null; }
-function overlayClick(e) { if(e.target===document.getElementById('modal-overlay')) closeModal(); }
+function _modalDraftKey() { return modalCtx ? 'mdraft:' + JSON.stringify(modalCtx) : null; }
+function saveDraft() {
+  const k = _modalDraftKey(); if (!k) return;
+  const data = { _period: pendingPeriod, _status: pendingStatus };
+  document.querySelectorAll('#modal-body input, #modal-body textarea').forEach(el => { if (el.id) data[el.id] = el.value; });
+  try { sessionStorage.setItem(k, JSON.stringify(data)); } catch(e) {}
+}
+function restoreDraft() {
+  const k = _modalDraftKey(); if (!k) return;
+  try {
+    const raw = sessionStorage.getItem(k); if (!raw) return;
+    const data = JSON.parse(raw);
+    document.querySelectorAll('#modal-body input, #modal-body textarea').forEach(el => { if (el.id && data[el.id] !== undefined) el.value = data[el.id]; });
+    if (data._period) selectPeriod(data._period);
+    if (data._status !== undefined && data._status !== null) { pendingStatus = null; selectStatus(data._status); }
+  } catch(e) {}
+}
+function clearDraft() { const k = _modalDraftKey(); if (k) try { sessionStorage.removeItem(k); } catch(e) {} }
+function openModal() {
+  pendingStatus = null;
+  document.getElementById('modal-overlay').style.display = 'flex';
+  setTimeout(restoreDraft, 30);
+}
+function closeModal() { saveDraft(); document.getElementById('modal-overlay').style.display='none'; modalCtx=null; }
+function overlayClick(e) { /* désactivé — fermeture uniquement via boutons */ }
+document.addEventListener('keydown', e => {
+  if (!modalCtx) return;
+  if (e.key === 'Escape') { closeModal(); return; }
+  if (e.key === 'Enter') {
+    const active = document.activeElement;
+    if (active && (active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) return;
+    e.preventDefault();
+    const btn = document.querySelector('#modal-actions .btn-mp');
+    if (btn) btn.click();
+  }
+});
 
 // ═══ EXPORT / IMPORT ══════════════════════════
 function exportData() {
