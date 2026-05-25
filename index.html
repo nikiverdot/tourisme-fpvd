@@ -2376,7 +2376,7 @@ function openBookingModal(b, k, idx) {
     langOpts  = langList.map(([v,l]) => `<option value="${v}" ${curLang===v?'selected':''}>${l}</option>`).join('');
   }
 
-  const viaList = ['RDV','GYG','Viator','TripAdvisor','Grape Escapes','FrenchTour','Challanges','Go Côté Saône','Winalist','OT','BFC','À REGLER'];
+  const viaList = ['RDV','GYG','Viator','TripAdvisor','Grape Escapes','FrenchTour','Challanges','Invitation','Go Côté Saône','Winalist','OT','BFC','À REGLER'];
   document.getElementById('modal-body').innerHTML = `
     <datalist id="dl-act">${actListOpts}</datalist>
     <div class="form-group"><label class="form-label">Prestation</label>
@@ -2411,7 +2411,7 @@ function openBookingModal(b, k, idx) {
       </div>
     </div>
     <div class="form-group"><label class="form-label">Via <span style="font-size:10px;color:#94a3b8;font-weight:400">— affiche (texte)</span></label>
-      <input id="f-via" class="form-input" list="dl-via" maxlength="30" placeholder="RDV, GYG, Winalist…" value="${esc(bk.via||'')}">
+      <input id="f-via" class="form-input" list="dl-via" maxlength="30" placeholder="RDV, GYG, Winalist…" value="${esc(bk.via||'')}" oninput="onViaChange()">
       <datalist id="dl-via">${viaList.map(v=>`<option value="${v}">`).join('')}</datalist>
     </div>
     <div class="form-group"><label class="form-label">Groupe / Client</label><input id="f-desc" class="form-input" type="text" placeholder="Famille Martin…" value="${esc(bk.description||'')}"></div>
@@ -2430,6 +2430,15 @@ function fmtTime(inp) {
   else { h = parseInt(v.slice(0, v.length - 2), 10); m = parseInt(v.slice(-2), 10); }
   h = Math.min(h, 23); m = Math.min(m, 59);
   inp.value = h + 'h' + String(m).padStart(2, '0');
+}
+function onViaChange() {
+  const via = (document.getElementById('f-via')?.value || '').trim().toLowerCase();
+  if (via === 'challanges' || via === 'invitation') {
+    const st = document.getElementById('f-status');
+    const pr = document.getElementById('f-price');
+    if (st) st.value = 'confirmed';
+    if (pr) pr.value = '0,00€';
+  }
 }
 function toggleGuideRow() {
   const langEl   = document.getElementById('f-lang');
