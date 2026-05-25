@@ -1194,10 +1194,12 @@ function toggleException(b, k) {
 function getEffectiveStatus(b, k, emp, ferme) {
   const raw = state.boutiques[b].schedule?.[k]?.[emp];
   if (raw !== undefined) return raw;                   // valeur explicite → priorité
-  if (b === 'delorme' && !ferme && emp === 'Julie') return 'ad'; // auto AD
   // Monique et postes CDD : pas de statut par défaut (cellule vide, comme Renfort)
   if (emp === 'Monique' || emp.includes('CDD')) return null;
-  return 'off';
+  // Julie : par défaut André Delorme dans les deux boutiques
+  if (emp === 'Julie' && !ferme) return 'ad';
+  // Bulle : VA par défaut (en vente à l'ADB) ; Delorme et autres : OFF
+  return b === 'bulle' ? 'va' : 'off';
 }
 
 // ═══ FAREHARBOR ICS ════════════════════════════
