@@ -126,6 +126,7 @@ tr.row-ferie .s-off { background: #fef08a !important; color: #a16207 !important;
 tr.row-today  td { background: #f0f8f7 !important; }
 tr.row-sunday td { background: #fffbf5; }
 tr.row-saturday td { background: #fffbf5; }
+tr.week-end td { border-bottom: 2px solid #94a3b8 !important; }
 tr.row-alert td { background: #fff5f5 !important; }
 .ferie-label { display: block; font-size: 10px; font-weight: 800; color: #a16207; text-transform: uppercase; letter-spacing: 0.04em; line-height: 1.2; margin-top: 2px; }
 
@@ -1061,6 +1062,13 @@ function isFerie(d) {
 // ═══ DATE UTILS ═══════════════════════════════
 function toKey(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function fromKey(k) { const [y,m,d]=k.split('-').map(Number); return new Date(y,m-1,d); }
+function getISOWeek(d) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+}
 function addDays(d,n) { const c=new Date(d); c.setDate(c.getDate()+n); return c; }
 function isToday(d) { const t=new Date(); t.setHours(0,0,0,0); const c=new Date(d); c.setHours(0,0,0,0); return c.getTime()===t.getTime(); }
 
@@ -1743,10 +1751,15 @@ function render() {
     ].filter(Boolean).join(' ');
 
     // ── FIRST ROW ──
-    html += '<tr class="' + rowCls + '" id="day-' + k + '">';
+    const weekEndCls = (dow === 6 && rows === 1) ? ' week-end' : '';
+    html += '<tr class="' + rowCls + weekEndCls + '" id="day-' + k + '">';
 
     // Jour (rowspan) + bouton exception (toutes boutiques)
     let jourContent = DAYS_FR[dow];
+    if (dow === 0) {
+      const wn = getISOWeek(d);
+      jourContent += '<span style="display:block;font-size:8px;font-weight:800;background:#cbd5e1;color:#334155;border-radius:3px;padding:0 3px;margin-top:1px;letter-spacing:.03em">S' + wn + '</span>';
+    }
     {
       const excTitle = exc
         ? 'Annuler l\'exception (retour au défaut)'
@@ -1840,7 +1853,8 @@ function render() {
     for (let gi = 1; gi < timeGroups.length; gi++) {
       const g = timeGroups[gi];
       const isLast = (gi === timeGroups.length - 1);
-      html += '<tr class="' + subCls + '">';
+      const weCls = (dow === 6 && isLast) ? ' week-end' : '';
+      html += '<tr class="' + subCls + weCls + '">';
       html += renderGroupCell(g, b, k, isLast);
       html += '<td class="pax-cell' + (g.totalPax>=10?' pax-big':'') + '" data-col="pax">' + (g.totalPax||'') + '</td>';
       html += '</tr>';
