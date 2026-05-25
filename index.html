@@ -786,7 +786,7 @@ function buildPayload() {
 }
 
 function doSaveNow() {
-  if (!db) return;
+  if (!db || !authUser) return; // never write without auth
   pendingSave = true;
   setSyncBadge('saving','Sauvegarde…');
   db.ref(DB_PATH).set(buildPayload())
@@ -1510,6 +1510,7 @@ function parseICS(raw) {
 
 // ═══ RENDER ═══════════════════════════════════
 function render() {
+  if (!authUser && isFirebase) return; // never render without auth
   const b    = state.currentBoutique;
   const bout = state.boutiques[b];
   const year = state.currentYear;
