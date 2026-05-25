@@ -1444,10 +1444,12 @@ function parseICS(raw) {
     } else { dateKey=dt.slice(0,4)+'-'+dt.slice(4,6)+'-'+dt.slice(6,8); time=''; }
 
     // Clean activity name: strip all noise from FareHarbor SUMMARY
+    // FH format: "ActivityName - TourType en Langue 🏳 ( booking: N Personnes)"
     let activity = rawSum
       .replace(/^\d+\s*[×x×]\s*/i,'')
       .replace(/\bBOOKING\s*#?\s*\d+\b/gi,'')
       .replace(/\b#\d{4,}\b/g,'')
+      .replace(/\s+[-–—]\s+\S.*/,'')                        // strip " - Tour en Français…" and everything after (activity names use " : " not " - ")
       .replace(/\(\s*booking\s*:\s*[^)]+\)/gi,'')            // "( booking: 6 Personnes)" and multi-word variants
       .replace(/\(\s*\d+\s*(?:personnes?|pax|persons?|pers\.?)\s*\)/gi,'')
       .replace(/\s+(?:en|in|auf)\s+(français|anglais|english|deutsch|spanish|español|italiano|italian|dutch|português|portuguese|russian)\b.*/gi,'')
@@ -1456,6 +1458,12 @@ function parseICS(raw) {
       .replace(/\s{2,}/g,' ')
       .trim();
     if (!activity) activity = 'Dégustation';
+
+    // Canonical activity name mapping (FH internal names → display names)
+    const FH_ACTIVITY_MAP = {
+      'Visite & Dégustation : Saveurs du Terroir': 'Visite & Dégustation : Saveurs du Terroir (Mâchon)',
+    };
+    activity = FH_ACTIVITY_MAP[activity] || activity;
 
     // Language — from summary + desc
     const lang = detectLang(rawSum + ' ' + rawDesc);
