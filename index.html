@@ -1122,7 +1122,7 @@ function getGroupedFHBookings(k) {
 }
 
 function getAllBookings(b,k) {
-  const fh = b==='delorme' ? getGroupedFHBookings(k) : [];
+  const fh = getGroupedFHBookings(k);
   // Tag manual bookings with their original index so modal can edit/delete correctly
   const manual = getManualBookings(b,k).map((bk, i) => Object.assign({}, bk, { _manualIdx: i }));
   const all = [...fh, ...manual];
@@ -1515,7 +1515,7 @@ function parseICS(raw) {
     const descBlocks = rawDesc.split(/\n\s*-{3,}\s*\n/).map(b=>b.trim()).filter(Boolean);
 
     if (descBlocks.length === 0) {
-      const pm = rawSum.match(/(\d+)\s*(?:pax|personnes?|participants?)/i);
+      const pm = rawSum.match(/(\d+)\s*(?:pax|personnes?|adultes?|participants?)/i);
       events.push({ dateKey, time, pax: pm?parseInt(pm[1]):1, status:evStatus, activity, langFlag, langCode, clientName:'', via:'', comment:'', source:'fareharbor' });
       return;
     }
@@ -1543,10 +1543,10 @@ function parseICS(raw) {
       // pax: "N Personnes" / "N pax" / "N De deux à..."
       let pax = 0;
       for (const line of lines) {
-        const m = line.match(/^(\d+)\s+(?:personnes?|pax|persons?|de\s)/i);
+        const m = line.match(/^(\d+)\s+(?:personnes?|pax|persons?|adultes?|de\s)/i);
         if (m) { pax=parseInt(m[1]); break; }
       }
-      if (!pax) { const m=bk.match(/(\d+)\s*(?:pax|personnes?|participants?)/i); if(m) pax=parseInt(m[1]); }
+      if (!pax) { const m=bk.match(/(\d+)\s*(?:pax|personnes?|adultes?|participants?)/i); if(m) pax=parseInt(m[1]); }
       if (!pax) pax=1;
 
       // via: detect from email domain or keywords in this booking block
