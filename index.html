@@ -1346,6 +1346,9 @@ function mapFHAffiliate(raw) {
   if (n.includes('frenchcour')||n.includes('myfrench'))               return 'FrenchTour';
   if (n.includes('challanges')||n.includes('chalange'))               return 'Challanges';
   if (n.includes('cotesaone')||n.includes('côtesaône')||n.includes('gosao')) return 'Go Côté Saône';
+  if (n.includes('winalist'))                                                 return 'Winalist';
+  if (n.includes('officetourisme')||n.includes('officedutourisme'))           return 'OT';
+  if (n.includes('bourgogne')||n.includes('bfc')||n.includes('franchecomte')) return 'BFC';
   return raw.trim().slice(0,30); // keep unknown affiliates as-is
 }
 
@@ -1730,24 +1733,41 @@ function renderVisiteCell(bk, b, k, idx, isLast) {
       if (p.clientName) parts.push(esc(p.clientName));
       parts.push(p.via ? viaLabel(p.via) : fhBadge);  // badge par participant
       const internalNote = p.bookingPk && fhNotes[p.bookingPk];
-      if (internalNote) parts.push('<span style="font-size:10px;color:#64748b;font-style:italic">📝 ' + esc(internalNote.slice(0,40)) + '</span>');
+      if (internalNote) {
+        const isRegler = /r[eé]gler/i.test(internalNote);
+        parts.push(isRegler
+          ? '<span style="font-size:10px;font-weight:800;color:#b91c1c;background:#fef2f2;padding:1px 5px;border-radius:3px;border:1px solid #fca5a5">' + esc(internalNote.slice(0,40).toUpperCase()) + '</span>'
+          : '<span style="font-size:10px;color:#64748b;font-style:italic">📝 ' + esc(internalNote.slice(0,40)) + '</span>');
+      }
       return parts.join(' ');
     }).join(' <span style="color:#64748b;font-weight:900"> + </span>');
     label = '<strong>' + timePart + '</strong> : ' + activity + ' — ' + partStr;
   } else {
-    const desc    = esc(bk.description || '');
-    const paxPart = bk.pax ? bk.pax + 'pax' : '';
-    const comm    = bk.comment ? esc(bk.comment.slice(0,40)) : '';
+    const desc     = esc(bk.description || '');
+    const paxPart  = bk.pax ? bk.pax + 'pax' : '';
+    const comm     = bk.comment ? esc(bk.comment.slice(0,40)) : '';
     const priceTag = bk.price ? ' <span style="color:#475569;font-size:10px">(' + esc(bk.price) + ')</span>' : '';
-    const via = bk.via || '';
-    label = '<strong>' + timePart + '</strong>'
-      + (desc ? ' : ' + desc : '')
-      + (paxPart ? ' <span style="color:#94a3b8">— ' + paxPart + '</span>' : '')
-      + (via ? ' ' + viaLabel(via) : '')
-      + priceTag
-      + (comm ? ' <span style="color:#94a3b8;font-size:10px"> · ' + comm + '</span>' : '');
+    const via      = bk.via || '';
+    const langPart = [bk.langCode, bk.langFlag].filter(Boolean).join(' ');
+    if (bk.activity) {
+      // Format identique FH: "10h30 : Activité FRA 🇫🇷 — 30pax Client (RDV)"
+      label = '<strong>' + timePart + '</strong> : ' + esc(bk.activity)
+        + (langPart ? ' <span style="color:#64748b">' + langPart + '</span>' : '')
+        + (paxPart  ? ' — ' + paxPart : '')
+        + (desc     ? ' ' + desc : '')
+        + (via      ? ' ' + viaLabel(via) : '')
+        + priceTag
+        + (comm     ? ' <span style="color:#94a3b8;font-size:10px"> · ' + comm + '</span>' : '');
+    } else {
+      label = '<strong>' + timePart + '</strong>'
+        + (desc     ? ' : ' + desc : '')
+        + (paxPart  ? ' <span style="color:#94a3b8">— ' + paxPart + '</span>' : '')
+        + (via      ? ' ' + viaLabel(via) : '')
+        + priceTag
+        + (comm     ? ' <span style="color:#94a3b8;font-size:10px"> · ' + comm + '</span>' : '');
+    }
     if (bk.status==='option')   label += ' <span class="visite-badge badge-option">option</span>';
-    if (bk.status==='a_regler') label += ' <span style="font-size:10px;font-weight:800;color:#b91c1c">(À RÉGLER)</span>';
+    if (bk.status==='a_regler') label += ' <span style="font-size:10px;font-weight:800;color:#b91c1c;background:#fef2f2;padding:1px 5px;border-radius:3px;border:1px solid #fca5a5">(À RÉGLER)</span>';
   }
 
   const addBtn = isLast
@@ -2099,12 +2119,28 @@ function openBookingModal(b, k, idx) {
   // New bookings default to "à régler"; existing use saved status (fallback: confirmed)
   const defStatus = edit ? (bk.status || 'confirmed') : 'a_regler';
   document.getElementById('modal-title').textContent = (edit?'Modifier':'Ajouter') + ' visite · ' + DAYS_FR[date.getDay()] + ' ' + date.getDate() + ' ' + MONTHS_FR[date.getMonth()];
+  // Build activity datalist from fhBookings
+  const fhActs = new Set();
+  Object.values(fhBookings).forEach(evs => evs.forEach(ev => { if(ev.activity) fhActs.add(ev.activity); }));
+  const actListOpts = [...fhActs].sort().map(a => `<option value="${esc(a)}">`).join('');
+  const langList = [
+    ['','— Langue'],['FRA|🇫🇷','Français 🇫🇷'],['ENG|🇬🇧','English 🇬🇧'],['USA|🇺🇸','English 🇺🇸'],
+    ['DEU|🇩🇪','Deutsch 🇩🇪'],['ESP|🇪🇸','Español 🇪🇸'],['ITA|🇮🇹','Italiano 🇮🇹'],
+    ['NLD|🇳🇱','Nederlands 🇳🇱'],['PRT|🇵🇹','Português 🇵🇹'],['CHN|🇨🇳','中文 🇨🇳'],['JPN|🇯🇵','日本語 🇯🇵']
+  ];
+  const curLang = (bk.langCode&&bk.langFlag) ? bk.langCode+'|'+bk.langFlag : '';
+  const langOpts = langList.map(([v,l]) => `<option value="${v}" ${curLang===v?'selected':''}>${l}</option>`).join('');
+  const viaList = ['RDV','GYG','Viator','Grape Escapes','FrenchTour','Challanges','Go Côté Saône','Winalist','OT','BFC','À REGLER'];
   document.getElementById('modal-body').innerHTML = `
+    <datalist id="dl-act">${actListOpts}</datalist>
+    <div class="form-group"><label class="form-label">Prestation</label>
+      <input id="f-activity" class="form-input" list="dl-act" placeholder="Visite & Dégustation…" value="${esc(bk.activity||'')}"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <div class="form-group"><label class="form-label">Heure</label><input id="f-time" class="form-input" type="text" inputmode="numeric" placeholder="10h00" value="${bk.time||''}" onblur="fmtTime(this)"></div>
-      <div class="form-group"><label class="form-label">Pax</label><input id="f-pax" class="form-input" type="number" min="1" placeholder="10" value="${bk.pax||''}"></div>
+      <div class="form-group"><label class="form-label">Langue</label><select id="f-lang" class="form-select">${langOpts}</select></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="form-group"><label class="form-label">Pax</label><input id="f-pax" class="form-input" type="number" min="1" placeholder="10" value="${bk.pax||''}"></div>
       <div class="form-group"><label class="form-label">Statut</label>
         <select id="f-status" class="form-select">
           <option value="confirmed" ${defStatus==='confirmed'?'selected':''}>✓ Confirmée</option>
@@ -2112,9 +2148,10 @@ function openBookingModal(b, k, idx) {
           <option value="a_regler"  ${defStatus==='a_regler' ?'selected':''}>💳 À régler</option>
         </select>
       </div>
-      <div class="form-group"><label class="form-label">Via <span style="font-size:10px;color:#94a3b8;font-weight:400">— affiche (texte)</span></label>
-        <input id="f-via" class="form-input" type="text" maxlength="30" placeholder="RDV, GYG, Viator…" value="${esc(bk.via||'')}">
-      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Via <span style="font-size:10px;color:#94a3b8;font-weight:400">— affiche (texte)</span></label>
+      <input id="f-via" class="form-input" list="dl-via" maxlength="30" placeholder="RDV, GYG, Winalist…" value="${esc(bk.via||'')}">
+      <datalist id="dl-via">${viaList.map(v=>`<option value="${v}">`).join('')}</datalist>
     </div>
     <div class="form-group"><label class="form-label">Groupe / Client</label><input id="f-desc" class="form-input" type="text" placeholder="Famille Martin…" value="${esc(bk.description||'')}"></div>
     <div class="form-group"><label class="form-label">Commentaire</label><textarea id="f-comment" class="form-textarea" placeholder="Notes internes…">${bk.comment||''}</textarea></div>
@@ -2136,7 +2173,8 @@ function fmtTime(inp) {
 function saveBooking() {
   const {b,k,idx}=modalCtx;
   const timeInp = document.getElementById('f-time'); fmtTime(timeInp);
-  const bk={time:timeInp.value, pax:parseInt(document.getElementById('f-pax').value)||0, status:document.getElementById('f-status').value, via:document.getElementById('f-via').value, description:document.getElementById('f-desc').value.trim(), comment:document.getElementById('f-comment').value.trim(), price:document.getElementById('f-price').value.trim()};
+  const langVal = (document.getElementById('f-lang').value||'').split('|');
+  const bk={time:timeInp.value, pax:parseInt(document.getElementById('f-pax').value)||0, status:document.getElementById('f-status').value, via:document.getElementById('f-via').value.trim(), activity:document.getElementById('f-activity').value.trim(), langCode:langVal[0]||'', langFlag:langVal[1]||'', description:document.getElementById('f-desc').value.trim(), comment:document.getElementById('f-comment').value.trim(), price:document.getElementById('f-price').value.trim()};
   if(!state.boutiques[b].bookings[k]) state.boutiques[b].bookings[k]=[];
   if(idx!==null&&idx>=0) state.boutiques[b].bookings[k][idx]=bk;
   else state.boutiques[b].bookings[k].push(bk);
@@ -2153,7 +2191,7 @@ function openFHDetail(k, idx) {
   document.getElementById('modal-title').textContent = 'FareHarbor · ' + DAYS_FR[date.getDay()] + ' ' + date.getDate() + ' ' + MONTHS_FR[date.getMonth()];
 
   const VIA_FH = {'GE':'background:#e8f5f4;color:#0a4a4a;border:1px solid #a8d4d0','GYG':'background:#f0fdf4;color:#166534;border:1px solid #86efac','Viator':'background:#eff6ff;color:#1e40af;border:1px solid #93c5fd','RDV':'background:#f0f8f7;color:#094848;border:1px solid #c4956a'};
-  const VIA_OPTIONS = ['', 'RDV', 'GYG', 'Viator', 'GE', 'FrenchTour', 'Challanges', 'Go Côté Saône', 'À REGLER'];
+  const VIA_OPTIONS = ['', 'RDV', 'GYG', 'Viator', 'GE', 'FrenchTour', 'Challanges', 'Go Côté Saône', 'Winalist', 'OT', 'BFC', 'À REGLER'];
   const VIA_LABELS  = {
     '':              '— Aucun',
     'RDV':           '(RDV) Rue des Vignerons',
@@ -2163,6 +2201,9 @@ function openFHDetail(k, idx) {
     'FrenchTour':    '(FrenchTour) MyFrenchTour',
     'Challanges':    '(Challanges) Château de Challanges',
     'Go Côté Saône': '(Go Côté Saône) Go Côté Saône',
+    'Winalist':      '(Winalist) Winalist',
+    'OT':            '(OT) Office de Tourisme',
+    'BFC':           '(BFC) Bourgogne Franche-Comté Tourisme',
     'À REGLER':      '(À REGLER) Règlement sur place',
   };
 
