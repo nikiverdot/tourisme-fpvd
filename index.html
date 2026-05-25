@@ -1782,7 +1782,7 @@ function renderVisiteCell(bk, b, k, idx, isLast) {
     const priceTag = bk.price ? ' <span style="color:#475569;font-size:10px">(' + esc(bk.price) + ')</span>' : '';
     const via      = bk.via || '';
     let langPart = [bk.langCode, bk.langFlag].filter(Boolean).join(' ');
-    if (bk.langCode === 'GUIDÉE') langPart = '👤 GUIDÉE' + (bk.guideLanguage ? ' ' + bk.guideLanguage : '') + (bk.guide ? ' · ' + esc(bk.guide) : '');
+    if (bk.langCode === 'GUIDÉE') langPart = '👤 GUIDÉE' + (bk.guide ? ' (' + esc(bk.guide).toUpperCase() + ')' : '') + (bk.guideLanguage ? ' ' + bk.guideLanguage : '');
     if (bk.activity) {
       // Format identique FH: "10h30 : Activité FRA 🇫🇷 — 30pax Client (RDV)"
       label = '<strong>' + timePart + '</strong> : ' + esc(bk.activity)
