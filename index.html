@@ -1221,7 +1221,7 @@ function getEffectiveStatus(b, k, emp, ferme) {
   if (emp === 'Agathe'  && k < '2026-02-02') return null;
   if (emp === 'Agathe'  && b === 'bulle' && k > '2027-02-28') return null;
   if (emp === 'Alice'   && b === 'bulle' && k > '2026-12-31') return null;
-  if (ferme && fromKey(k).getDay() === 0) return 'repos'; // dimanche fermé → REPOS
+  if (ferme && fromKey(k).getDay() === 0 && emp !== 'Monique' && !emp.includes('CDD')) return 'repos'; // dimanche fermé → REPOS
 
   const raw = state.boutiques[b].schedule?.[k]?.[emp];
   if (raw !== undefined) return raw;                   // valeur explicite → priorité
