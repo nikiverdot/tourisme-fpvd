@@ -1215,11 +1215,12 @@ function toggleException(b, k) {
 }
 // Retourne le statut effectif : Julie = AD automatique sur jours ouverts
 function getEffectiveStatus(b, k, emp, ferme) {
-  // Dates d'entrée/sortie : priorité absolue, ignorent les données Firebase
+  // Règles absolues — priorité sur les données Firebase
   if (emp === 'Estelle' && k < '2026-01-21') return null;
   if (emp === 'Agathe'  && k < '2026-02-02') return null;
   if (emp === 'Agathe'  && b === 'bulle' && k > '2027-02-28') return null;
   if (emp === 'Alice'   && b === 'bulle' && k > '2026-12-31') return null;
+  if (ferme && fromKey(k).getDay() === 0) return 'repos'; // dimanche fermé → REPOS
 
   const raw = state.boutiques[b].schedule?.[k]?.[emp];
   if (raw !== undefined) return raw;                   // valeur explicite → priorité
@@ -1227,8 +1228,6 @@ function getEffectiveStatus(b, k, emp, ferme) {
   if (emp === 'Monique' || emp.includes('CDD')) return null;
   // Julie : par défaut André Delorme dans les deux boutiques
   if (emp === 'Julie' && !ferme) return 'ad';
-  // Dimanche fermé : REPOS par défaut (pas de travail)
-  if (ferme && fromKey(k).getDay() === 0) return 'repos';
   // Bulle : VA par défaut (en vente à l'ADB) ; Delorme et autres : OFF
   return b === 'bulle' ? 'va' : 'off';
 }
