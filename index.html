@@ -771,13 +771,19 @@ async function authSubmit() {
       const name = (document.getElementById('auth-name').value||'').trim();
       if (!name) { document.getElementById('auth-submit-btn').disabled=false; return showAuthErr('Entrez votre prénom.'); }
       if (pass.length < 6) { document.getElementById('auth-submit-btn').disabled=false; return showAuthErr('Mot de passe trop court (min. 6 caractères).'); }
-      // Check ACL before creating account
+      // Créer le compte d'abord, puis vérifier l'ACL une fois authentifié
       const isAdmin = email === ADMIN_EMAIL.toLowerCase();
+      const cred = await firebase.auth().createUserWithEmailAndPassword(email, pass);
       if (!isAdmin) {
         const snap = await db.ref(ACL_PATH + '/' + emailKey(email)).once('value');
-        if (!snap.exists()) { document.getElementById('auth-submit-btn').disabled=false; return showAuthErr("Votre email n'est pas autorisé. Contactez mfverdot@gmail.com."); }
+        if (!snap.exists()) {
+          // Email non autorisé → supprimer le compte et déconnecter
+          await cred.user.delete();
+          await firebase.auth().signOut();
+          document.getElementById('auth-submit-btn').disabled = false;
+          return showAuthErr("Votre email n'est pas autorisé. Contactez mfverdot@gmail.com.");
+        }
       }
-      const cred = await firebase.auth().createUserWithEmailAndPassword(email, pass);
       await cred.user.updateProfile({ displayName: name });
     }
   } catch(e) {
