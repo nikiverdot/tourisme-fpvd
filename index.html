@@ -159,10 +159,15 @@ tr.row-ferme .status-cell:hover{ transform: none !important; opacity: 1 !importa
 body.is-admin tr.row-ferme .status-cell { pointer-events: auto !important; opacity: 0.85; }
 body.is-admin tr.row-ferme .status-cell:hover { transform: scale(1.05) !important; opacity: 1 !important; }
 
-/* ── Mode lecture seule (viewer) ── */
-body.is-viewer .status-cell  { pointer-events: none !important; cursor: default !important; }
+/* ── Mode lecture seule (viewer) — ZÉRO interaction ── */
+body.is-viewer .status-cell    { pointer-events: none !important; cursor: default !important; }
 body.is-viewer .status-cell:hover { transform: none !important; opacity: 1 !important; }
-body.is-viewer .exc-toggle   { pointer-events: none !important; display: none !important; }
+body.is-viewer .exc-toggle     { pointer-events: none !important; display: none !important; }
+body.is-viewer .rdv-cell       { pointer-events: none !important; cursor: default !important; }
+body.is-viewer .visite-cell    { pointer-events: none !important; cursor: default !important; }
+body.is-viewer .add-visite-btn { display: none !important; }
+body.is-viewer .rdv-add        { display: none !important; }
+body.is-viewer .renfort-chip, body.is-viewer .renfort-empty { pointer-events: none !important; cursor: default !important; }
 .viewer-badge { display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:700; background:#fef9c3; color:#854d0e; border:1px solid #fde68a; border-radius:12px; padding:2px 8px; white-space:nowrap; }
 tr.row-ferme.row-sunday .status-cell.s-repos  { background: #ede9fe !important; color: #6d28d9 !important; border-color: #c4b5fd !important; }
 tr.row-ferme.row-monday .status-cell.s-repos  { background: #ede9fe !important; color: #6d28d9 !important; border-color: #c4b5fd !important; }
@@ -2528,8 +2533,10 @@ function renderGroupCell(group, b, k, isLast) {
     const bk = group.items[0];
     const isFH = bk.source === 'fareharbor';
     const manualIdx = isFH ? group.startIdx : (bk._manualIdx !== undefined ? bk._manualIdx : group.startIdx);
+    const fhTime = (bk.time||'').replace(/'/g,"\\'");
+    const fhAct  = (bk.activity||'').replace(/'/g,"\\'");
     const onclick = isFH
-      ? 'openFHDetail(\'' + k + '\',' + group.startIdx + ')'
+      ? 'openFHDetail(\'' + k + '\',\'' + fhTime + '\',\'' + fhAct + '\')'
       : (_canAdd ? 'openBookingModal(\'' + b + '\',\'' + k + '\',' + manualIdx + ')' : '');
     return '<td class="visite-cell" data-col="visite" onclick="' + onclick + '" style="cursor:pointer;line-height:1.6">'
       + '<div class="visite-line">' + buildVisiteLabel(bk) + '</div>'
@@ -2541,8 +2548,10 @@ function renderGroupCell(group, b, k, isLast) {
     const globalIdx = group.startIdx + i;
     const isFH = bk.source === 'fareharbor';
     const manualIdx = isFH ? globalIdx : (bk._manualIdx !== undefined ? bk._manualIdx : globalIdx);
+    const fhTime2 = (bk.time||'').replace(/'/g,"\\'");
+    const fhAct2  = (bk.activity||'').replace(/'/g,"\\'");
     const onclick = isFH
-      ? 'openFHDetail(\'' + k + '\',' + globalIdx + ')'
+      ? 'openFHDetail(\'' + k + '\',\'' + fhTime2 + '\',\'' + fhAct2 + '\')'
       : (_canAdd ? 'openBookingModal(\'' + b + '\',\'' + k + '\',' + manualIdx + ')' : '');
     return '<span ' + (onclick ? 'onclick="event.stopPropagation();' + onclick + '" style="cursor:pointer;white-space:nowrap"' : 'style="white-space:nowrap"') + '>'
       + buildVisiteBody(bk) + '</span>';
@@ -2557,8 +2566,10 @@ function renderVisiteCell(bk, b, k, idx, isLast) {
   const _canAdd = currentUserRole !== 'viewer';
   const isFH = bk.source === 'fareharbor';
   const manualIdx = isFH ? idx : (bk._manualIdx !== undefined ? bk._manualIdx : idx);
+  const fhTimeV = (bk.time||'').replace(/'/g,"\\'");
+  const fhActV  = (bk.activity||'').replace(/'/g,"\\'");
   const onclick = isFH
-    ? 'openFHDetail(\'' + k + '\',' + idx + ')'
+    ? 'openFHDetail(\'' + k + '\',\'' + fhTimeV + '\',\'' + fhActV + '\')'
     : (_canAdd ? 'openBookingModal(\'' + b + '\',\'' + k + '\',' + manualIdx + ')' : '');
   const addBtn = (isLast && _canAdd)
     ? '<div onclick="event.stopPropagation();openBookingModal(\'' + b + '\',\'' + k + '\',null)" style="display:inline-block"><span class="add-visite-btn">+ ajouter</span></div>'
@@ -3277,9 +3288,13 @@ function saveBooking() {
 function deleteBooking() { if (currentUserRole==='viewer') return; const {b,k,idx}=modalCtx; state.boutiques[b].bookings[k].splice(idx,1); clearDraft(); scheduleSave(); closeModal(); render(); }
 
 // ═══ FH DETAIL MODAL ══════════════════════════
-function openFHDetail(k, idx) {
+function openFHDetail(k, time, activity) {
   const all = getAllBookings(state.currentBoutique, k);
-  const bk = all[idx]; if(!bk || bk.source !== 'fareharbor') return;
+  // Recherche par time+activity plutôt que par index (plus fiable)
+  const bk = all.find(b => b.source === 'fareharbor'
+    && (b.time||'') === (time||'')
+    && (b.activity||'') === (activity||''));
+  if (!bk) return;
   const b = state.currentBoutique;
   const isBulle = b === 'bulle';
   const date = fromKey(k);
