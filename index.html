@@ -782,7 +782,13 @@ async function authSubmit() {
     }
   } catch(e) {
     document.getElementById('auth-submit-btn').disabled = false;
-    const msgs = { 'auth/user-not-found':"Compte inconnu. Cliquez sur 'Premier accès' pour créer votre compte.", 'auth/wrong-password':'Mot de passe incorrect.', 'auth/invalid-credential':'Email ou mot de passe incorrect.', 'auth/email-already-in-use':"Ce compte existe déjà. Utilisez 'Connexion'.", 'auth/invalid-email':'Email invalide.' };
+    const msgs = {
+      'auth/user-not-found':    "Compte introuvable. Si c'est votre première visite, cliquez sur « Premier accès ».",
+      'auth/wrong-password':    "Mot de passe incorrect.",
+      'auth/invalid-credential':"Email ou mot de passe incorrect. Si c'est votre première visite, cliquez sur « Premier accès ».",
+      'auth/email-already-in-use': "Ce compte existe déjà. Utilisez « Connexion ».",
+      'auth/invalid-email':     "Adresse email invalide."
+    };
     showAuthErr(msgs[e.code] || ('Erreur : ' + e.message));
   }
 }
@@ -790,8 +796,16 @@ async function authSubmit() {
 async function doReset() {
   const email = (document.getElementById('auth-email').value||'').trim();
   if (!email) return showAuthErr('Entrez votre email pour réinitialiser le mot de passe.');
-  try { await firebase.auth().sendPasswordResetEmail(email); showAuthOk('Email de réinitialisation envoyé à ' + email); }
-  catch(e) { showAuthErr('Erreur : ' + e.message); }
+  try {
+    await firebase.auth().sendPasswordResetEmail(email);
+    showAuthOk('Email de réinitialisation envoyé à ' + email + '. Vérifiez vos spams.\n⚠ Cela ne fonctionne que si vous avez déjà créé votre compte via « Premier accès ».');
+  } catch(e) {
+    if (e.code === 'auth/user-not-found') {
+      showAuthErr("Aucun compte trouvé pour cet email. Utilisez d'abord « Premier accès » pour créer votre compte.");
+    } else {
+      showAuthErr('Erreur : ' + e.message);
+    }
+  }
 }
 
 function emailKey(email) { return email.toLowerCase().replace(/\./g,'_dot_').replace(/@/g,'_at_'); }
@@ -955,7 +969,12 @@ function openAdminPanel() {
     + '<option value="bulle">🫧 Atelier de la Bulle</option>'
     + '<option value="delorme">🍾 Caveau André Delorme</option>'
     + '</select></div>'
-    + '<p style="font-size:10px;color:#94a3b8;margin-top:4px">💡 L\'utilisateur créera son propre mot de passe lors du premier accès.</p>'
+    + '<p style="font-size:10px;color:#94a3b8;margin-top:4px">💡 Aucun email automatique n\'est envoyé — copie le message ci-dessous et envoie-le toi-même.</p>'
+    + '<div id="adm-invite-box" style="display:none;margin-top:10px">'
+    + '<label style="font-size:11px;font-weight:700;color:#475569;display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">📋 Message à envoyer</label>'
+    + '<textarea id="adm-invite-text" style="width:100%;height:110px;font-size:11px;padding:8px;border:1.5px solid #e2e8f0;border-radius:8px;resize:none;font-family:inherit;color:#334155;background:#f8fafc" readonly></textarea>'
+    + '<button onclick="copyInviteMsg()" style="margin-top:5px;width:100%;padding:7px;background:#0e5c5c;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">📋 Copier le message</button>'
+    + '</div>'
     + '</div>';
   document.getElementById('modal-actions').innerHTML =
     '<button class="btn-ms" onclick="closeModal()">Fermer</button>'
@@ -991,10 +1010,22 @@ async function adminAddUser() {
   const boutique = document.getElementById('adm-boutique')?.value || 'bulle';
   if (!email || !name) return toast('⚠ Remplissez email et prénom/nom','#dc2626');
   await db.ref(ACL_PATH + '/' + emailKey(email)).set({ email, name, defaultBoutique: boutique, addedAt: Date.now(), addedBy: ADMIN_EMAIL });
-  toast('✅ ' + name + ' (' + (boutique==='delorme'?'André Delorme':'Bulle') + ') peut maintenant créer son compte','#16a34a');
   document.getElementById('adm-email').value = '';
   document.getElementById('adm-name').value  = '';
   loadAdminList();
+  // Afficher le message d'invitation à copier
+  const inviteMsg = 'Bonjour ' + name + ' 👋\n\nTu as maintenant accès au planning Famille Piffaut.\n\n🔗 https://tourisme-fpvd.fr\n\n➡ Clique sur « Premier accès », saisis ton email (' + email + ') et choisis un mot de passe.\n\nBonne journée !';
+  const box = document.getElementById('adm-invite-box');
+  const ta  = document.getElementById('adm-invite-text');
+  if (box && ta) { ta.value = inviteMsg; box.style.display = 'block'; ta.select(); }
+}
+
+function copyInviteMsg() {
+  const ta = document.getElementById('adm-invite-text');
+  if (!ta) return;
+  ta.select();
+  try { document.execCommand('copy'); } catch(e) { navigator.clipboard?.writeText(ta.value); }
+  toast('✅ Message copié !','#16a34a');
 }
 async function adminToggleBoutique(key, newBoutique) {
   await db.ref(ACL_PATH + '/' + key + '/defaultBoutique').set(newBoutique);
