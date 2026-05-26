@@ -239,6 +239,8 @@ td.pax-cell {
 
 /* EMPLOYEE cell */
 td.emp-cell { padding: 3px 3px; text-align: center; vertical-align: middle !important; background: #f8faff; }
+td.emp-cell-locked .status-cell { cursor: default !important; opacity: 0.85; }
+td.emp-cell-locked .status-cell:hover { transform: none !important; }
 td.emp-cell:first-of-type,
 td[data-col="emp-0"] { border-left: 3px solid #94a3b8 !important; }
 thead th.th-emp:first-of-type,
@@ -751,9 +753,40 @@ let authUser    = null;
 let currentUser = localStorage.getItem('piffaut-user') || '';
 let authTab     = 'login';
 
-const ADMIN_EMAIL = 'mfverdot@gmail.com';
+const ADMIN_EMAIL       = 'mfverdot@gmail.com';
+const MANAGER_BULLE     = 'tourisme@fpvd.fr';      // gère tout Bulle sauf Monique
+const MANAGER_DELORME   = 'caveau@andre-delorme.com'; // gère Julie + Renfort + CDD (AD)
 const ACL_PATH    = 'piffaut-acl';
 const PRES_PATH   = 'piffaut-presence';
+
+// ── Permissions ──────────────────────────────────────────────────────────────
+// Renvoie true si l'utilisateur connecté peut modifier la cellule d'un employé
+function canEditEmployee(b, empName) {
+  if (!authUser) return false;
+  const email = authUser.email.toLowerCase();
+  if (email === ADMIN_EMAIL) return true;                    // admin → tout
+  if (email === MANAGER_BULLE) {
+    return b === 'bulle' && empName !== 'Monique';           // Bulle sauf Monique
+  }
+  if (email === MANAGER_DELORME) {
+    if (b !== 'delorme') return false;
+    return empName === 'Julie'                               // Julie
+        || empName.toLowerCase().includes('cdd')            // CDD
+        || empName.toLowerCase().includes('renfort');        // Renfort
+  }
+  // Autres utilisateurs : uniquement leur propre colonne
+  const myName = (authUser.displayName || '').trim().toLowerCase();
+  return myName !== '' && empName.trim().toLowerCase() === myName;
+}
+
+function canEditRenfort(b) {
+  if (!authUser) return false;
+  const email = authUser.email.toLowerCase();
+  if (email === ADMIN_EMAIL)     return true;
+  if (email === MANAGER_BULLE)   return b === 'bulle';
+  if (email === MANAGER_DELORME) return b === 'delorme';
+  return false; // autres utilisateurs ne peuvent pas modifier les renforts
+}
 
 // ═══ AUTH UI ══════════════════════════════════
 function switchAuthTab(tab) {
@@ -1906,7 +1939,9 @@ function render() {
       const consec = consecutiveWorkDays(b, k, emp);
       const warnCls = consec >= 7 ? ' cell-warn-7' : (consec >= 6 ? ' cell-warn-6' : '');
       const warnTip = consec >= 7 ? ' ⚠ 7 jours consécutifs !' : (consec >= 6 ? ' ⚠ 6 jours : repos obligatoire demain' : '');
-      const clickEvt = ferme ? '' : 'onclick="openStatusModal(\'' + b + '\',\'' + k + '\',\'' + emp.replace(/'/g,"\\'") + '\')"';
+      const canEdit  = !ferme && canEditEmployee(b, emp);
+      const clickEvt = canEdit ? 'onclick="openStatusModal(\'' + b + '\',\'' + k + '\',\'' + emp.replace(/'/g,"\\'") + '\')"' : '';
+      const lockedCls = canEdit ? '' : ' emp-cell-locked';
       const sn = getStatusNote(b, k, emp);
       const noteHtml = sn ? '<span class="status-note">' + esc(sn) + '</span>' : '';
       const consecHtml = consec>=6 ? '<span style="font-size:7px;opacity:.8">'+consec+'j</span>' : '';
@@ -1924,7 +1959,7 @@ function render() {
         const sSoirClass = STATUS_CLASSES[sSoir] || '';
         const sSoirAbbr  = STATUS_ABBR[sSoir]    || '';
         const sSoirLabel = STATUS_LABELS[sSoir]  || '—';
-        html += '<td class="emp-cell" data-col="emp-' + empIdx + '" rowspan="' + rows + '">' +
+        html += '<td class="emp-cell' + lockedCls + '" data-col="emp-' + empIdx + '" rowspan="' + rows + '">' +
           '<div class="status-cell' + warnCls + '" style="padding:0;gap:0;overflow:hidden;border-color:#94a3b8" ' + clickEvt + ' title="Matin: ' + sLabel + ' · Après-midi: ' + sPMLabel + ' · Soir: ' + sSoirLabel + warnTip + '">' +
           '<div class="status-third ' + sClass      + '" style="border-bottom:1px solid rgba(0,0,0,.08)">' + sAbbr     + '<span class="half-tag">M</span></div>' +
           '<div class="status-third ' + sPMClass    + '" style="border-bottom:1px solid rgba(0,0,0,.08)">' + sPMAbbr   + '<span class="half-tag">A</span></div>' +
@@ -1935,13 +1970,13 @@ function render() {
         const sPMClass = STATUS_CLASSES[sPM] || '';
         const sPMAbbr  = STATUS_ABBR[sPM]    || '';
         const sPMLabel = STATUS_LABELS[sPM]  || '—';
-        html += '<td class="emp-cell" data-col="emp-' + empIdx + '" rowspan="' + rows + '">' +
+        html += '<td class="emp-cell' + lockedCls + '" data-col="emp-' + empIdx + '" rowspan="' + rows + '">' +
           '<div class="status-cell' + warnCls + '" style="padding:0;gap:0;overflow:hidden;border-color:#94a3b8" ' + clickEvt + ' title="Matin: ' + sLabel + ' · Après-midi: ' + sPMLabel + warnTip + '">' +
           '<div class="status-half ' + sClass   + '" style="border-bottom:1px solid rgba(0,0,0,.08)">' + sAbbr   + '<span class="half-tag">M</span></div>' +
           '<div class="status-half ' + sPMClass + '">' + sPMAbbr + '<span class="half-tag">A</span>' + noteHtml + '</div>' +
           '</div></td>';
       } else {
-        html += '<td class="emp-cell" data-col="emp-' + empIdx + '" rowspan="' + rows + '"><div class="status-cell ' + sClass + (alert?' cell-alert':'') + warnCls + '" ' + clickEvt + ' title="' + sLabel + warnTip + '">' + sAbbr + cpHtml + consecHtml + noteHtml + '</div></td>';
+        html += '<td class="emp-cell' + lockedCls + '" data-col="emp-' + empIdx + '" rowspan="' + rows + '"><div class="status-cell ' + sClass + (alert?' cell-alert':'') + warnCls + '" ' + clickEvt + ' title="' + sLabel + warnTip + '">' + sAbbr + cpHtml + consecHtml + noteHtml + '</div></td>';
       }
     });
 
@@ -1949,7 +1984,7 @@ function render() {
     const rf = bout.renforts?.[k] || ['',''];
     for (let ri = 0; ri < 2; ri++) {
       const rfName = rf[ri] || '';
-      const rfClick = ferme ? '' : 'onclick="openRenfortModal(\'' + b + '\',\'' + k + '\',' + ri + ')"';
+      const rfClick = (ferme || !canEditRenfort(b)) ? '' : 'onclick="openRenfortModal(\'' + b + '\',\'' + k + '\',' + ri + ')"';
       html += '<td class="renfort-cell" data-col="renfort-' + ri + '" rowspan="' + rows + '">';
       if (rfName) {
         html += '<span class="renfort-chip" ' + rfClick + '>👤 ' + esc(rfName) + '</span>';
@@ -2380,6 +2415,7 @@ function updatePriorityWarning() {
 
 // ═══ STATUS MODAL ══════════════════════════════
 function openStatusModal(b, k, emp) {
+  if (!canEditEmployee(b, emp)) return; // sécurité côté client
   modalCtx = { type:'status', b, k, emp };
   pendingStatus = null;
   const date    = fromKey(k);
