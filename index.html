@@ -1355,13 +1355,21 @@ function countCPUsed(b, emp, k) {
   let count = 0;
   for (const dk in sched) {
     if (dk < start || dk > end || dk > k) continue;
-    if (sched[dk]?.[emp] === 'conges') count++;
+    // CP RÉVISION (quota séparé de 5j) → ne compte PAS dans les CP normaux
+    if (sched[dk]?.[emp] === 'conges' && !isRevisionCP(b, dk, emp)) count++;
   }
   return count;
 }
 
-// Compte les jours ÉCOLE (formation) utilisés comme jours de révision sur la période
-function countRevisionUsed(b, emp, k) {
+// Détecte si un jour CP est un "CP Révision" (note contient RÉVISION)
+function isRevisionCP(b, k, emp) {
+  const note = (state.boutiques[b].statusNotesAM?.[k]?.[emp]
+             || state.boutiques[b].statusNotes?.[k]?.[emp] || '').toUpperCase();
+  return /\b(R[ÉE]VISION|RÉVISION|REVISION)\b/.test(note);
+}
+
+// CP de révision utilisés dans la période (CP + note RÉVISION)
+function countRevisionCPUsed(b, emp, k) {
   const period = getCPPeriod(emp, k);
   if (!period || !period.revTotal) return 0;
   const start = period.from;
@@ -1370,10 +1378,13 @@ function countRevisionUsed(b, emp, k) {
   let count = 0;
   for (const dk in sched) {
     if (dk < start || dk > end || dk > k) continue;
-    if (sched[dk]?.[emp] === 'formation') count++;
+    if (sched[dk]?.[emp] === 'conges' && isRevisionCP(b, dk, emp)) count++;
   }
   return count;
 }
+
+// Stub kept for compat (plus utilisé directement)
+function countRevisionUsed(b, emp, k) { return countRevisionCPUsed(b, emp, k); }
 function consecutiveWorkDays(b, k, emp) {
   const d0 = fromKey(k);
   if (!WORK_STATUSES.has(getEffectiveStatus(b, k, emp, isDayFerme(b, k, d0)))) return 0;
@@ -2274,7 +2285,14 @@ function render() {
       const cpTot    = cpPeriod ? cpPeriod.cpTotal : CP_TOTAL;
       let cpHtml = '';
       if (s === 'conges') {
-        cpHtml = '<span style="font-size:7px;font-weight:700;opacity:.85">' + (cpTot - countCPUsed(b, emp, k)) + 'j</span>';
+        if (cpPeriod && cpPeriod.revTotal > 0 && isRevisionCP(b, k, emp)) {
+          // CP de révision : compteur séparé (violet, Xr)
+          const revRem = cpPeriod.revTotal - countRevisionCPUsed(b, emp, k);
+          cpHtml = '<span style="font-size:7px;font-weight:700;opacity:.9;color:#7c3aed">' + revRem + 'r</span>';
+        } else {
+          // CP normal : compteur standard (Xj)
+          cpHtml = '<span style="font-size:7px;font-weight:700;opacity:.85">' + (cpTot - countCPUsed(b, emp, k)) + 'j</span>';
+        }
       }
       const sPM   = getStatusPM(b, k, emp);
       const sSoir = getStatusSoir(b, k, emp);
