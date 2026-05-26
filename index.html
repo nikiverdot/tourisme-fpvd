@@ -778,13 +778,15 @@ let state = {
       name: 'Atelier de la Bulle', color: '#0e5c5c',
       employees: ['Loic','Estelle','Alice','Agathe','Monique'],
       schedule: {}, schedulePM: {}, bookings: {}, notes: {}, renforts: {}, statusNotes: {},
-      statusNotesAM: {}, statusNotesPM: {}, statusNotesSoir: {}
+      statusNotesAM: {}, statusNotesPM: {}, statusNotesSoir: {},
+      renfortLabels: ['Renfort 1', 'Renfort 2']
     },
     delorme: {
       name: 'Caveau André Delorme', color: '#0891b2',
       employees: ['Julie','Monique','Agathe','Poste ouvert (CDD)'],
       schedule: {}, schedulePM: {}, bookings: {}, notes: {}, exceptions: {}, renforts: {}, statusNotes: {},
-      statusNotesAM: {}, statusNotesPM: {}, statusNotesSoir: {}
+      statusNotesAM: {}, statusNotesPM: {}, statusNotesSoir: {},
+      renfortLabels: ['Renfort 1', 'Renfort 2']
     }
   }
 };
@@ -958,6 +960,7 @@ function initFirebaseData() {
           state.boutiques[b].statusNotesPM  = data.boutiques[b].statusNotesPM  || {};
           state.boutiques[b].statusNotesSoir= data.boutiques[b].statusNotesSoir|| {};
           state.boutiques[b].schedulePM     = data.boutiques[b].schedulePM     || {};
+          state.boutiques[b].renfortLabels  = data.boutiques[b].renfortLabels  || ['Renfort 1','Renfort 2'];
           if (data.boutiques[b].employees && data.boutiques[b].employees.length)
             state.boutiques[b].employees = data.boutiques[b].employees;
         }
@@ -994,6 +997,7 @@ function buildPayload() {
       statusNotesPM:   state.boutiques[b].statusNotesPM   || {},
       statusNotesSoir: state.boutiques[b].statusNotesSoir || {},
       schedulePM:      state.boutiques[b].schedulePM      || {},
+      renfortLabels:   state.boutiques[b].renfortLabels   || ['Renfort 1','Renfort 2'],
       employees:    state.boutiques[b].employees    || []
     };
   });
@@ -1645,15 +1649,18 @@ function isEmpInContract(emp, k) {
 }
 // Retourne le statut effectif : Julie = AD automatique sur jours ouverts
 function getEffectiveStatus(b, k, emp, ferme) {
-  // Règles absolues — priorité sur les données Firebase
+  // Dimanche fermé → REPOS (règle opérationnelle, priorité absolue)
+  if (ferme && fromKey(k).getDay() === 0 && emp !== 'Monique' && !emp.includes('CDD')) return 'repos';
+
+  // Valeur explicite → toujours prioritaire (permet à l'admin de réaffecter une colonne hors-contrat)
+  const raw = state.boutiques[b].schedule?.[k]?.[emp];
+  if (raw !== undefined) return raw;
+
+  // Limites de contrat (défaut null si hors période, overridables ci-dessus)
   if (emp === 'Estelle' && k < '2026-01-21') return null;
   if (emp === 'Agathe'  && k < '2026-02-02') return null;
-  if (emp === 'Agathe'  && k > '2027-01-31') return null;   // fin alternance (1 an depuis 1 fév 2026)
-  if (emp === 'Alice'   && b === 'bulle' && k > '2026-12-31') return null;
-  if (ferme && fromKey(k).getDay() === 0 && emp !== 'Monique' && !emp.includes('CDD')) return 'repos'; // dimanche fermé → REPOS (sauf Monique/CDD)
-
-  const raw = state.boutiques[b].schedule?.[k]?.[emp];
-  if (raw !== undefined) return raw;                   // valeur explicite → priorité (inclus overrides Julie)
+  if (emp === 'Agathe'  && k > '2027-01-31') return null;
+  if (emp === 'Alice'   && k > '2026-12-31') return null;
 
   // Valeurs par défaut Julie (seulement si aucun override explicite)
   if (emp === 'Julie'   && !ferme) return 'ad';              // AD par défaut toujours
@@ -2177,8 +2184,10 @@ function render() {
     const titleTip = 'Renommer : ' + esc(e) + (cpP ? ' · ' + cpP.label + (cpP.to ? ' → ' + cpP.to : ' (CDI)') + ' · CP: ' + cpP.cpTotal + 'j' + (cpP.revTotal ? ' + ' + cpP.revTotal + 'j révision' : '') : '');
     html += '<th class="th-emp" data-col="emp-' + idx + '" onclick="openRenameEmpModal(\'' + b + '\',' + idx + ')" title="' + titleTip + '"><div class="th-inner">' + esc(label) + rh('emp-' + idx) + '</div></th>';
   });
-  html += '<th class="th-renfort" data-col="renfort-0"><div class="th-inner">Renfort 1' + rh('renfort-0') + '</div></th>';
-  html += '<th class="th-renfort" data-col="renfort-1"><div class="th-inner">Renfort 2' + rh('renfort-1') + '</div></th>';
+  const _rl = state.boutiques[b].renfortLabels || ['Renfort 1','Renfort 2'];
+  const _isAdminRender = authUser && isAdmin(authUser.email);
+  html += '<th class="th-renfort" data-col="renfort-0"' + (_isAdminRender ? ' onclick="openRenameColModal(\'renfort-0\')" style="cursor:pointer" title="Renommer"' : '') + '><div class="th-inner">' + esc(_rl[0]) + rh('renfort-0') + '</div></th>';
+  html += '<th class="th-renfort" data-col="renfort-1"' + (_isAdminRender ? ' onclick="openRenameColModal(\'renfort-1\')" style="cursor:pointer" title="Renommer"' : '') + '><div class="th-inner">' + esc(_rl[1]) + rh('renfort-1') + '</div></th>';
   html += '</tr></thead><tbody>';
 
   const alertDaysList = [];
@@ -2279,8 +2288,9 @@ function render() {
 
     // Employee cells (rowspan)
     emps.forEach((emp, empIdx) => {
-      // Hors contrat → cellule vide hachurée, non cliquable
-      if (!isEmpInContract(emp, k)) {
+      // Hors contrat → cellule vide hachurée pour les non-admins (admin peut réaffecter)
+      const _isAdminNow = authUser && isAdmin(authUser.email);
+      if (!isEmpInContract(emp, k) && !_isAdminNow) {
         html += '<td class="emp-cell emp-cell-out" data-col="emp-' + empIdx + '" rowspan="' + rows + '"></td>';
         return;
       }
@@ -2547,8 +2557,9 @@ function getColLabels() {
   const emps = state.boutiques[b].employees;
   const labels = { ...COL_LABELS };
   emps.forEach(e => { labels[e] = e.split(' ')[0]; }); // clé = nom employé
-  labels['renfort-0'] = 'Renfort 1';
-  labels['renfort-1'] = 'Renfort 2';
+  const _rlLabels = state.boutiques[b]?.renfortLabels || ['Renfort 1','Renfort 2'];
+  labels['renfort-0'] = _rlLabels[0];
+  labels['renfort-1'] = _rlLabels[1];
   return labels;
 }
 
@@ -2757,6 +2768,36 @@ function saveRenameEmp() {
   scheduleSave();
   closeModal();
   render();
+}
+
+// ── Renommer une colonne Renfort (admin seulement) ──
+function openRenameColModal(colKey) {
+  if (!authUser || !isAdmin(authUser.email)) return;
+  const b      = state.currentBoutique;
+  const labels = state.boutiques[b].renfortLabels || ['Renfort 1','Renfort 2'];
+  const idx    = colKey === 'renfort-0' ? 0 : 1;
+  modalCtx = { type:'renameCol', b, colKey, idx };
+  document.getElementById('modal-title').textContent = 'Renommer la colonne';
+  document.getElementById('modal-body').innerHTML =
+    '<div class="form-group"><label class="form-label">Nom actuel</label>'
+    + '<div style="padding:5px 0;font-weight:600;color:#64748b">' + esc(labels[idx]) + '</div></div>'
+    + '<div class="form-group"><label class="form-label">Nouveau nom</label>'
+    + '<input id="f-colname" class="form-input" type="text" value="' + esc(labels[idx]) + '" placeholder="Ex: CDD, Saisonnier, Renfort…" autofocus></div>'
+    + '<p style="font-size:10px;color:#94a3b8;margin-top:4px">💡 Renomme uniquement l\'en-tête. Les noms de personnes dans cette colonne restent inchangés.</p>';
+  document.getElementById('modal-actions').innerHTML =
+    '<button class="btn-ms" onclick="closeModal()">Annuler</button>'
+    + '<button class="btn-mp" onclick="saveRenameCol()">Renommer</button>';
+  openModal();
+  setTimeout(() => { const el=document.getElementById('f-colname'); if(el){el.focus();el.select();} }, 80);
+}
+function saveRenameCol() {
+  if (!modalCtx || modalCtx.type !== 'renameCol') return;
+  const { b, idx } = modalCtx;
+  const newName = (document.getElementById('f-colname')?.value || '').trim();
+  if (!newName) return;
+  if (!state.boutiques[b].renfortLabels) state.boutiques[b].renfortLabels = ['Renfort 1','Renfort 2'];
+  state.boutiques[b].renfortLabels[idx] = newName;
+  scheduleSave(); closeModal(); render();
 }
 
 // ═══ RENFORT MODAL ════════════════════════════
