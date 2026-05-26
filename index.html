@@ -397,6 +397,24 @@ thead th { position: sticky; top: 0; z-index: 200; }
 .status-picker-mini .status-option { font-size:10px !important; padding:3px 7px !important; border-radius:5px; cursor:pointer; font-weight:700; }
 .status-note-sm { font-size:9px; font-style:italic; color:#334155; display:block; flex-basis:100%; text-align:center; margin-top:0; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; opacity:.85; line-height:1.2; }
 .period-full-bar { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:10px; padding:6px 8px; background:#fffbf0; border:1.5px dashed #f59e0b; border-radius:8px; }
+/* ── Colonnes figées : DATE · NOTES · VISITES ── */
+:root { --freeze-jour:0px; --freeze-date:34px; --freeze-rdv:80px; --freeze-visite:280px; }
+td.jour-cell, td.date-cell, td.rdv-cell, td.visite-cell { position:sticky; z-index:4; }
+td.jour-cell   { left:var(--freeze-jour);   background:#fff; }
+td.date-cell   { left:var(--freeze-date);   background:#fff; }
+td.rdv-cell    { left:var(--freeze-rdv);    background:#fff; }
+td.visite-cell { left:var(--freeze-visite); background:#fff; box-shadow:3px 0 6px -1px rgba(0,0,0,.1); }
+thead th[data-col="date"]   { left:var(--freeze-jour);   z-index:210; }
+thead th[data-col="rdv"]    { left:var(--freeze-rdv);    z-index:210; }
+thead th[data-col="visite"] { left:var(--freeze-visite); z-index:210; box-shadow:3px 0 6px -1px rgba(0,0,0,.1); }
+/* Backgrounds par état de ligne (doivent couvrir la couleur de fond de la ligne) */
+tr.row-ferie    td.jour-cell,tr.row-ferie    td.date-cell,tr.row-ferie    td.rdv-cell,tr.row-ferie    td.visite-cell { background:#fef08a !important; }
+tr.row-today    td.jour-cell,tr.row-today    td.date-cell,tr.row-today    td.rdv-cell,tr.row-today    td.visite-cell { background:#f0f8f7 !important; }
+tr.row-sunday   td.jour-cell,tr.row-sunday   td.date-cell,tr.row-sunday   td.rdv-cell,tr.row-sunday   td.visite-cell { background:#fffbf5; }
+tr.row-saturday td.jour-cell,tr.row-saturday td.date-cell,tr.row-saturday td.rdv-cell,tr.row-saturday td.visite-cell { background:#fffbf5; }
+tr.row-alert    td.jour-cell,tr.row-alert    td.date-cell,tr.row-alert    td.rdv-cell,tr.row-alert    td.visite-cell { background:#fff5f5 !important; }
+tr.row-ferme    td.jour-cell,tr.row-ferme    td.date-cell,tr.row-ferme    td.rdv-cell,tr.row-ferme    td.visite-cell { background:#64748b !important; }
+tr.day-row:hover td.jour-cell,tr.day-row:hover td.date-cell,tr.day-row:hover td.rdv-cell,tr.day-row:hover td.visite-cell { background:rgba(248,250,252,.97) !important; }
 /* ── Badges contrat dans l'en-tête employé ── */
 .contract-badge { display:block; font-size:7px; font-weight:700; padding:1px 4px; border-radius:3px; margin-top:2px; line-height:1.4; text-align:center; }
 .contract-alt   { background:#ede9fe; color:#6d28d9; border:1px solid #c4b5fd; }
@@ -2370,6 +2388,28 @@ function render() {
 
   updateMobileTodayCard();
   updateActivityDots();
+  setTimeout(updateStickyLeftOffsets, 0); // recalcule les offsets left après layout
+}
+
+// Recalcule les CSS variables --freeze-* selon les largeurs réelles des colonnes figées
+function updateStickyLeftOffsets() {
+  const table = document.querySelector('#table-' + state.currentBoutique + ' table');
+  if (!table) return;
+  const firstRow = table.querySelector('tbody tr.day-first');
+  if (!firstRow) return;
+  const jour = firstRow.querySelector('td.jour-cell');
+  const date = firstRow.querySelector('td.date-cell');
+  const rdv  = firstRow.querySelector('td.rdv-cell');
+  if (!jour) return;
+  const r = document.documentElement;
+  let left = 0;
+  r.style.setProperty('--freeze-jour',   left + 'px');
+  left += jour.offsetWidth;
+  r.style.setProperty('--freeze-date',   left + 'px');
+  if (date) left += date.offsetWidth;
+  r.style.setProperty('--freeze-rdv',    left + 'px');
+  if (rdv)  left += rdv.offsetWidth;
+  r.style.setProperty('--freeze-visite', left + 'px');
 }
 
 // ── Corps d'une réservation sans le préfixe horaire ──
@@ -2622,6 +2662,7 @@ document.addEventListener('mousemove', e => {
   const newW  = Math.max(30, _resizeState.startW + delta);
   colWidths[_resizeState.col] = Math.round(newW);
   applyColStyles();
+  updateStickyLeftOffsets();
 });
 
 document.addEventListener('mouseup', e => {
@@ -2631,6 +2672,7 @@ document.addEventListener('mouseup', e => {
   document.body.style.cursor = '';
   document.body.style.userSelect = '';
   _resizeState = null;
+  updateStickyLeftOffsets(); // recalcule après redimensionnement
 });
 
 // ═══ NAVIGATION ════════════════════════════════
