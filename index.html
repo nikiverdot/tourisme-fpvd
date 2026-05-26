@@ -2275,9 +2275,6 @@ function render() {
       let cpHtml = '';
       if (s === 'conges') {
         cpHtml = '<span style="font-size:7px;font-weight:700;opacity:.85">' + (cpTot - countCPUsed(b, emp, k)) + 'j</span>';
-      } else if (s === 'formation' && cpPeriod && cpPeriod.revTotal > 0) {
-        const revRem = cpPeriod.revTotal - countRevisionUsed(b, emp, k);
-        cpHtml = '<span style="font-size:7px;font-weight:700;opacity:.85;color:#7c3aed">' + revRem + 'r</span>';
       }
       const sPM   = getStatusPM(b, k, emp);
       const sSoir = getStatusSoir(b, k, emp);
