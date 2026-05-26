@@ -427,8 +427,15 @@ thead th { position: sticky; top: 0; z-index: 200; }
 .presence-chip { display: flex; align-items: center; gap: 4px; background: #f0fdf4;
   border: 1px solid #86efac; border-radius: 20px; padding: 2px 8px 2px 4px;
   font-size: 10px; font-weight: 600; color: #166534; white-space: nowrap; }
+.presence-chip.is-editing { background: #fef9c3; border-color: #fcd34d; color: #92400e; }
 .presence-avatar { width: 18px; height: 18px; border-radius: 50%; display: flex;
   align-items: center; justify-content: center; font-size: 8px; font-weight: 800; color: white; }
+/* Indicateur d'activité sur une cellule */
+.activity-dot { position: absolute; top: 2px; right: 2px; width: 14px; height: 14px;
+  border-radius: 50%; color: white; font-size: 7px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 10; pointer-events: none; border: 1.5px solid white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25); }
 
 /* ── ADMIN ── */
 .btn-admin { background: #f0f8f7 !important; color: #0e5c5c !important; border-color: #c4956a !important; }
@@ -995,22 +1002,62 @@ function relTime(ts) {
 const PRES_COLORS = ['#0e5c5c','#0891b2','#dc2626','#16a34a','#d97706','#db2777','#0284c7','#059669','#b45309'];
 function userColor(uid) { let h=0; for(let i=0;i<uid.length;i++) h=(h*31+uid.charCodeAt(i))&0xffff; return PRES_COLORS[Math.abs(h)%PRES_COLORS.length]; }
 
+let presenceData = {};
+
 function initPresence(user) {
   const pRef = db.ref(PRES_PATH + '/' + user.uid);
   const name = currentUser || user.email.split('@')[0];
   pRef.set({ name, email: user.email, color: userColor(user.uid), since: Date.now() });
   pRef.onDisconnect().remove();
   db.ref(PRES_PATH).on('value', snap => {
-    const all = snap.val() || {};
-    const bar = document.getElementById('presence-bar');
-    if (!bar) return;
-    bar.innerHTML = Object.entries(all).map(([uid, u]) => {
-      const isMe = authUser && uid === authUser.uid;
-      const initials = (u.name||'?').substring(0,2).toUpperCase();
-      return '<div class="presence-chip" title="' + esc(u.name||u.email) + (isMe?' (vous)':'') + '">'
-        + '<div class="presence-avatar" style="background:' + (u.color||'#0e5c5c') + '">' + initials + '</div>'
-        + esc((u.name||u.email).split(' ')[0]) + (isMe ? ' ✎' : '') + '</div>';
-    }).join('');
+    presenceData = snap.val() || {};
+    updatePresenceBar();
+    updateActivityDots();
+  });
+}
+
+function updatePresenceBar() {
+  const bar = document.getElementById('presence-bar');
+  if (!bar) return;
+  bar.innerHTML = Object.entries(presenceData).map(([uid, u]) => {
+    const isMe    = authUser && uid === authUser.uid;
+    const initials = (u.name||'?').substring(0,2).toUpperCase();
+    const editing  = u.editing;
+    const editingCls = (!isMe && editing) ? ' is-editing' : '';
+    const editLabel  = isMe ? ' ✎' : (editing ? ' ✎ ' + esc((editing.emp||'').split(' ')[0]) : '');
+    const tooltip  = esc(u.name||u.email) + (isMe?' (vous)':'') + (editing&&!isMe?' — édite '+esc(editing.emp||''):'');
+    return '<div class="presence-chip' + editingCls + '" title="' + tooltip + '">'
+      + '<div class="presence-avatar" style="background:' + (u.color||'#0e5c5c') + '">' + initials + '</div>'
+      + esc((u.name||u.email).split(' ')[0]) + editLabel + '</div>';
+  }).join('');
+}
+
+function setActivity(b, k, emp) {
+  if (!authUser || !db) return;
+  db.ref(PRES_PATH + '/' + authUser.uid + '/editing').set({ b, k, emp, since: Date.now() });
+}
+function clearActivity() {
+  if (!authUser || !db) return;
+  db.ref(PRES_PATH + '/' + authUser.uid + '/editing').remove();
+}
+
+function updateActivityDots() {
+  // Retire les anciens indicateurs
+  document.querySelectorAll('.activity-dot').forEach(el => el.remove());
+  Object.entries(presenceData).forEach(([uid, u]) => {
+    if (!u.editing) return;
+    if (authUser && uid === authUser.uid) return; // pas soi-même
+    const { b, k, emp } = u.editing;
+    if (b !== state.currentBoutique) return;
+    const cell = document.querySelector('td.emp-cell[data-key="' + k + '"][data-emp="' + CSS.escape(emp) + '"]');
+    if (!cell) return;
+    cell.style.position = 'relative';
+    const dot = document.createElement('div');
+    dot.className = 'activity-dot';
+    dot.style.background = u.color || '#0e5c5c';
+    dot.title = (u.name || u.email) + ' est en train d\'éditer';
+    dot.textContent = (u.name||'?').substring(0,1).toUpperCase();
+    cell.appendChild(dot);
   });
 }
 
@@ -1967,7 +2014,7 @@ function render() {
         const sSoirClass = STATUS_CLASSES[sSoir] || '';
         const sSoirAbbr  = STATUS_ABBR[sSoir]    || '';
         const sSoirLabel = STATUS_LABELS[sSoir]  || '—';
-        html += '<td class="emp-cell' + lockedCls + '" data-col="emp-' + empIdx + '" rowspan="' + rows + '">' +
+        html += '<td class="emp-cell' + lockedCls + '" data-col="emp-' + empIdx + '" data-key="' + k + '" data-emp="' + esc(emp) + '" rowspan="' + rows + '">' +
           '<div class="status-cell' + warnCls + '" style="padding:0;gap:0;overflow:hidden;border-color:#94a3b8" ' + clickEvt + ' title="Matin: ' + sLabel + ' · Après-midi: ' + sPMLabel + ' · Soir: ' + sSoirLabel + warnTip + '">' +
           '<div class="status-third ' + sClass      + '" style="border-bottom:1px solid rgba(0,0,0,.08)">' + sAbbr     + '<span class="half-tag">M</span></div>' +
           '<div class="status-third ' + sPMClass    + '" style="border-bottom:1px solid rgba(0,0,0,.08)">' + sPMAbbr   + '<span class="half-tag">A</span></div>' +
@@ -1978,13 +2025,13 @@ function render() {
         const sPMClass = STATUS_CLASSES[sPM] || '';
         const sPMAbbr  = STATUS_ABBR[sPM]    || '';
         const sPMLabel = STATUS_LABELS[sPM]  || '—';
-        html += '<td class="emp-cell' + lockedCls + '" data-col="emp-' + empIdx + '" rowspan="' + rows + '">' +
+        html += '<td class="emp-cell' + lockedCls + '" data-col="emp-' + empIdx + '" data-key="' + k + '" data-emp="' + esc(emp) + '" rowspan="' + rows + '">' +
           '<div class="status-cell' + warnCls + '" style="padding:0;gap:0;overflow:hidden;border-color:#94a3b8" ' + clickEvt + ' title="Matin: ' + sLabel + ' · Après-midi: ' + sPMLabel + warnTip + '">' +
           '<div class="status-half ' + sClass   + '" style="border-bottom:1px solid rgba(0,0,0,.08)">' + sAbbr   + '<span class="half-tag">M</span></div>' +
           '<div class="status-half ' + sPMClass + '">' + sPMAbbr + '<span class="half-tag">A</span>' + noteHtml + '</div>' +
           '</div></td>';
       } else {
-        html += '<td class="emp-cell' + lockedCls + '" data-col="emp-' + empIdx + '" rowspan="' + rows + '"><div class="status-cell ' + sClass + (alert?' cell-alert':'') + warnCls + '" ' + clickEvt + ' title="' + sLabel + warnTip + '">' + sAbbr + cpHtml + consecHtml + noteHtml + '</div></td>';
+        html += '<td class="emp-cell' + lockedCls + '" data-col="emp-' + empIdx + '" data-key="' + k + '" data-emp="' + esc(emp) + '" rowspan="' + rows + '"><div class="status-cell ' + sClass + (alert?' cell-alert':'') + warnCls + '" ' + clickEvt + ' title="' + sLabel + warnTip + '">' + sAbbr + cpHtml + consecHtml + noteHtml + '</div></td>';
       }
     });
 
@@ -2029,6 +2076,7 @@ function render() {
   ).join('');
 
   updateMobileTodayCard();
+  updateActivityDots();
 }
 
 // ── Corps d'une réservation sans le préfixe horaire ──
@@ -2424,6 +2472,7 @@ function updatePriorityWarning() {
 // ═══ STATUS MODAL ══════════════════════════════
 function openStatusModal(b, k, emp) {
   if (!canEditEmployee(b, emp)) return; // sécurité côté client
+  setActivity(b, k, emp);
   modalCtx = { type:'status', b, k, emp };
   pendingStatus = null;
   const date    = fromKey(k);
@@ -2833,7 +2882,7 @@ function openModal() {
   document.getElementById('modal-overlay').style.display = 'flex';
   setTimeout(restoreDraft, 30);
 }
-function closeModal() { saveDraft(); document.getElementById('modal-overlay').style.display='none'; modalCtx=null; }
+function closeModal() { saveDraft(); clearActivity(); document.getElementById('modal-overlay').style.display='none'; modalCtx=null; }
 function overlayClick(e) { /* désactivé — fermeture uniquement via boutons */ }
 document.addEventListener('keydown', e => {
   if (!modalCtx) return;
