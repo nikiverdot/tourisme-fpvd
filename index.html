@@ -823,8 +823,11 @@ let currentUser = localStorage.getItem('piffaut-user') || '';
 let authTab     = 'login';
 
 const ADMIN_EMAIL       = 'mfverdot@gmail.com';  // admin principal
-const ADMIN_EMAILS      = ['mfverdot@gmail.com', 'verdotmf@gmail.com']; // tous les admins
-const isAdmin = (email) => ADMIN_EMAILS.includes((email||'').toLowerCase());
+// Tous les comptes de Monique (admin + seule à pouvoir modifier sa propre colonne)
+const MONIQUE_EMAILS    = ['mfverdot@gmail.com', 'verdotmf@gmail.com', 'monique.verdot@fpvd.fr', 'verdotmonique@gmail.com'];
+const ADMIN_EMAILS      = MONIQUE_EMAILS; // Monique est la seule administratrice
+const isAdmin   = (email) => MONIQUE_EMAILS.includes((email||'').toLowerCase());
+const isMonique = (email) => MONIQUE_EMAILS.includes((email||'').toLowerCase());
 // Clé publique VAPID — remplacer par la vraie clé après génération
 const VAPID_PUBLIC_KEY  = 'BLVOFQuubXbAZWnYeLgBNam55ifATR_3igEBmf9E5XqDiJ3emTzJmCn9Y5FT-pck6dcQpqg2z_X_G55rSyY6uK8';
 const PUSH_SECRET       = 'fpvd-push-planning'; // même valeur que dans Netlify env
@@ -851,7 +854,9 @@ function canEditEmployee(b, empName) {
   if (!authUser) return false;
   if (currentUserRole === 'viewer') return false;            // viewer → lecture seule
   const email = authUser.email.toLowerCase();
-  if (isAdmin(email)) return true;                           // admin → tout, y compris Monique
+  // Colonne Monique : réservée exclusivement à ses propres comptes
+  if (empName === 'Monique') return isMonique(email);
+  if (isAdmin(email)) return true;                           // admin → tout le reste
   // Managers hardcodés (compatibilité) + rôle ACL 'manager'
   const mgBoutique = email === MANAGER_BULLE    ? 'bulle'
                    : email === MANAGER_DELORME  ? 'delorme'
@@ -2581,7 +2586,10 @@ function getColLabels() {
 function applyColStyles() {
   const b      = state.currentBoutique;
   const emps   = state.boutiques[b]?.employees || [];
-  const hidden = hiddenCols[b] || new Set();
+  // Copie locale pour ne pas modifier les prefs sauvegardées
+  const hidden = new Set(hiddenCols[b] || []);
+  // Masquer automatiquement la colonne Monique quand elle est connectée
+  if (authUser && isMonique(authUser.email)) hidden.add('Monique');
   let css = '';
   // Résoudre le nom employé → index positionnel courant
   hidden.forEach(key => {
@@ -2606,7 +2614,10 @@ function buildColPanel() {
   const hidden = hiddenCols[b] || new Set();
   const labels = getColLabels();
   const bLabel = b === 'bulle' ? '🫧 Bulle' : '🍾 André Delorme';
-  const allCols = ['rdv', 'visite', 'pax', ...emps, 'renfort-0', 'renfort-1'];
+  const isMoniqueSession = authUser && isMonique(authUser.email);
+  let allCols = ['rdv', 'visite', 'pax', ...emps, 'renfort-0', 'renfort-1'];
+  // Monique ne voit pas sa propre entrée dans le filtre (colonne auto-cachée)
+  if (isMoniqueSession) allCols = allCols.filter(c => c !== 'Monique');
   let html = `<div class="col-panel-title">Colonnes — ${bLabel}</div>`;
   allCols.forEach(col => {
     const checked = !hidden.has(col) ? 'checked' : '';
