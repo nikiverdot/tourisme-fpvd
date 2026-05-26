@@ -2523,9 +2523,7 @@ function openBookingModal(b, k, idx) {
   } else {
     // AD : sélection de langue
     const langList = [
-      ['','— Langue'],['FRA|🇫🇷','Français 🇫🇷'],['ENG|🇬🇧','English 🇬🇧'],['USA|🇺🇸','English 🇺🇸'],
-      ['DEU|🇩🇪','Deutsch 🇩🇪'],['ESP|🇪🇸','Español 🇪🇸'],['ITA|🇮🇹','Italiano 🇮🇹'],
-      ['NLD|🇳🇱','Nederlands 🇳🇱'],['PRT|🇵🇹','Português 🇵🇹'],['CHN|🇨🇳','中文 🇨🇳'],['JPN|🇯🇵','日本語 🇯🇵']
+      ['','— Langue'],['FRA|🇫🇷','Français 🇫🇷'],['ENG|🇬🇧','English 🇬🇧'],['USA|🇺🇸','English 🇺🇸']
     ];
     const curLang = (bk.langCode&&bk.langFlag) ? bk.langCode+'|'+bk.langFlag : '';
     langLabel = 'Langue';
@@ -2572,7 +2570,7 @@ function openBookingModal(b, k, idx) {
     </div>
     <div class="form-group"><label class="form-label">Groupe / Client</label><input id="f-desc" class="form-input" type="text" placeholder="Famille Martin…" value="${esc(bk.description||'')}"></div>
     <div class="form-group"><label class="form-label">Commentaire</label><textarea id="f-comment" class="form-textarea" placeholder="Notes internes…">${bk.comment||''}</textarea></div>
-    <div class="form-group"><label class="form-label">Tarif</label><input id="f-price" class="form-input" type="text" inputmode="decimal" placeholder="9,50 ou 45 ou 9,50/pax" value="${bk.price||''}" onblur="fmtPrice(this)"></div>`;
+    <div class="form-group"><label class="form-label">Tarif par personne</label><input id="f-price" class="form-input" type="text" inputmode="decimal" placeholder="9,50 ou 45 ou 9,50/pax" value="${bk.price||''}" onblur="fmtPrice(this)"></div>`;
   document.getElementById('modal-actions').innerHTML = edit
     ? '<button class="btn-md" onclick="deleteBooking()">Supprimer</button><button class="btn-ms" onclick="closeModal()">Annuler</button><button class="btn-mp" onclick="saveBooking()">Enregistrer</button>'
     : '<button class="btn-ms" onclick="closeModal()">Annuler</button><button class="btn-mp" onclick="saveBooking()">Ajouter</button>';
