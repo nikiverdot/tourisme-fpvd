@@ -852,9 +852,17 @@ function initFirebaseData() {
       render();
       if (firstDataLoad) { firstDataLoad = false; setTimeout(scrollToToday, 150); }
     }
-    const ts = data && data.lastUpdated;
-    setSyncBadge('online', ts ? 'Sync ' + relTime(ts) : 'Connecté');
+    setSyncBadge('online', '● En ligne');
   }, () => setSyncBadge('error','Erreur sync'));
+
+  // Connexion temps réel Firebase
+  db.ref('.info/connected').on('value', snap => {
+    if (snap.val() === true) {
+      setSyncBadge('online', '● En ligne');
+    } else {
+      setSyncBadge('offline', 'Hors ligne');
+    }
+  });
 }
 
 // ═══ SAVE (FIABLE) ════════════════════════════
@@ -880,7 +888,7 @@ function doSaveNow() {
   pendingSave = true;
   setSyncBadge('saving','Sauvegarde…');
   db.ref(DB_PATH).set(buildPayload())
-    .then(() => { pendingSave = false; setSyncBadge('online','✓ Sauvegardé'); })
+    .then(() => { pendingSave = false; setSyncBadge('online','✓ Sauvegardé · ' + new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})); })
     .catch(err => {
       pendingSave = false;
       setSyncBadge('error','Erreur save');
