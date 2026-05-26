@@ -1864,6 +1864,7 @@ async function syncFareHarbor() {
   btn.disabled = false; btn.textContent = '🔄 Sync FareHarbor';
   render();
   updateMobileTodayCard(); // s'assurer que le widget jour est à jour après sync FH
+  setTimeout(scrollToToday, 100); // repositionner sur aujourd'hui après reconstruction du DOM
 }
 
 // ═══ FH MANUAL TAGS ══════════════════════════
