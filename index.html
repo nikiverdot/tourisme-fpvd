@@ -267,12 +267,12 @@ thead th[data-col="emp-0"] { border-left: 3px solid #94a3b8 !important; }
 .status-cell:hover { transform: scale(1.04); opacity: 0.85; }
 /* Demi-journée (matin / après-midi) */
 .status-half {
-  flex: 1; display: flex; align-items: center; justify-content: center;
+  flex: 1; display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
   font-size: 10px; font-weight: 800; letter-spacing: 0.03em; gap: 2px;
   min-height: 17px; width: 100%;
 }
 .status-third {
-  flex: 1; display: flex; align-items: center; justify-content: center;
+  flex: 1; display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
   font-size: 9px; font-weight: 800; letter-spacing: 0.03em; gap: 2px;
   min-height: 11px; width: 100%;
 }
@@ -395,7 +395,7 @@ thead th { position: sticky; top: 0; z-index: 200; }
 .period-section-clear { font-size:10px; color:#dc2626; cursor:pointer; background:#fef2f2; border:1px solid #fca5a5; border-radius:4px; padding:1px 7px; line-height:1.6; }
 .status-picker-mini { display:flex; flex-wrap:wrap; gap:3px; margin-bottom:5px; }
 .status-picker-mini .status-option { font-size:10px !important; padding:3px 7px !important; border-radius:5px; cursor:pointer; font-weight:700; }
-.status-note-sm { font-size:9px; font-style:italic; color:#334155; display:block; margin-top:1px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; opacity:.85; }
+.status-note-sm { font-size:9px; font-style:italic; color:#334155; display:block; flex-basis:100%; text-align:center; margin-top:0; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; opacity:.85; line-height:1.2; }
 .period-full-bar { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:10px; padding:6px 8px; background:#fffbf0; border:1.5px dashed #f59e0b; border-radius:8px; }
 /* ── Badges contrat dans l'en-tête employé ── */
 .contract-badge { display:block; font-size:7px; font-weight:700; padding:1px 4px; border-radius:3px; margin-top:2px; line-height:1.4; text-align:center; }
