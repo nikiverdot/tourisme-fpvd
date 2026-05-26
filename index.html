@@ -1622,22 +1622,20 @@ async function saveFHTag(bookingPk, via) {
   try {
     if (via) await db.ref('piffaut-fh-tags/' + bookingPk).set(via);
     else     await db.ref('piffaut-fh-tags/' + bookingPk).remove();
-  } catch(e) { console.error('saveFHTag:', e); }
+  } catch(e) { console.error('saveFHTag:', e); toast('⚠ Erreur Firebase (canal) : ' + e.message, '#dc2626'); }
 }
 
 async function saveFHNote(bookingPk, note) {
   if (!db || !bookingPk) return;
   bookingPk = parseInt(bookingPk);
   note = (note || '').trim();
-  if (note) {
-    fhNotes[bookingPk] = note;
-    await db.ref('piffaut-fh-notes/' + bookingPk).set(note);
-  } else {
-    delete fhNotes[bookingPk];
-    await db.ref('piffaut-fh-notes/' + bookingPk).remove();
-  }
+  if (note) fhNotes[bookingPk] = note; else delete fhNotes[bookingPk];
   render();
   toast('✅ Note enregistrée', '#16a34a');
+  try {
+    if (note) await db.ref('piffaut-fh-notes/' + bookingPk).set(note);
+    else      await db.ref('piffaut-fh-notes/' + bookingPk).remove();
+  } catch(e) { console.error('saveFHNote:', e); toast('⚠ Erreur Firebase (note) : ' + e.message, '#dc2626'); }
 }
 
 async function saveFHOverride(bookingPk, fields) {
@@ -1647,9 +1645,11 @@ async function saveFHOverride(bookingPk, fields) {
   const merged = { ...cur, ...fields };
   Object.keys(merged).forEach(k => { if (merged[k] === undefined) delete merged[k]; });
   fhOverrides[bookingPk] = merged;
-  await db.ref('piffaut-fh-overrides/' + bookingPk).set(merged);
   render();
   toast('✅ Enregistré', '#16a34a');
+  try {
+    await db.ref('piffaut-fh-overrides/' + bookingPk).set(merged);
+  } catch(e) { console.error('saveFHOverride:', e); toast('⚠ Erreur Firebase (statut) : ' + e.message, '#dc2626'); }
 }
 
 // ═══ FH CSV AFFILIATE IMPORT ══════════════════
