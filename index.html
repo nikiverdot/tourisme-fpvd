@@ -402,6 +402,8 @@ thead th { position: sticky; top: 0; z-index: 200; }
 .contract-alt   { background:#ede9fe; color:#6d28d9; border:1px solid #c4b5fd; }
 .contract-cdd   { background:#fef9c3; color:#854d0e; border:1px solid #fde68a; }
 .contract-cdi   { background:#dcfce7; color:#15803d; border:1px solid #86efac; }
+/* Cellule hors contrat : vide et non interactive */
+.emp-cell-out { background: repeating-linear-gradient(135deg,#f1f5f9 0px,#f1f5f9 4px,#e2e8f0 4px,#e2e8f0 8px) !important; cursor: default !important; pointer-events: none !important; opacity: .45; }
 /* ── AUTH OVERLAY ── */
 #auth-overlay {
   position: fixed; inset: 0; z-index: 9999;
@@ -1604,6 +1606,13 @@ function toggleException(b, k) {
   scheduleSave();
   render();
 }
+// Retourne false si l'employé est hors contrat à la date k (cellule vide, non cliquable)
+function isEmpInContract(emp, k) {
+  if (emp === 'Estelle' && k < '2026-01-21') return false;
+  if (emp === 'Agathe'  && (k < '2026-02-02' || k > '2027-01-31')) return false;
+  if (emp === 'Alice'   && k > '2026-12-31') return false;
+  return true;
+}
 // Retourne le statut effectif : Julie = AD automatique sur jours ouverts
 function getEffectiveStatus(b, k, emp, ferme) {
   // Règles absolues — priorité sur les données Firebase
@@ -2248,6 +2257,11 @@ function render() {
 
     // Employee cells (rowspan)
     emps.forEach((emp, empIdx) => {
+      // Hors contrat → cellule vide hachurée, non cliquable
+      if (!isEmpInContract(emp, k)) {
+        html += '<td class="emp-cell emp-cell-out" data-col="emp-' + empIdx + '" rowspan="' + rows + '"></td>';
+        return;
+      }
       const s      = getEffectiveStatus(b, k, emp, ferme);
       const consec = consecutiveWorkDays(b, k, emp);
       const warnCls = consec >= 7 ? ' cell-warn-7' : (consec >= 6 ? ' cell-warn-6' : '');
