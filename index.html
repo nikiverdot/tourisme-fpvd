@@ -197,7 +197,7 @@ tr.row-today   td.jour-cell { color: #0e5c5c; }
 td.date-cell {
   text-align: center; padding: 2px 3px; vertical-align: middle !important;
 }
-.date-num   { display: block; font-size: 16px; font-weight: 800; color: #1e293b; line-height: 1; }
+.date-num   { display: block; font-size: 19px; font-weight: 800; color: #1e293b; line-height: 1; }
 .date-month { display: block; font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em; }
 tr.row-today .date-num  { color: #0e5c5c; }
 tr.row-sunday .date-num { color: #f97316; }
@@ -233,11 +233,16 @@ td.visite-cell { padding: 3px 8px; vertical-align: middle !important; }
 td.pax-cell {
   text-align: center; padding: 4px 4px; vertical-align: middle !important;
   font-size: 15px; font-weight: 800;
+  border-right: 3px solid #94a3b8 !important;
 }
 .pax-big { color: #dc2626; }
 
 /* EMPLOYEE cell */
-td.emp-cell { padding: 3px 3px; text-align: center; vertical-align: middle !important; }
+td.emp-cell { padding: 3px 3px; text-align: center; vertical-align: middle !important; background: #f8faff; }
+td.emp-cell:first-of-type,
+td[data-col="emp-0"] { border-left: 3px solid #94a3b8 !important; }
+thead th.th-emp:first-of-type,
+thead th[data-col="emp-0"] { border-left: 3px solid #94a3b8 !important; }
 .status-cell {
   border-radius: 6px; cursor: pointer; text-align: center;
   font-size: 12px; font-weight: 800; min-height: 36px; height: auto;
@@ -306,9 +311,10 @@ tr.row-ferme .renfort-empty { color: #475569 !important; }
 tr.row-ferme .renfort-chip  { opacity: 0.5; pointer-events: none; }
 
 /* Thead rename hint */
-thead th.th-emp { cursor: pointer; }
+thead th.th-emp { cursor: pointer; background: #f0f4ff; }
 thead th.th-emp:hover { background: #d1d5db; }
 thead th.th-emp::after { content: ' ✎'; font-size: 8px; opacity: 0.4; }
+thead th[data-col="pax"] { border-right: 3px solid #94a3b8 !important; }
 thead th.th-renfort { background: #fef9c3 !important; color: #92400e !important; border-color: #fcd34d !important; }
 
 /* LEGEND */
