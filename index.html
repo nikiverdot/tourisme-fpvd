@@ -758,6 +758,8 @@ let currentUser = localStorage.getItem('piffaut-user') || '';
 let authTab     = 'login';
 
 const ADMIN_EMAIL       = 'mfverdot@gmail.com';
+// Clé publique VAPID — remplacer par la vraie clé après génération
+const VAPID_PUBLIC_KEY  = 'VOTRE_VAPID_PUBLIC_KEY';
 const MANAGER_BULLE     = 'tourisme@fpvd.fr';      // gère tout Bulle sauf Monique
 const MANAGER_DELORME   = 'caveau@andre-delorme.com'; // gère Julie + Renfort + CDD (AD)
 const ACL_PATH    = 'piffaut-acl';
@@ -2909,6 +2911,7 @@ function init() {
     initFirebaseData();
     initPresence(user);
     render();
+    subscribeToPush();
     setTimeout(scrollToToday, 200);
     syncFareHarbor();
   });
@@ -3171,6 +3174,38 @@ function parseAndImportCSV(text, overwrite) {
   }
 
   return { rows: rowCnt, statuses: statCnt, notes: noteCnt, bookings: bkCnt };
+}
+
+// ── Push notifications ────────────────────────────────────────────────────────
+function urlBase64ToUint8Array(b64) {
+  const pad = '='.repeat((4 - b64.length % 4) % 4);
+  const raw = atob((b64 + pad).replace(/-/g,'+').replace(/_/g,'/'));
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+async function subscribeToPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  if (VAPID_PUBLIC_KEY === 'VOTRE_VAPID_PUBLIC_KEY') return; // clé pas encore configurée
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') return;
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+    if (db && authUser) {
+      await db.ref('piffaut-push-subscriptions/' + authUser.uid).set({
+        subscription: sub.toJSON(),
+        email:       authUser.email,
+        name:        authUser.displayName || '',
+        updatedAt:   Date.now()
+      });
+    }
+  } catch(e) { console.warn('Push subscription failed:', e); }
 }
 
 // ── Service Worker registration ──
