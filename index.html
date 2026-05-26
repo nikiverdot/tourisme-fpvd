@@ -26,6 +26,7 @@ const FIREBASE_CONFIG = {
 const FAREHARBOR_ICS_DELORME = "https://fareharbor.com/integrations/ics/andre-delorme/calendar/?token=cc1ce7f0-f5f4-43d8-b6ec-b0d86f86f062";
 const FAREHARBOR_ICS_BULLE   = "https://fareharbor.com/integrations/ics/les-petits-veuve-ambal/calendar/?token=b2355683-6798-4049-8de9-46fdf9311166";
 const WINALIST_ICS_BULLE     = "https://www.winalist.fr/ics/experiences/feed/148/5KXKToGoHt4YYyBdjoqXpnlBUk5Ko8";
+const WINALIST_ICS_DELORME   = "https://www.winalist.fr/ics/experiences/feed/667/Zf9VbGVo86VT02wQtxjSilX6onx8Ut";
 </script>
 <style>
 :root { color-scheme: light; }
@@ -1624,24 +1625,26 @@ async function syncFareHarbor() {
   btn.disabled = true; btn.textContent = '⏳…';
   msg.style.color = '#64748b'; msg.textContent = '⏳ Récupération des calendriers…';
 
-  // Fetch all sources in parallel (FH Delorme, FH Bulle, Winalist Bulle)
-  const [txtDelorme, txtBulle, txtWinalist] = await Promise.all([
+  // Fetch all sources in parallel (FH + Winalist pour les 2 boutiques)
+  const [txtDelorme, txtBulle, txtWinalistB, txtWinalistD] = await Promise.all([
     fetchICS(FAREHARBOR_ICS_DELORME),
     fetchICS(FAREHARBOR_ICS_BULLE),
-    fetchICS(WINALIST_ICS_BULLE)
+    fetchICS(WINALIST_ICS_BULLE),
+    fetchICS(WINALIST_ICS_DELORME)
   ]);
 
-  if (!txtDelorme && !txtBulle && !txtWinalist) {
+  if (!txtDelorme && !txtBulle && !txtWinalistB && !txtWinalistD) {
     msg.style.color = '#dc2626'; msg.textContent = '⚠ Calendriers inaccessibles (CORS). Fonctionne depuis un serveur web.';
     btn.disabled = false; btn.textContent = '🔄 Sync FareHarbor';
     return;
   }
 
   // Parse each ICS and tag with boutique
-  const eventsDelorme  = txtDelorme  ? parseICS(txtDelorme).map(ev =>      ({ ...ev, boutique: 'delorme' })) : [];
-  const eventsBulle    = txtBulle    ? parseICS(txtBulle).map(ev =>        ({ ...ev, boutique: 'bulle'   })) : [];
-  const eventsWinalist = txtWinalist ? parseWinalist(txtWinalist).map(ev => ({ ...ev, boutique: 'bulle'   })) : [];
-  const allEvents      = [...eventsDelorme, ...eventsBulle, ...eventsWinalist];
+  const eventsDelorme   = txtDelorme   ? parseICS(txtDelorme).map(ev =>       ({ ...ev, boutique: 'delorme' })) : [];
+  const eventsBulle     = txtBulle     ? parseICS(txtBulle).map(ev =>         ({ ...ev, boutique: 'bulle'   })) : [];
+  const eventsWinalistB = txtWinalistB ? parseWinalist(txtWinalistB).map(ev => ({ ...ev, boutique: 'bulle'   })) : [];
+  const eventsWinalistD = txtWinalistD ? parseWinalist(txtWinalistD).map(ev => ({ ...ev, boutique: 'delorme' })) : [];
+  const allEvents       = [...eventsDelorme, ...eventsBulle, ...eventsWinalistB, ...eventsWinalistD];
 
   // Enrich with partner/channel from FH API (if keys configured)
   msg.style.color = '#64748b'; msg.textContent = '⏳ Récupération des canaux…';
@@ -1668,11 +1671,17 @@ async function syncFareHarbor() {
   allEvents.forEach(ev => { if (!fhBookings[ev.dateKey]) fhBookings[ev.dateKey] = []; fhBookings[ev.dateKey].push(ev); });
 
   // Status message
-  const cntD = eventsDelorme.length, cntB = eventsBulle.length, cntW = eventsWinalist.length;
-  const cntTotal = cntD + cntB + cntW;
+  const cntD  = eventsDelorme.length,   cntB  = eventsBulle.length;
+  const cntWB = eventsWinalistB.length, cntWD = eventsWinalistD.length;
+  const cntTotal = cntD + cntB + cntWB + cntWD;
   const channelCnt = Object.keys(channelMap).length;
   const tagCnt     = Object.keys(fhTags).length;
-  const sourceParts = [cntD > 0 ? cntD + ' AD' : '', cntB > 0 ? cntB + ' ADB (FH)' : '', cntW > 0 ? cntW + ' ADB (Winalist)' : ''].filter(Boolean).join(' · ');
+  const sourceParts = [
+    cntD  > 0 ? cntD  + ' AD (FH)'       : '',
+    cntWD > 0 ? cntWD + ' AD (Winalist)' : '',
+    cntB  > 0 ? cntB  + ' ADB (FH)'      : '',
+    cntWB > 0 ? cntWB + ' ADB (Winalist)': ''
+  ].filter(Boolean).join(' · ');
   msg.style.color = '#16a34a';
   msg.textContent = '✓ ' + sourceParts + (cntTotal ? ' — ' + cntTotal + ' réservation' + (cntTotal !== 1 ? 's' : '') : '')
     + (channelCnt > 0 ? ' · ' + channelCnt + ' canal' + (channelCnt > 1 ? 'x' : '') : '')
