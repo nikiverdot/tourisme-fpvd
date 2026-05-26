@@ -93,8 +93,8 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; colo
 /* ── TABLE ── */
 /* border-collapse:separate é obrigatório para position:sticky funcionar no Chrome/Safari */
 table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 800px; }
-col.col-jour  { width: 36px; }
-col.col-date  { width: 28px; }
+col.col-jour  { width: 30px; }
+col.col-date  { width: 20px; }
 col.col-rdv   { width: 200px; }
 col.col-visite{ width: 320px; }
 col.col-pax   { width: 42px; }
@@ -194,8 +194,8 @@ tr.row-today   td.jour-cell { color: #0e5c5c; }
 
 /* DATE cell */
 td.date-cell {
-  text-align: center; padding: 2px 4px; vertical-align: middle !important;
-  white-space: nowrap;
+  text-align: center; padding: 2px 1px; vertical-align: middle !important;
+  white-space: nowrap; overflow: hidden;
 }
 .date-num   { display: block; font-size: 16px; font-weight: 800; color: #1e293b; line-height: 1; }
 .date-month { display: block; font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em; }
