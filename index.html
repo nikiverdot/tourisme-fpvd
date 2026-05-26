@@ -2308,7 +2308,7 @@ function render() {
         const sSoirAbbr  = STATUS_ABBR[sSoir]    || '';
         const sSoirLabel = STATUS_LABELS[sSoir]  || '—';
         html += '<td class="emp-cell' + lockedCls + '" data-col="emp-' + empIdx + '" data-key="' + k + '" data-emp="' + esc(emp) + '" rowspan="' + rows + '">' +
-          '<div class="status-cell' + warnCls + '" style="padding:0;gap:0;overflow:hidden;border-color:#94a3b8" ' + clickEvt + ' title="Matin: ' + sLabel + ' · Après-midi: ' + sPMLabel + ' · Soir: ' + sSoirLabel + warnTip + '">' +
+          '<div class="status-cell' + warnCls + '" style="padding:0;gap:0;overflow:hidden;border-color:#94a3b8" ' + clickEvt + ' title="Matin: ' + sLabel + (snAM?' ('+snAM+')':'') + ' · Après-midi: ' + sPMLabel + (snPM?' ('+snPM+')':'') + ' · Soir: ' + sSoirLabel + (snSoir?' ('+snSoir+')':'') + warnTip + '">' +
           '<div class="status-third ' + sClass      + '" style="border-bottom:1px solid rgba(0,0,0,.08)">' + sAbbr   + '<span class="half-tag">M</span>' + noteHtmlAM   + '</div>' +
           '<div class="status-third ' + sPMClass    + '" style="border-bottom:1px solid rgba(0,0,0,.08)">' + sPMAbbr + '<span class="half-tag">A</span>' + noteHtmlPM   + '</div>' +
           '<div class="status-third ' + sSoirClass  + '">' + sSoirAbbr + '<span class="half-tag">S</span>' + noteHtmlSoir + '</div>' +
@@ -2319,12 +2319,12 @@ function render() {
         const sPMAbbr  = STATUS_ABBR[sPM]    || '';
         const sPMLabel = STATUS_LABELS[sPM]  || '—';
         html += '<td class="emp-cell' + lockedCls + '" data-col="emp-' + empIdx + '" data-key="' + k + '" data-emp="' + esc(emp) + '" rowspan="' + rows + '">' +
-          '<div class="status-cell' + warnCls + '" style="padding:0;gap:0;overflow:hidden;border-color:#94a3b8" ' + clickEvt + ' title="Matin: ' + sLabel + ' · Après-midi: ' + sPMLabel + warnTip + '">' +
+          '<div class="status-cell' + warnCls + '" style="padding:0;gap:0;overflow:hidden;border-color:#94a3b8" ' + clickEvt + ' title="Matin: ' + sLabel + (snAM?' ('+snAM+')':'') + ' · Après-midi: ' + sPMLabel + (snPM?' ('+snPM+')':'') + warnTip + '">' +
           '<div class="status-half ' + sClass   + '" style="border-bottom:1px solid rgba(0,0,0,.08)">' + sAbbr   + '<span class="half-tag">M</span>' + noteHtmlAM + '</div>' +
           '<div class="status-half ' + sPMClass + '">' + sPMAbbr + '<span class="half-tag">A</span>' + noteHtmlPM + '</div>' +
           '</div></td>';
       } else {
-        html += '<td class="emp-cell' + lockedCls + '" data-col="emp-' + empIdx + '" data-key="' + k + '" data-emp="' + esc(emp) + '" rowspan="' + rows + '"><div class="status-cell ' + sClass + (alert?' cell-alert':'') + warnCls + '" ' + clickEvt + ' title="' + sLabel + warnTip + '">' + sAbbr + cpHtml + consecHtml + noteHtmlAM + '</div></td>';
+        html += '<td class="emp-cell' + lockedCls + '" data-col="emp-' + empIdx + '" data-key="' + k + '" data-emp="' + esc(emp) + '" rowspan="' + rows + '"><div class="status-cell ' + sClass + (alert?' cell-alert':'') + warnCls + '" ' + clickEvt + ' title="' + sLabel + (snAM?' · '+snAM:'') + warnTip + '">' + sAbbr + cpHtml + consecHtml + noteHtmlAM + '</div></td>';
       }
     });
 
@@ -2808,63 +2808,104 @@ function updatePriorityWarning() {
   }
 }
 
-// ═══ STATUS MODAL — 3 PÉRIODES INDÉPENDANTES ═══
+// ═══ STATUS MODAL — Journée entière par défaut, périodes en option ═══
+let modalSplit = false;
+
 function openStatusModal(b, k, emp) {
   if (!canEditEmployee(b, emp)) return;
   setActivity(b, k, emp);
   modalCtx = { type:'status', b, k, emp };
   pendingStatus = null;
-  const date       = fromKey(k);
-  const curAM      = getStatus(b, k, emp);
-  const curPM      = getStatusPM(b, k, emp);    // null = journée entière
-  const curSoir    = getStatusSoir(b, k, emp);  // null = pas de soir
-  const curNoteAM  = getStatusNoteAM(b, k, emp);
-  const curNotePM  = getStatusNotePM(b, k, emp);
-  const curNoteSoir= getStatusNoteSoir(b, k, emp);
+  const date        = fromKey(k);
+  const curAM       = getStatus(b, k, emp);
+  const curPM       = getStatusPM(b, k, emp);
+  const curSoir     = getStatusSoir(b, k, emp);
+  const curNoteAM   = getStatusNoteAM(b, k, emp);
+  const curNotePM   = getStatusNotePM(b, k, emp);
+  const curNoteSoir = getStatusNoteSoir(b, k, emp);
 
-  const miniPicker = (period, sel) =>
-    STATUSES.map(s =>
-      '<div class="status-option ' + SO_CLASSES[s] + (sel===s?' selected':'') + '" ' +
-      'data-period="' + period + '" data-status="' + s + '" ' +
-      'onclick="selectPeriodStatus(\'' + period + '\',\'' + s + '\')">' + STATUS_ABBR[s] + '</div>'
-    ).join('');
+  // Auto-expand périodes si la cellule a déjà des données per-période
+  modalSplit = (curPM !== null || curSoir !== null || curNotePM !== '' || curNoteSoir !== '');
+
+  const picker = (period, sel, mini) => STATUSES.map(s =>
+    '<div class="status-option ' + SO_CLASSES[s] + (sel===s?' selected':'') + '" ' +
+    'data-period="' + period + '" data-status="' + s + '" ' +
+    'onclick="selectPeriodStatus(\'' + period + '\',\'' + s + '\')" ' +
+    (mini ? '' : 'style="font-size:12px;padding:5px 10px"') + '>' + STATUS_ABBR[s] + '</div>'
+  ).join('');
 
   document.getElementById('modal-title').textContent = emp + ' · ' + DAYS_FR[date.getDay()] + ' ' + date.getDate() + ' ' + MONTHS_FR[date.getMonth()];
   document.getElementById('modal-body').innerHTML =
-    // ── Raccourci "Journée entière" ──
-    '<div class="period-full-bar">' +
-    '<span style="font-size:11px;font-weight:700;color:#78350f;margin-right:6px;white-space:nowrap;flex-shrink:0">☀ Journée :</span>' +
-    STATUSES.map(s => '<div class="status-option ' + SO_CLASSES[s] + '" onclick="applyFullDay(\'' + s + '\')" style="font-size:10px;padding:3px 7px">' + STATUS_ABBR[s] + '</div>').join('') +
-    '<span onclick="applyFullDay(null)" style="font-size:10px;padding:3px 8px;background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:5px;cursor:pointer;font-weight:700;white-space:nowrap;flex-shrink:0">✕ Effacer tout</span>' +
-    '</div>' +
 
-    // ── Matin ──
-    '<div class="period-section" id="ps-am">' +
-    '<div class="period-section-hd">🌅 Matin <span class="period-section-clear" onclick="clearPeriodSection(\'am\')">✕ effacer</span></div>' +
-    '<div class="status-picker-mini">' + miniPicker('am', curAM) + '</div>' +
-    '<input id="note-am" class="form-input" type="text" placeholder="Message matin… (ex : Soutenance, NPB)" maxlength="50" value="' + esc(curNoteAM) + '" style="font-size:11px;padding:5px 8px;margin-top:4px" oninput="updatePriorityWarning()">' +
-    '</div>' +
+    // ── Label Matin (visible seulement en mode périodes) ──
+    '<div id="matin-label" style="display:' + (modalSplit?'flex':'none') + ';font-size:12px;font-weight:700;color:#334155;margin-bottom:5px;justify-content:space-between;align-items:center">' +
+    '🌅 Matin <span class="period-section-clear" onclick="clearPeriodSection(\'am\')">✕ effacer</span></div>' +
 
-    // ── Après-midi ──
+    // ── Picker AM (= journée entière en mode simple) ──
+    '<div id="ps-am" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">' + picker('am', curAM, false) + '</div>' +
+
+    // ── Note AM (= note journée en mode simple) ──
+    '<input id="note-am" class="form-input" type="text" ' +
+    'placeholder="' + (modalSplit ? 'Message matin… (ex : Soutenance, NPB)' : 'Message pour la journée… (ex : NPB, Soutenance)') + '" ' +
+    'maxlength="50" value="' + esc(curNoteAM) + '" ' +
+    'style="font-size:12px;padding:6px 10px;margin-bottom:6px" oninput="updatePriorityWarning()">' +
+
+    // ── Toggle périodes ──
+    '<div style="text-align:center;margin:2px 0 6px">' +
+    '<span id="split-toggle" onclick="toggleSplitMode()" ' +
+    'style="font-size:11px;color:#94a3b8;cursor:pointer;user-select:none;padding:3px 8px;border-radius:4px;border:1px solid #e2e8f0">' +
+    (modalSplit ? '▲ Journée entière' : '÷ Diviser en périodes') +
+    '</span></div>' +
+
+    // ── Sections PM + Soir (cachées par défaut) ──
+    '<div id="split-sections" style="display:' + (modalSplit?'block':'none') + '">' +
+
     '<div class="period-section" id="ps-pm">' +
-    '<div class="period-section-hd">🌆 Après-midi <span style="font-size:10px;color:#94a3b8;font-weight:400">(vide = même que matin)</span><span class="period-section-clear" onclick="clearPeriodSection(\'pm\')">✕</span></div>' +
-    '<div class="status-picker-mini">' + miniPicker('pm', curPM) + '</div>' +
+    '<div class="period-section-hd">🌆 Après-midi ' +
+    '<span style="font-size:10px;color:#94a3b8;font-weight:400">(vide = même que matin)</span>' +
+    '<span class="period-section-clear" onclick="clearPeriodSection(\'pm\')">✕</span></div>' +
+    '<div class="status-picker-mini">' + picker('pm', curPM, true) + '</div>' +
     '<input id="note-pm" class="form-input" type="text" placeholder="Message après-midi…" maxlength="50" value="' + esc(curNotePM) + '" style="font-size:11px;padding:5px 8px;margin-top:4px">' +
     '</div>' +
 
-    // ── Soir ──
     '<div class="period-section" id="ps-soir">' +
-    '<div class="period-section-hd">🌙 Soir <span style="font-size:10px;color:#94a3b8;font-weight:400">(optionnel)</span><span class="period-section-clear" onclick="clearPeriodSection(\'soir\')">✕</span></div>' +
-    '<div class="status-picker-mini">' + miniPicker('soir', curSoir) + '</div>' +
+    '<div class="period-section-hd">🌙 Soir ' +
+    '<span style="font-size:10px;color:#94a3b8;font-weight:400">(optionnel)</span>' +
+    '<span class="period-section-clear" onclick="clearPeriodSection(\'soir\')">✕</span></div>' +
+    '<div class="status-picker-mini">' + picker('soir', curSoir, true) + '</div>' +
     '<input id="note-soir" class="form-input" type="text" placeholder="Message soir… (ex : CSA SOIRÉE VIP)" maxlength="50" value="' + esc(curNoteSoir) + '" style="font-size:11px;padding:5px 8px;margin-top:4px">' +
-    '</div>' +
+    '</div></div>' +
 
     '<div id="priority-warning" style="display:none;margin-top:8px;padding:9px 12px;background:#fef3c7;border:1.5px solid #f59e0b;border-radius:8px;font-size:12px;color:#92400e;gap:6px;align-items:flex-start"></div>';
 
-  document.getElementById('modal-actions').innerHTML = '<button class="btn-ms" onclick="closeModal()">Annuler</button><button class="btn-mp" onclick="saveStatus()">Enregistrer</button>';
+  document.getElementById('modal-actions').innerHTML =
+    '<button class="btn-md" onclick="clearAllPeriods()" title="Effacer toute la journée">✕</button>' +
+    '<button class="btn-ms" onclick="closeModal()">Annuler</button>' +
+    '<button class="btn-mp" onclick="saveStatus()">Enregistrer</button>';
   openModal();
   updatePriorityWarning();
 }
+
+// Affiche / masque les sections Après-midi + Soir
+function toggleSplitMode() {
+  modalSplit = !modalSplit;
+  const sections = document.getElementById('split-sections');
+  const toggle   = document.getElementById('split-toggle');
+  const lbl      = document.getElementById('matin-label');
+  const noteAM   = document.getElementById('note-am');
+  if (!modalSplit) {
+    // Retour journée entière → on vide PM et Soir pour ne pas les sauver
+    clearPeriodSection('pm');
+    clearPeriodSection('soir');
+  }
+  if (sections) sections.style.display = modalSplit ? 'block' : 'none';
+  if (toggle)   toggle.textContent = modalSplit ? '▲ Journée entière' : '÷ Diviser en périodes';
+  if (lbl)      lbl.style.display  = modalSplit ? 'flex' : 'none';
+  if (noteAM)   noteAM.placeholder = modalSplit ? 'Message matin… (ex : Soutenance, NPB)' : 'Message pour la journée… (ex : NPB, Soutenance)';
+}
+
+// Efface toutes les périodes (bouton ✕ dans les actions)
+function clearAllPeriods() { ['am','pm','soir'].forEach(p => clearPeriodSection(p)); }
 
 let pendingStatus = null;   // conservé pour compat draft
 let pendingPeriod = 'full'; // conservé pour compat draft
@@ -2882,19 +2923,10 @@ function selectPeriodStatus(period, status) {
   if (period === 'am') updatePriorityWarning();
 }
 
-// Raccourci Journée entière : applique le même statut à AM + PM, efface Soir
+// (compat — gardé pour saveStatus, plus exposé dans le modal)
 function applyFullDay(status) {
-  if (status === null) {
-    ['am','pm','soir'].forEach(p => {
-      const c = document.getElementById('ps-' + p);
-      if (c) c.querySelectorAll('.status-option[data-status]').forEach(b => b.classList.remove('selected'));
-    });
-    ['note-am','note-pm','note-soir'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
-  } else {
-    selectPeriodStatus('am',   status);
-    selectPeriodStatus('pm',   status);
-    clearPeriodSection('soir');
-  }
+  if (status === null) { clearAllPeriods(); }
+  else { selectPeriodStatus('am', status); selectPeriodStatus('pm', status); clearPeriodSection('soir'); }
   updatePriorityWarning();
 }
 
