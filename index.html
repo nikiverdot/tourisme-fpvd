@@ -1094,8 +1094,11 @@ let presenceData = {};
 function initPresence(user) {
   const pRef = db.ref(PRES_PATH + '/' + user.uid);
   const name = currentUser || user.email.split('@')[0];
-  pRef.set({ name, email: user.email, color: userColor(user.uid), since: Date.now() });
-  pRef.onDisconnect().remove();
+  // Monique est invisible : elle ne publie pas sa présence (les autres ne la voient pas)
+  if (!isMonique(user.email)) {
+    pRef.set({ name, email: user.email, color: userColor(user.uid), since: Date.now() });
+    pRef.onDisconnect().remove();
+  }
   db.ref(PRES_PATH).on('value', snap => {
     presenceData = snap.val() || {};
     updatePresenceBar();
@@ -1107,6 +1110,8 @@ function updatePresenceBar() {
   const bar = document.getElementById('presence-bar');
   if (!bar) return;
   bar.innerHTML = Object.entries(presenceData).map(([uid, u]) => {
+    // Ne jamais afficher Monique dans la barre de présence
+    if (isMonique(u.email)) return '';
     const isMe    = authUser && uid === authUser.uid;
     const initials = (u.name||'?').substring(0,2).toUpperCase();
     const editing  = u.editing;
@@ -2586,10 +2591,7 @@ function getColLabels() {
 function applyColStyles() {
   const b      = state.currentBoutique;
   const emps   = state.boutiques[b]?.employees || [];
-  // Copie locale pour ne pas modifier les prefs sauvegardées
-  const hidden = new Set(hiddenCols[b] || []);
-  // Masquer automatiquement la colonne Monique quand elle est connectée
-  if (authUser && isMonique(authUser.email)) hidden.add('Monique');
+  const hidden = hiddenCols[b] || new Set();
   let css = '';
   // Résoudre le nom employé → index positionnel courant
   hidden.forEach(key => {
@@ -2614,10 +2616,7 @@ function buildColPanel() {
   const hidden = hiddenCols[b] || new Set();
   const labels = getColLabels();
   const bLabel = b === 'bulle' ? '🫧 Bulle' : '🍾 André Delorme';
-  const isMoniqueSession = authUser && isMonique(authUser.email);
-  let allCols = ['rdv', 'visite', 'pax', ...emps, 'renfort-0', 'renfort-1'];
-  // Monique ne voit pas sa propre entrée dans le filtre (colonne auto-cachée)
-  if (isMoniqueSession) allCols = allCols.filter(c => c !== 'Monique');
+  const allCols = ['rdv', 'visite', 'pax', ...emps, 'renfort-0', 'renfort-1'];
   let html = `<div class="col-panel-title">Colonnes — ${bLabel}</div>`;
   allCols.forEach(col => {
     const checked = !hidden.has(col) ? 'checked' : '';
