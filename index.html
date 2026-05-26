@@ -721,7 +721,7 @@ tr.day-row:hover td.jour-cell,tr.day-row:hover td.date-cell,tr.day-row:hover td.
 <div class="toolbar">
   <button class="btn btn-today"  onclick="scrollToToday()">📍 Aujourd'hui</button>
   <button class="btn btn-ics"    onclick="syncFareHarbor()" id="btn-ics">🔄 Sync FareHarbor</button>
-  <button class="btn btn-ics"    onclick="openFHSettings()" title="Configuration API FareHarbor" style="padding:4px 8px;font-size:14px;min-width:0">⚙️</button>
+  <button id="btn-fh-settings" class="btn btn-ics" onclick="openFHSettings()" title="Configuration API FareHarbor" style="padding:4px 8px;font-size:14px;min-width:0;display:none">⚙️</button>
   <label  id="btn-csv-fh" class="btn btn-ics" title="Importer CSV FareHarbor (Rapports → Réservations → Exporter)" style="cursor:pointer;font-size:11px;display:none">📊 CSV FH<input type="file" accept=".csv,.txt" onchange="importFHAffiliatesCSV(event)" style="display:none"></label>
   <span   class="ics-msg"        id="ics-status"></span>
   <button id="btn-export" class="btn btn-export" onclick="exportData()" style="display:none">⬇ Exporter</button>
@@ -1277,7 +1277,7 @@ function updateUserChip(user) {
   const isViewer = currentUserRole === 'viewer';
   document.body.classList.toggle('is-admin',  isAdminU);
   document.body.classList.toggle('is-viewer', isViewer);
-  ['btn-admin','btn-export','btn-import-json','btn-csv-import','btn-csv-fh'].forEach(id => {
+  ['btn-admin','btn-export','btn-import-json','btn-csv-import','btn-csv-fh','btn-fh-settings'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = isAdminU ? '' : 'none';
   });
