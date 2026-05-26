@@ -2,10 +2,16 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=5.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0, user-scalable=yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FP Planning">
+<meta name="theme-color" content="#0e5c5c">
+<meta name="msapplication-TileColor" content="#0e5c5c">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon.svg">
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
 <title>Planning — Famille Piffaut</title>
 <script>
 const FIREBASE_CONFIG = {
@@ -531,6 +537,51 @@ thead th { position: sticky; top: 0; z-index: 200; }
   col.col-visite { width: 120px; }
   col.col-emp    { width: 40px; }
 }
+
+/* ── Widget / Today Card (mobile only) ── */
+#mobile-today-card {
+  display: none;
+}
+@media (max-width: 600px) {
+  #mobile-today-card {
+    display: flex; flex-direction: column; gap: 0;
+    background: #0e5c5c; color: white;
+    margin: 6px 8px; border-radius: 14px;
+    overflow: hidden; box-shadow: 0 4px 16px rgba(14,92,92,.25);
+    flex-shrink: 0;
+  }
+  #mobile-today-card .mtc-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px 6px;
+  }
+  #mobile-today-card .mtc-date-block { display: flex; flex-direction: column; }
+  #mobile-today-card .mtc-day  { font-size: 10px; font-weight: 700; opacity: .7; letter-spacing: .08em; text-transform: uppercase; }
+  #mobile-today-card .mtc-num  { font-size: 34px; font-weight: 800; line-height: 1; color: #c4956a; }
+  #mobile-today-card .mtc-month{ font-size: 11px; font-weight: 600; opacity: .8; text-transform: uppercase; }
+  #mobile-today-card .mtc-pax  {
+    background: rgba(196,149,106,.15); border: 1px solid rgba(196,149,106,.35);
+    border-radius: 10px; padding: 6px 12px; text-align: center;
+  }
+  #mobile-today-card .mtc-pax-num { font-size: 26px; font-weight: 800; color: #c4956a; line-height: 1; }
+  #mobile-today-card .mtc-pax-lbl { font-size: 9px; font-weight: 600; opacity: .75; text-transform: uppercase; letter-spacing: .06em; }
+  #mobile-today-card .mtc-visits  {
+    padding: 0 14px 10px; display: flex; flex-direction: column; gap: 4px;
+  }
+  #mobile-today-card .mtc-visit-row {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,.08); border-radius: 7px; padding: 5px 8px;
+    font-size: 11px;
+  }
+  #mobile-today-card .mtc-visit-time { font-weight: 800; color: #c4956a; min-width: 38px; }
+  #mobile-today-card .mtc-visit-body { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; opacity: .9; }
+  #mobile-today-card .mtc-empty { padding: 4px 14px 10px; font-size: 11px; opacity: .55; font-style: italic; }
+  #mobile-today-card .mtc-goto {
+    background: rgba(255,255,255,.1); text-align: center; padding: 8px;
+    font-size: 11px; font-weight: 700; cursor: pointer; letter-spacing: .04em;
+    border-top: 1px solid rgba(255,255,255,.08);
+  }
+  #mobile-today-card .mtc-goto:active { background: rgba(255,255,255,.18); }
+}
 </style>
 <style id="col-styles"></style>
 </head>
@@ -612,6 +663,21 @@ thead th { position: sticky; top: 0; z-index: 200; }
 
 <div id="alerts-container"></div>
 
+<div id="mobile-today-card" onclick="scrollToToday()">
+  <div class="mtc-header">
+    <div class="mtc-date-block">
+      <span class="mtc-day" id="mtc-day">—</span>
+      <span class="mtc-num" id="mtc-num">—</span>
+      <span class="mtc-month" id="mtc-month">—</span>
+    </div>
+    <div class="mtc-pax">
+      <div class="mtc-pax-num" id="mtc-pax">—</div>
+      <div class="mtc-pax-lbl">PAX aujourd'hui</div>
+    </div>
+  </div>
+  <div class="mtc-visits" id="mtc-visits"></div>
+  <div class="mtc-goto">↓ Voir le planning complet</div>
+</div>
 <div class="table-wrap">
   <table id="planning-table"></table>
 </div>
@@ -1865,6 +1931,8 @@ function render() {
     DAYS_FR[a.d.getDay()] + ' ' + a.d.getDate() + ' ' + MONTHS_FR[a.d.getMonth()] +
     '</strong> — 3+ absences + groupe 10+ pax</div>'
   ).join('');
+
+  updateMobileTodayCard();
 }
 
 // ── Corps d'une réservation sans le préfixe horaire ──
@@ -2100,6 +2168,32 @@ function scrollToToday() {
   const elTop  = el.getBoundingClientRect().top;
   const wrapTop = wrap.getBoundingClientRect().top;
   wrap.scrollBy({ top: elTop - wrapTop - 8, behavior: 'smooth' });
+}
+
+function updateMobileTodayCard() {
+  const card = document.getElementById('mobile-today-card');
+  if (!card || window.innerWidth > 600) return;
+  const today = new Date();
+  const k = toKey(today);
+  document.getElementById('mtc-day').textContent   = DAYS_FR[today.getDay()];
+  document.getElementById('mtc-num').textContent   = today.getDate();
+  document.getElementById('mtc-month').textContent = MONTHS_FR[today.getMonth()];
+  const b = state.currentBoutique;
+  const bks = getAllBookings(b, k);
+  const totalPax = bks.reduce((s, bk) => s + (bk.pax || 0), 0);
+  document.getElementById('mtc-pax').textContent = totalPax || '—';
+  const visitsEl = document.getElementById('mtc-visits');
+  if (bks.length === 0) {
+    visitsEl.innerHTML = '<div class="mtc-empty">Pas de visite programmée</div>';
+  } else {
+    visitsEl.innerHTML = bks.slice(0, 4).map(bk => {
+      const via = bk.via ? ' · ' + (VIA_DISPLAY?.[bk.via] || bk.via) : (bk.source === 'fareharbor' ? ' · FH' : '');
+      return '<div class="mtc-visit-row">'
+        + '<span class="mtc-visit-time">' + (bk.time || '—') + '</span>'
+        + '<span class="mtc-visit-body">' + (bk.pax ? bk.pax + 'pax ' : '') + esc(bk.clientName || bk.description || bk.activity || '') + via + '</span>'
+        + '</div>';
+    }).join('') + (bks.length > 4 ? '<div class="mtc-empty">+ ' + (bks.length - 4) + ' autres…</div>' : '');
+  }
 }
 
 // ═══ RENAME EMPLOYEE MODAL ════════════════════
@@ -2983,6 +3077,13 @@ function parseAndImportCSV(text, overwrite) {
   }
 
   return { rows: rowCnt, statuses: statCnt, notes: noteCnt, bookings: bkCnt };
+}
+
+// ── Service Worker registration ──
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
 }
 </script>
 </body>
