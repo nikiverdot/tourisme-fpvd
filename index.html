@@ -2145,16 +2145,8 @@ function render() {
     const label = e.length > 10 ? e.split(' ')[0] : e;
     const today = toKey(new Date());
     const cpP   = getCPPeriod(e, today);
-    let contractBadge = '';
-    if (cpP) {
-      const typeClass = cpP.label === 'Alternance' ? 'contract-alt'
-                      : cpP.label === 'CDD'        ? 'contract-cdd'
-                      : 'contract-cdi';
-      const endStr = cpP.to ? cpP.to.slice(5).replace('-', '/') : '∞';
-      contractBadge = '<div class="contract-badge ' + typeClass + '">' + cpP.label.slice(0,3).toUpperCase() + ' ' + endStr + '</div>';
-    }
     const titleTip = 'Renommer : ' + esc(e) + (cpP ? ' · ' + cpP.label + (cpP.to ? ' → ' + cpP.to : ' (CDI)') + ' · CP: ' + cpP.cpTotal + 'j' + (cpP.revTotal ? ' + ' + cpP.revTotal + 'j révision' : '') : '');
-    html += '<th class="th-emp" data-col="emp-' + idx + '" onclick="openRenameEmpModal(\'' + b + '\',' + idx + ')" title="' + titleTip + '"><div class="th-inner">' + esc(label) + contractBadge + rh('emp-' + idx) + '</div></th>';
+    html += '<th class="th-emp" data-col="emp-' + idx + '" onclick="openRenameEmpModal(\'' + b + '\',' + idx + ')" title="' + titleTip + '"><div class="th-inner">' + esc(label) + rh('emp-' + idx) + '</div></th>';
   });
   html += '<th class="th-renfort" data-col="renfort-0"><div class="th-inner">Renfort 1' + rh('renfort-0') + '</div></th>';
   html += '<th class="th-renfort" data-col="renfort-1"><div class="th-inner">Renfort 2' + rh('renfort-1') + '</div></th>';
