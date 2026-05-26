@@ -1409,7 +1409,7 @@ function setStatusNote(b,k,e,v) {
 function getManualBookings(b,k) { return state.boutiques[b].bookings?.[k] || []; }
 function getFHBookings(k) {
   const b = state.currentBoutique;
-  return (fhBookings[k] || []).filter(ev => !ev.boutique || ev.boutique === b);
+  return (fhBookings[k] || []).filter(ev => ev.boutique === b);
 }
 function timeToSort(t) {
   if (!t) return 9999;
@@ -1421,7 +1421,7 @@ function timeToSort(t) {
 // Regroupe les réservations FH du même créneau (heure + activité) sur 1 ligne
 function getGroupedFHBookings(k) {
   const b = state.currentBoutique;
-  const raw = (fhBookings[k] || []).filter(ev => !ev.boutique || ev.boutique === b);
+  const raw = (fhBookings[k] || []).filter(ev => ev.boutique === b);
   const groups = [];
   const keyMap = {};
   for (const bk of raw) {
