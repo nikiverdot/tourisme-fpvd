@@ -760,6 +760,7 @@ let authTab     = 'login';
 const ADMIN_EMAIL       = 'mfverdot@gmail.com';
 // Clé publique VAPID — remplacer par la vraie clé après génération
 const VAPID_PUBLIC_KEY  = 'VOTRE_VAPID_PUBLIC_KEY';
+const PUSH_SECRET       = 'VOTRE_PUSH_SECRET'; // même valeur que dans Netlify env
 const MANAGER_BULLE     = 'tourisme@fpvd.fr';      // gère tout Bulle sauf Monique
 const MANAGER_DELORME   = 'caveau@andre-delorme.com'; // gère Julie + Renfort + CDD (AD)
 const ACL_PATH    = 'piffaut-acl';
@@ -2670,9 +2671,11 @@ function saveBooking() {
   const langVal = (document.getElementById('f-lang').value||'').split('|');
   const bk={time:timeInp.value, pax:parseInt(document.getElementById('f-pax').value)||0, status:document.getElementById('f-status').value, via:document.getElementById('f-via').value.trim(), activity:document.getElementById('f-activity').value.trim(), langCode:langVal[0]||'', langFlag:langVal[1]||'', guide:(document.getElementById('f-guide')?.value||'').trim(), guideLanguage:(document.getElementById('f-guide-lang')?.value||'').trim(), description:document.getElementById('f-desc').value.trim(), comment:document.getElementById('f-comment').value.trim(), price:document.getElementById('f-price').value.trim()};
   if(!state.boutiques[b].bookings[k]) state.boutiques[b].bookings[k]=[];
-  if(idx!==null&&idx>=0) state.boutiques[b].bookings[k][idx]=bk;
+  const isNew = !(idx!==null&&idx>=0);
+  if(!isNew) state.boutiques[b].bookings[k][idx]=bk;
   else state.boutiques[b].bookings[k].push(bk);
   clearDraft(); scheduleSave(); closeModal(); render();
+  if (isNew) sendBookingPush(bk, b, k); // notif push si réservation ajoutée pour aujourd'hui
 }
 function deleteBooking() { const {b,k,idx}=modalCtx; state.boutiques[b].bookings[k].splice(idx,1); clearDraft(); scheduleSave(); closeModal(); render(); }
 
@@ -3174,6 +3177,32 @@ function parseAndImportCSV(text, overwrite) {
   }
 
   return { rows: rowCnt, statuses: statCnt, notes: noteCnt, bookings: bkCnt };
+}
+
+// ── Push : notif immédiate lors d'une nouvelle réservation aujourd'hui ────────
+async function sendBookingPush(bk, boutique, dateKey) {
+  if (PUSH_SECRET === 'VOTRE_PUSH_SECRET') return; // pas encore configuré
+  const todayKey = toKey(new Date());
+  if (dateKey !== todayKey) return; // seulement pour aujourd'hui
+
+  const boutiqueName = boutique === 'bulle' ? '🫧 Bulle' : '🍾 André Delorme';
+  const paxPart   = bk.pax   ? `${bk.pax} pax` : '';
+  const timePart  = bk.time  ? `${bk.time}` : '';
+  const clientPart = bk.clientName || bk.description || bk.activity || '';
+  const parts = [timePart, paxPart, clientPart].filter(Boolean).join(' · ');
+
+  const who = currentUser ? ` (ajouté par ${currentUser})` : '';
+
+  try {
+    await fetch('/.netlify/functions/send-push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Push-Secret': PUSH_SECRET },
+      body: JSON.stringify({
+        title:   `📋 Nouvelle réservation — ${boutiqueName}`,
+        message: parts + who
+      })
+    });
+  } catch(e) { console.warn('sendBookingPush failed:', e); }
 }
 
 // ── Push notifications ────────────────────────────────────────────────────────
