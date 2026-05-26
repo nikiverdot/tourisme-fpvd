@@ -519,9 +519,23 @@ tr.day-row:hover td.jour-cell,tr.day-row:hover td.date-cell,tr.day-row:hover td.
 
   /* Masqués sur mobile */
   #presence-bar  { display: none !important; }
-  .col-panel-wrap { display: none !important; }
   #btn-export, #btn-import-json { display: none !important; }
   #sync-label  { display: none; }
+
+  /* Colonnes : bouton visible sur mobile (ouvre une modale) */
+  .col-panel-wrap { display: block !important; flex-shrink: 0; }
+  /* Le dropdown ne s'ouvre pas sur mobile (géré via modale JS) */
+  .col-panel-wrap .col-panel { display: none !important; }
+
+  /* Désactiver le gel horizontal des colonnes sur mobile */
+  td.jour-cell, td.date-cell, td.rdv-cell, td.visite-cell {
+    position: static !important;
+    left: unset !important;
+    box-shadow: none !important;
+  }
+  thead th[data-col="date"],
+  thead th[data-col="rdv"],
+  thead th[data-col="visite"] { left: unset !important; }
 
   /* Bouton admin et import CSV : compacts sur mobile */
   #btn-admin, #btn-csv-import { padding: 5px 9px; font-size: 11px; }
@@ -1833,6 +1847,7 @@ async function syncFareHarbor() {
 
   btn.disabled = false; btn.textContent = '🔄 Sync FareHarbor';
   render();
+  updateMobileTodayCard(); // s'assurer que le widget jour est à jour après sync FH
 }
 
 // ═══ FH MANUAL TAGS ══════════════════════════
@@ -2604,6 +2619,21 @@ function buildColPanel() {
 
 function toggleColPanel(e) {
   if (e) e.stopPropagation();
+  // Sur mobile : ouvrir comme modale bottom-sheet
+  if (window.innerWidth <= 600) {
+    buildColPanel();
+    const b = state.currentBoutique;
+    const bLabel = b === 'bulle' ? '🫧 Bulle' : '🍾 André Delorme';
+    modalCtx = { type:'colFilter' };
+    document.getElementById('modal-title').textContent = '⊞ Colonnes — ' + bLabel;
+    document.getElementById('modal-body').innerHTML =
+      '<div style="margin:-6px -14px 0">' + document.getElementById('col-panel').innerHTML + '</div>';
+    document.getElementById('modal-actions').innerHTML =
+      '<button class="btn-mp" onclick="closeModal()">Fermer</button>';
+    openModal();
+    return;
+  }
+  // Desktop : panneau déroulant
   const panel = document.getElementById('col-panel');
   const isOpen = panel.style.display !== 'none';
   if (isOpen) { panel.style.display = 'none'; return; }
@@ -2708,7 +2738,7 @@ function scrollToToday() {
 
 function updateMobileTodayCard() {
   const card = document.getElementById('mobile-today-card');
-  if (!card || window.innerWidth > 600) return;
+  if (!card) return;
   const today = new Date();
   const k = toKey(today);
   document.getElementById('mtc-day').textContent   = DAYS_FR[today.getDay()];
