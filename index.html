@@ -2254,7 +2254,10 @@ function renderVisiteCell(bk, b, k, idx, isLast) {
 function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
 // ═══ COLUMN MANAGER ═══════════════════════════
-let hiddenCols = new Set(JSON.parse(localStorage.getItem('piffaut-hidden-cols') || '[]'));
+// hiddenCols : { bulle: Set<string>, delorme: Set<string> }
+// Les clés des colonnes employé sont le NOM de l'employé (pas l'index positonnel)
+// → masquer "Agathe" en AD n'impacte pas "Agathe" dans la Bulle
+let hiddenCols = { bulle: new Set(), delorme: new Set() };
 let colWidths  = JSON.parse(localStorage.getItem('piffaut-col-widths') || '{}');
 
 const COL_LABELS = {
@@ -2265,17 +2268,25 @@ function getColLabels() {
   const b    = state.currentBoutique;
   const emps = state.boutiques[b].employees;
   const labels = { ...COL_LABELS };
-  emps.forEach((e, i) => { labels['emp-' + i] = e.split(' ')[0]; });
+  emps.forEach(e => { labels[e] = e.split(' ')[0]; }); // clé = nom employé
   labels['renfort-0'] = 'Renfort 1';
   labels['renfort-1'] = 'Renfort 2';
   return labels;
 }
 
 function applyColStyles() {
+  const b      = state.currentBoutique;
+  const emps   = state.boutiques[b]?.employees || [];
+  const hidden = hiddenCols[b] || new Set();
   let css = '';
-  // Hidden columns
-  hiddenCols.forEach(col => {
-    css += `[data-col="${col}"] { display: none !important; }\n`;
+  // Résoudre le nom employé → index positionnel courant
+  hidden.forEach(key => {
+    if (key === 'rdv' || key === 'visite' || key === 'pax' || key === 'renfort-0' || key === 'renfort-1') {
+      css += `[data-col="${key}"] { display: none !important; }\n`;
+    } else {
+      const idx = emps.indexOf(key);
+      if (idx >= 0) css += `[data-col="emp-${idx}"] { display: none !important; }\n`;
+    }
   });
   // Column widths
   Object.entries(colWidths).forEach(([col, w]) => {
@@ -2286,15 +2297,18 @@ function applyColStyles() {
 }
 
 function buildColPanel() {
+  const b      = state.currentBoutique;
+  const emps   = state.boutiques[b].employees;
+  const hidden = hiddenCols[b] || new Set();
   const labels = getColLabels();
-  const b = state.currentBoutique;
-  const emps = state.boutiques[b].employees;
-  const allCols = ['rdv', 'visite', 'pax', ...emps.map((_,i) => 'emp-'+i), 'renfort-0', 'renfort-1'];
-  let html = '<div class="col-panel-title">Afficher / Masquer</div>';
+  const bLabel = b === 'bulle' ? '🫧 Bulle' : '🍾 André Delorme';
+  const allCols = ['rdv', 'visite', 'pax', ...emps, 'renfort-0', 'renfort-1'];
+  let html = `<div class="col-panel-title">Colonnes — ${bLabel}</div>`;
   allCols.forEach(col => {
-    const checked = !hiddenCols.has(col) ? 'checked' : '';
+    const checked = !hidden.has(col) ? 'checked' : '';
     const lbl = esc(labels[col] || col);
-    html += `<label class="col-item"><input type="checkbox" ${checked} onchange="toggleCol('${col}',this.checked)"> <span>${lbl}</span></label>`;
+    const safeCol = col.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    html += `<label class="col-item"><input type="checkbox" ${checked} onchange="toggleCol('${safeCol}',this.checked)"> <span>${lbl}</span></label>`;
   });
   document.getElementById('col-panel').innerHTML = html;
 }
@@ -2309,10 +2323,36 @@ function toggleColPanel(e) {
 }
 
 function toggleCol(col, visible) {
-  if (visible) hiddenCols.delete(col);
-  else hiddenCols.add(col);
-  localStorage.setItem('piffaut-hidden-cols', JSON.stringify([...hiddenCols]));
+  const b = state.currentBoutique;
+  if (!hiddenCols[b]) hiddenCols[b] = new Set();
+  if (visible) hiddenCols[b].delete(col);
+  else         hiddenCols[b].add(col);
   applyColStyles();
+  saveHiddenColsToFirebase();
+}
+
+async function saveHiddenColsToFirebase() {
+  if (!db || !authUser) return;
+  const data = {
+    bulle:   [...(hiddenCols.bulle   || [])],
+    delorme: [...(hiddenCols.delorme || [])]
+  };
+  try {
+    await db.ref('piffaut-prefs/' + authUser.uid + '/hiddenCols').set(data);
+  } catch(e) { console.warn('saveHiddenCols:', e); }
+}
+
+async function loadUserPrefs() {
+  if (!db || !authUser) return;
+  try {
+    const snap = await db.ref('piffaut-prefs/' + authUser.uid + '/hiddenCols').once('value');
+    const val  = snap.val() || {};
+    hiddenCols = {
+      bulle:   new Set(val.bulle   || []),
+      delorme: new Set(val.delorme || [])
+    };
+    applyColStyles();
+  } catch(e) { console.warn('loadUserPrefs:', e); }
 }
 
 document.addEventListener('click', e => {
@@ -2356,7 +2396,13 @@ document.addEventListener('mouseup', e => {
 });
 
 // ═══ NAVIGATION ════════════════════════════════
-function switchBoutique(b) { state.currentBoutique=b; render(); setTimeout(scrollToToday,100); }
+function switchBoutique(b) {
+  state.currentBoutique = b;
+  document.getElementById('col-panel').style.display = 'none'; // ferme le panel si ouvert
+  render();
+  applyColStyles();
+  setTimeout(scrollToToday, 100);
+}
 function prevYear() { state.currentYear--; render(); }
 function nextYear() { state.currentYear++; render(); }
 function scrollToToday() {
@@ -3024,6 +3070,7 @@ function init() {
     initFirebaseData();
     initPresence(user);
     render();
+    loadUserPrefs(); // charger colonnes masquées depuis Firebase
     subscribeToPush();
     setTimeout(scrollToToday, 200);
     syncFareHarbor();
