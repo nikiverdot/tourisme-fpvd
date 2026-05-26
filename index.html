@@ -132,7 +132,7 @@ tr.month-sep td {
 /* Day rows — border-right+bottom only (separate mode evita bordas duplas) */
 tr.day-row td { border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
 tr.day-row td:first-child { border-left: 1px solid #e2e8f0; }
-tr.day-row:hover td { background-color: rgba(248,250,252,0.6); }
+tr.day-row:hover td:not(.emp-cell) { background-color: rgba(248,250,252,0.6); }
 tr.row-ferie td { background: #fef08a !important; }
 tr.row-ferie .s-off { background: #fef08a !important; color: #a16207 !important; border-color: transparent !important; }
 tr.row-today  td { background: #f0f8f7 !important; }
