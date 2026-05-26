@@ -1493,12 +1493,14 @@ function getEffectiveStatus(b, k, emp, ferme) {
   if (emp === 'Agathe'  && k < '2026-02-02') return null;
   if (emp === 'Agathe'  && k > '2027-02-28') return null;   // fin contrat toutes boutiques
   if (emp === 'Alice'   && b === 'bulle' && k > '2026-12-31') return null;
-  if (emp === 'Julie'   && !ferme) return 'ad';              // AD par défaut toujours
-  if (emp === 'Julie'   && ferme && [0,1].includes(fromKey(k).getDay())) return 'repos'; // dim/lun fermé → REPOS
   if (ferme && fromKey(k).getDay() === 0 && emp !== 'Monique' && !emp.includes('CDD')) return 'repos'; // dimanche fermé → REPOS (sauf Monique/CDD)
 
   const raw = state.boutiques[b].schedule?.[k]?.[emp];
-  if (raw !== undefined) return raw;                   // valeur explicite → priorité
+  if (raw !== undefined) return raw;                   // valeur explicite → priorité (inclus overrides Julie)
+
+  // Valeurs par défaut Julie (seulement si aucun override explicite)
+  if (emp === 'Julie'   && !ferme) return 'ad';              // AD par défaut toujours
+  if (emp === 'Julie'   && ferme && [0,1].includes(fromKey(k).getDay())) return 'repos'; // dim/lun fermé → REPOS
   // Monique et postes CDD : pas de statut par défaut (cellule vide, comme Renfort)
   if (emp === 'Monique' || emp.includes('CDD')) return null;
   // Bulle : VA par défaut (en vente à l'ADB) ; Delorme et autres : OFF
