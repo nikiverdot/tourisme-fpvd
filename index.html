@@ -1076,7 +1076,7 @@ async function adminAddUser() {
   document.getElementById('adm-name').value  = '';
   loadAdminList();
   // Afficher le message d'invitation à copier
-  const inviteMsg = 'Bonjour ' + name + ' 👋\n\nTu as maintenant accès au planning Famille Piffaut.\n\n🔗 https://tourisme-fpvd.fr\n\n➡ Clique sur « Premier accès », saisis ton email (' + email + ') et choisis un mot de passe.\n\nBonne journée !';
+  const inviteMsg = 'Bonjour ' + name + ' 👋\n\nTu as maintenant accès au Planning Oenotourisme FPVD.\n\n🔗 https://tourisme-fpvd.fr\n\n➡ Clique sur « Premier accès », saisis ton email (' + email + ') et choisis un mot de passe.\n\nBonne journée !';
   const box = document.getElementById('adm-invite-box');
   const ta  = document.getElementById('adm-invite-text');
   if (box && ta) { ta.value = inviteMsg; box.style.display = 'block'; ta.select(); }
