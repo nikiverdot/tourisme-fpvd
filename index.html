@@ -1584,7 +1584,7 @@ async function syncFareHarbor() {
       fhOverrides = overridesSnap.val() || {};
     } catch(e) { fhTags = {}; fhNotes = {}; fhOverrides = {}; }
   }
-  allEvents.forEach(ev => { if (!ev.via && ev.bookingPk && fhTags[ev.bookingPk]) ev.via = fhTags[ev.bookingPk]; });
+  allEvents.forEach(ev => { if (ev.bookingPk && fhTags[ev.bookingPk]) ev.via = fhTags[ev.bookingPk]; });
 
   // Store merged result
   fhBookings = {};
@@ -2100,7 +2100,7 @@ function buildVisiteBody(bk) {
       parts.push(p.via ? viaLabel(p.via) : fhBadge);
       const internalNote = p.bookingPk && fhNotes[p.bookingPk];
       if (internalNote) parts.push('<span style="font-size:10px;color:#64748b;font-style:italic">📝 ' + esc(internalNote.slice(0,40)) + '</span>');
-      if (status === 'a_regler') parts.push(regler);
+      if (status === 'a_regler' || p.via === 'RDV') parts.push(regler);
       return parts.join(' ');
     }).join(' <span style="color:#64748b;font-weight:900"> + </span>');
     return isBulle ? partStr : esc(bk.activity || 'Dégustation') + ' — ' + partStr;
