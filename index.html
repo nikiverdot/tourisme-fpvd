@@ -132,7 +132,7 @@ tr.month-sep td {
 /* Day rows — border-right+bottom only (separate mode evita bordas duplas) */
 tr.day-row td { border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
 tr.day-row td:first-child { border-left: 1px solid #e2e8f0; }
-tr.day-row:hover td:not(.emp-cell) { background-color: rgba(248,250,252,0.6); }
+/* hover ligne supprimé — aucune modification de couleur au survol */
 tr.row-ferie td { background: #fef08a !important; }
 tr.row-ferie .s-off { background: #fef08a !important; color: #a16207 !important; border-color: transparent !important; }
 tr.row-today  td { background: #f0f8f7 !important; }
@@ -414,7 +414,7 @@ tr.row-sunday   td.jour-cell,tr.row-sunday   td.date-cell,tr.row-sunday   td.rdv
 tr.row-saturday td.jour-cell,tr.row-saturday td.date-cell,tr.row-saturday td.rdv-cell,tr.row-saturday td.visite-cell { background:#fffbf5; }
 tr.row-alert    td.jour-cell,tr.row-alert    td.date-cell,tr.row-alert    td.rdv-cell,tr.row-alert    td.visite-cell { background:#fff5f5 !important; }
 tr.row-ferme    td.jour-cell,tr.row-ferme    td.date-cell,tr.row-ferme    td.rdv-cell,tr.row-ferme    td.visite-cell { background:#64748b !important; }
-tr.day-row:hover td.jour-cell,tr.day-row:hover td.date-cell,tr.day-row:hover td.rdv-cell,tr.day-row:hover td.visite-cell { background:rgba(248,250,252,.97) !important; }
+/* hover colonnes figées supprimé */
 /* ── Badges contrat dans l'en-tête employé ── */
 .contract-badge { display:block; font-size:7px; font-weight:700; padding:1px 4px; border-radius:3px; margin-top:2px; line-height:1.4; text-align:center; }
 .contract-alt   { background:#ede9fe; color:#6d28d9; border:1px solid #c4b5fd; }
