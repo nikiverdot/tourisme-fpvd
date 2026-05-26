@@ -723,7 +723,7 @@ tr.day-row:hover td.jour-cell,tr.day-row:hover td.date-cell,tr.day-row:hover td.
   <button class="btn btn-ics"    onclick="syncFareHarbor()" id="btn-ics">🔄 Sync FareHarbor</button>
   <button id="btn-fh-settings" class="btn btn-ics" onclick="openFHSettings()" title="Configuration API FareHarbor" style="padding:4px 8px;font-size:14px;min-width:0;display:none">⚙️</button>
   <label  id="btn-csv-fh" class="btn btn-ics" title="Importer CSV FareHarbor (Rapports → Réservations → Exporter)" style="cursor:pointer;font-size:11px;display:none">📊 CSV FH<input type="file" accept=".csv,.txt" onchange="importFHAffiliatesCSV(event)" style="display:none"></label>
-  <span   class="ics-msg"        id="ics-status"></span>
+  <span   class="ics-msg"        id="ics-status" style="display:none"></span>
   <button id="btn-export" class="btn btn-export" onclick="exportData()" style="display:none">⬇ Exporter</button>
   <label  id="btn-import-json" class="btn btn-import" style="display:none">⬆ Importer<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
   <button id="btn-csv-import" class="btn btn-import" onclick="openImportCSVModal()" style="display:none;background:#f0fdf4;color:#15803d;border-color:#86efac">📋 Import CSV 2026</button>
@@ -823,10 +823,11 @@ let currentUser = localStorage.getItem('piffaut-user') || '';
 let authTab     = 'login';
 
 const ADMIN_EMAIL       = 'mfverdot@gmail.com';  // admin principal
-// Tous les comptes de Monique (admin + seule à pouvoir modifier sa propre colonne)
+// Tous les comptes de Monique (présence invisible + seule à modifier sa colonne)
 const MONIQUE_EMAILS    = ['mfverdot@gmail.com', 'verdotmf@gmail.com', 'monique.verdot@fpvd.fr', 'verdotmonique@gmail.com'];
-const ADMIN_EMAILS      = MONIQUE_EMAILS; // Monique est la seule administratrice
-const isAdmin   = (email) => MONIQUE_EMAILS.includes((email||'').toLowerCase());
+// Comptes admin qui court-circuitent l'ACL (verdotmonique passe par l'ACL Firebase)
+const ADMIN_EMAILS      = ['mfverdot@gmail.com', 'verdotmf@gmail.com', 'monique.verdot@fpvd.fr'];
+const isAdmin   = (email) => ADMIN_EMAILS.includes((email||'').toLowerCase());
 const isMonique = (email) => MONIQUE_EMAILS.includes((email||'').toLowerCase());
 // Clé publique VAPID — remplacer par la vraie clé après génération
 const VAPID_PUBLIC_KEY  = 'BLVOFQuubXbAZWnYeLgBNam55ifATR_3igEBmf9E5XqDiJ3emTzJmCn9Y5FT-pck6dcQpqg2z_X_G55rSyY6uK8';
@@ -1282,7 +1283,7 @@ function updateUserChip(user) {
   const isViewer = currentUserRole === 'viewer';
   document.body.classList.toggle('is-admin',  isAdminU);
   document.body.classList.toggle('is-viewer', isViewer);
-  ['btn-admin','btn-export','btn-import-json','btn-csv-import','btn-csv-fh','btn-fh-settings'].forEach(id => {
+  ['btn-admin','btn-export','btn-import-json','btn-csv-import','btn-csv-fh','btn-fh-settings','ics-status'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = isAdminU ? '' : 'none';
   });
