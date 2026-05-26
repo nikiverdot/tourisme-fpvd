@@ -156,6 +156,12 @@ tr.row-ferme .status-cell      { background: #475569 !important; color: #64748b 
 tr.row-ferme .status-cell:hover{ transform: none !important; opacity: 1 !important; }
 body.is-admin tr.row-ferme .status-cell { pointer-events: auto !important; opacity: 0.85; }
 body.is-admin tr.row-ferme .status-cell:hover { transform: scale(1.05) !important; opacity: 1 !important; }
+
+/* ── Mode lecture seule (viewer) ── */
+body.is-viewer .status-cell  { pointer-events: none !important; cursor: default !important; }
+body.is-viewer .status-cell:hover { transform: none !important; opacity: 1 !important; }
+body.is-viewer .exc-toggle   { pointer-events: none !important; display: none !important; }
+.viewer-badge { display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:700; background:#fef9c3; color:#854d0e; border:1px solid #fde68a; border-radius:12px; padding:2px 8px; white-space:nowrap; }
 tr.row-ferme.row-sunday .status-cell.s-repos { background: #ede9fe !important; color: #6d28d9 !important; border-color: #c4b5fd !important; }
 
 /* Bouton d'exception */
@@ -756,6 +762,7 @@ let isFirebase  = false;
 let saveTimer   = null;
 let pendingSave = false;
 let authUser    = null;
+let currentUserRole = null; // 'admin' | 'manager' | 'employee' | 'viewer'
 let currentUser = localStorage.getItem('piffaut-user') || '';
 let authTab     = 'login';
 
@@ -772,6 +779,7 @@ const PRES_PATH   = 'piffaut-presence';
 // Renvoie true si l'utilisateur connecté peut modifier la cellule d'un employé
 function canEditEmployee(b, empName) {
   if (!authUser) return false;
+  if (currentUserRole === 'viewer') return false;            // viewer → lecture seule
   const email = authUser.email.toLowerCase();
   if (email === ADMIN_EMAIL) return true;                    // admin → tout
   if (email === MANAGER_BULLE) {
@@ -790,6 +798,7 @@ function canEditEmployee(b, empName) {
 
 function canEditRenfort(b) {
   if (!authUser) return false;
+  if (currentUserRole === 'viewer') return false;            // viewer → lecture seule
   const email = authUser.email.toLowerCase();
   if (email === ADMIN_EMAIL)     return true;
   if (email === MANAGER_BULLE)   return b === 'bulle';
@@ -1068,11 +1077,19 @@ function openAdminPanel() {
     + '<div class="form-group"><label class="form-label">Email</label><input id="adm-email" class="form-input" type="email" placeholder="prenom@email.com"></div>'
     + '<div class="form-group"><label class="form-label">Prénom Nom</label><input id="adm-name" class="form-input" type="text" placeholder="Julie Martin"></div>'
     + '</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
     + '<div class="form-group"><label class="form-label">Boutique par défaut</label>'
     + '<select id="adm-boutique" class="form-select">'
     + '<option value="bulle">🫧 Atelier de la Bulle</option>'
     + '<option value="delorme">🍾 Caveau André Delorme</option>'
     + '</select></div>'
+    + '<div class="form-group"><label class="form-label">Rôle</label>'
+    + '<select id="adm-role" class="form-select">'
+    + '<option value="employee">👤 Employé(e)</option>'
+    + '<option value="viewer">👁 Visualisation seule</option>'
+    + '<option value="manager">⭐ Manager</option>'
+    + '</select></div>'
+    + '</div>'
     + '<p style="font-size:10px;color:#94a3b8;margin-top:4px">💡 Aucun email automatique n\'est envoyé — copie le message ci-dessous et envoie-le toi-même.</p>'
     + '<div id="adm-invite-box" style="display:none;margin-top:10px">'
     + '<label style="font-size:11px;font-weight:700;color:#475569;display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">📋 Message à envoyer</label>'
@@ -1098,9 +1115,19 @@ async function loadAdminList() {
     const bq    = u.defaultBoutique || 'bulle';
     const bNext = bq === 'delorme' ? 'bulle' : 'delorme';
     const bLabel= bq === 'delorme' ? '🍾 AD' : '🫧 Bulle';
+    const role  = u.role || 'employee';
+    const roleCycle = { 'employee': 'viewer', 'viewer': 'manager', 'manager': 'employee' };
+    const roleNext  = roleCycle[role] || 'employee';
+    const roleInfo  = {
+      employee: { label: '👤 Employé',      bg: '#eff6ff', color: '#2563eb', border: '#93c5fd' },
+      viewer:   { label: '👁 Lecture seule', bg: '#fef9c3', color: '#854d0e', border: '#fde68a' },
+      manager:  { label: '⭐ Manager',       bg: '#f0f8f7', color: '#0e5c5c', border: '#7bc4bc' }
+    };
+    const ri = roleInfo[role] || roleInfo.employee;
     html += '<div class="admin-user-row"><div><strong>' + esc(u.name||'') + '</strong> <span style="color:#94a3b8;font-size:11px">' + esc(u.email) + '</span></div>'
-      + '<div style="display:flex;gap:6px;align-items:center">'
-      + '<span onclick="adminToggleBoutique(\'' + k + '\',\'' + bNext + '\')" style="font-size:10px;font-weight:700;color:#0e5c5c;background:#e0f2f0;border:1px solid #7bc4bc;border-radius:4px;padding:1px 6px;cursor:pointer" title="Cliquer pour changer">' + bLabel + ' ↕</span>'
+      + '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
+      + '<span onclick="adminToggleBoutique(\'' + k + '\',\'' + bNext + '\')" style="font-size:10px;font-weight:700;color:#0e5c5c;background:#e0f2f0;border:1px solid #7bc4bc;border-radius:4px;padding:1px 6px;cursor:pointer" title="Cliquer pour changer la boutique">' + bLabel + ' ↕</span>'
+      + '<span onclick="adminToggleRole(\'' + k + '\',\'' + roleNext + '\')" style="font-size:10px;font-weight:700;color:' + ri.color + ';background:' + ri.bg + ';border:1px solid ' + ri.border + ';border-radius:4px;padding:1px 6px;cursor:pointer" title="Cliquer pour changer le rôle">' + ri.label + ' ↕</span>'
       + '<button onclick="adminRemoveUser(\'' + k + '\')" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:5px;padding:2px 8px;cursor:pointer;font-size:10px;font-weight:600;flex-shrink:0">Retirer</button>'
       + '</div></div>';
   });
@@ -1112,8 +1139,9 @@ async function adminAddUser() {
   const email   = (document.getElementById('adm-email').value||'').trim().toLowerCase();
   const name    = (document.getElementById('adm-name').value||'').trim();
   const boutique = document.getElementById('adm-boutique')?.value || 'bulle';
+  const role     = document.getElementById('adm-role')?.value || 'employee';
   if (!email || !name) return toast('⚠ Remplissez email et prénom/nom','#dc2626');
-  await db.ref(ACL_PATH + '/' + emailKey(email)).set({ email, name, defaultBoutique: boutique, addedAt: Date.now(), addedBy: ADMIN_EMAIL });
+  await db.ref(ACL_PATH + '/' + emailKey(email)).set({ email, name, defaultBoutique: boutique, role, addedAt: Date.now(), addedBy: ADMIN_EMAIL });
   document.getElementById('adm-email').value = '';
   document.getElementById('adm-name').value  = '';
   loadAdminList();
@@ -1137,6 +1165,13 @@ async function adminToggleBoutique(key, newBoutique) {
   loadAdminList();
 }
 
+async function adminToggleRole(key, newRole) {
+  await db.ref(ACL_PATH + '/' + key + '/role').set(newRole);
+  const labels = { employee: 'Employé(e)', viewer: 'Lecture seule', manager: 'Manager' };
+  toast('✅ Rôle → ' + (labels[newRole] || newRole), '#16a34a');
+  loadAdminList();
+}
+
 async function adminRemoveUser(key) {
   if (!confirm('Retirer cet accès ?')) return;
   await db.ref(ACL_PATH + '/' + key).remove();
@@ -1153,12 +1188,29 @@ function updateUserChip(user) {
   const nl = document.getElementById('user-name-label');
   if (av) av.textContent = name.substring(0,2).toUpperCase();
   if (nl) nl.textContent = name;
-  const isAdmin = user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-  document.body.classList.toggle('is-admin', isAdmin);
+  const isAdmin  = user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const isViewer = currentUserRole === 'viewer';
+  document.body.classList.toggle('is-admin',  isAdmin);
+  document.body.classList.toggle('is-viewer', isViewer);
   ['btn-admin','btn-export','btn-import-json','btn-csv-import','btn-csv-fh'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = isAdmin ? '' : 'none';
   });
+  // Badge "lecture seule" visible dans le header
+  let vb = document.getElementById('viewer-badge');
+  if (isViewer) {
+    if (!vb) {
+      vb = document.createElement('span');
+      vb.id = 'viewer-badge';
+      vb.className = 'viewer-badge';
+      vb.textContent = '👁 Lecture seule';
+      // Insérer avant le bouton Déconnexion
+      const logoutBtn = document.querySelector('.app-header button[onclick="logoutUser()"]');
+      if (logoutBtn) logoutBtn.parentNode.insertBefore(vb, logoutBtn);
+    }
+  } else if (vb) {
+    vb.remove();
+  }
 }
 
 function logoutUser() {
@@ -2954,10 +3006,13 @@ function init() {
           showAuthErr("Votre email n'est pas autorisé. Contactez mfverdot@gmail.com.");
           return;
         }
-        // Appliquer la boutique par défaut de cet utilisateur
+        // Appliquer la boutique par défaut et le rôle de cet utilisateur
         const aclData = snap.val();
         if (aclData?.defaultBoutique) state.currentBoutique = aclData.defaultBoutique;
+        currentUserRole = aclData?.role || 'employee';
       } catch(e) { /* Si règles pas encore configurées, on laisse passer */ }
+    } else {
+      currentUserRole = 'admin';
     }
 
     authUser = user;
