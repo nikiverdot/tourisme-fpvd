@@ -610,23 +610,6 @@ thead th { position: sticky; top: 0; z-index: 200; }
   <table id="planning-table"></table>
 </div>
 
-<div class="legend">
-  <div class="leg-item"><div class="leg-dot" style="background:#dbeafe;border-color:#93c5fd"></div>VA</div>
-  <div class="leg-item"><div class="leg-dot" style="background:#fef9c3;border-color:#fcd34d"></div>AD</div>
-  <div class="leg-item"><div class="leg-dot" style="background:#e8d4b0;border-color:#c49a50"></div>CSA</div>
-  <div class="leg-item"><div class="leg-dot" style="background:#ede9fe;border-color:#c4b5fd"></div>Repos</div>
-  <div class="leg-item"><div class="leg-dot" style="background:#fef08a;border-color:#fcd34d"></div>Off</div>
-  <div class="leg-item"><div class="leg-dot" style="background:#dcfce7;border-color:#86efac"></div>Congés</div>
-  <div class="leg-item"><div class="leg-dot" style="background:#fce7f3;border-color:#f9a8d4"></div>École</div>
-  <div class="leg-item"><div class="leg-dot" style="background:#fee2e2;border-color:#fca5a5"></div>Maladie</div>
-  <div class="leg-item" style="margin-left:8px"><div class="leg-dot" style="background:#dbeafe;border-color:#93c5fd"></div>✓ Confirmée</div>
-  <div class="leg-item"><div class="leg-dot" style="background:#fef9c3;border-color:#fcd34d"></div>◌ Option</div>
-  <div class="leg-item"><div class="leg-dot" style="background:#fff7ed;border-left:2px solid #f97316;border-radius:2px"></div>FH FareHarbor</div>
-  <div class="leg-item" style="margin-left:8px"><div class="leg-dot" style="background:#64748b;border-color:#475569"></div>Fermé (caveau)</div>
-  <div class="leg-item"><span style="font-size:10px">⚙</span> Exception jour</div>
-  <div class="leg-item"><div class="leg-dot" style="background:#fef08a;border-color:#fcd34d"></div>Jour férié (ligne)</div>
-  <div class="leg-item"><div class="leg-dot" style="background:#fef08a;border-color:#fcd34d"></div>JF (statut)</div>
-</div>
 
 </div><!-- /.app-wrapper -->
 
@@ -2354,7 +2337,7 @@ function openBookingModal(b, k, idx) {
   modalCtx  = { type:'booking', b, k, idx };
   const date = fromKey(k);
   const edit = idx!==null && idx>=0;
-  const defStatus = edit ? (bk.status || 'confirmed') : 'a_regler';
+  const defStatus = edit ? (bk.status || 'confirmed') : 'confirmed';
   document.getElementById('modal-title').textContent = (edit?'Modifier':'Ajouter') + ' visite · ' + DAYS_FR[date.getDay()] + ' ' + date.getDate() + ' ' + MONTHS_FR[date.getMonth()];
 
   // ── Activity datalist : boutique-specific ──────────────────────────
