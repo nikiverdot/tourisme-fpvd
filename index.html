@@ -2308,14 +2308,19 @@ function render() {
     html += note ? '<span class="rdv-text">' + esc(note) + '</span>' : (canEditNote ? '<span class="rdv-add">+ note</span>' : '');
     html += '</td>';
 
-    // First visite (or empty + add btn)
+    // Visite unique (rowspan=rows) — tous les horaires du jour dans une seule cellule
     const _canAddBooking = currentUserRole !== 'viewer';
     if (timeGroups.length === 0) {
-      html += '<td class="visite-cell" data-col="visite"><span class="visite-empty">—</span>' + (_canAddBooking ? '<br><span class="add-visite-btn" onclick="openBookingModal(\'' + b + '\',\'' + k + '\',null)">+ ajouter</span>' : '') + '</td>';
+      html += '<td class="visite-cell" data-col="visite" rowspan="1"><span class="visite-empty">—</span>' + (_canAddBooking ? '<br><span class="add-visite-btn" onclick="openBookingModal(\'' + b + '\',\'' + k + '\',null)">+ ajouter</span>' : '') + '</td>';
       html += '<td class="pax-cell" data-col="pax"></td>';
     } else {
+      // Une seule <td> avec rowspan couvrant toutes les sous-lignes → vertical-align:middle fonctionne
+      let visiteContent = '';
+      for (let gi = 0; gi < timeGroups.length; gi++) {
+        visiteContent += buildGroupCellContent(timeGroups[gi], b, k, gi === timeGroups.length - 1);
+      }
+      html += '<td class="visite-cell" data-col="visite" rowspan="' + rows + '" style="line-height:1.6">' + visiteContent + '</td>';
       const g0 = timeGroups[0];
-      html += renderGroupCell(g0, b, k, timeGroups.length === 1);
       html += '<td class="pax-cell' + (g0.totalPax>=10?' pax-big':'') + '" data-col="pax">' + (g0.totalPax||'') + '</td>';
     }
 
@@ -2410,7 +2415,7 @@ function render() {
       const isLast = (gi === timeGroups.length - 1);
       const weCls = '';
       html += '<tr class="' + subCls + weCls + '">';
-      html += renderGroupCell(g, b, k, isLast);
+      // Pas de visite-cell ici : elle est couverte par le rowspan de la première ligne
       html += '<td class="pax-cell' + (g.totalPax>=10?' pax-big':'') + '" data-col="pax">' + (g.totalPax||'') + '</td>';
       html += '</tr>';
     }
@@ -2523,14 +2528,13 @@ function buildVisiteLabel(bk, showTime = true) {
   return showTime ? '<strong>' + timePart + '</strong> : ' + body : body;
 }
 
-// ── Cellule d'un groupe horaire (1 ou plusieurs réservations à la même heure) ──
-function renderGroupCell(group, b, k, isLast) {
+// ── Contenu HTML d'un groupe horaire (sans l'enveloppe <td>) ──
+function buildGroupCellContent(group, b, k, isLast) {
   const _canAdd = currentUserRole !== 'viewer';
   const addBtn = (isLast && _canAdd)
     ? '<div onclick="event.stopPropagation();openBookingModal(\'' + b + '\',\'' + k + '\',null)" style="display:inline-block"><span class="add-visite-btn">+ ajouter</span></div>'
     : '';
   if (group.items.length === 1) {
-    // Cas simple : une seule réservation → comportement identique à avant
     const bk = group.items[0];
     const isFH = bk.source === 'fareharbor';
     const manualIdx = isFH ? group.startIdx : (bk._manualIdx !== undefined ? bk._manualIdx : group.startIdx);
@@ -2539,9 +2543,9 @@ function renderGroupCell(group, b, k, isLast) {
     const onclick = isFH
       ? 'openFHDetail(\'' + k + '\',\'' + fhTime + '\',\'' + fhAct + '\')'
       : (_canAdd ? 'openBookingModal(\'' + b + '\',\'' + k + '\',' + manualIdx + ')' : '');
-    return '<td class="visite-cell" data-col="visite" onclick="' + onclick + '" style="cursor:pointer;line-height:1.6">'
-      + '<div class="visite-line">' + buildVisiteLabel(bk) + '</div>'
-      + addBtn + '</td>';
+    return '<div class="visite-line"' + (onclick ? ' onclick="event.stopPropagation();' + onclick + '" style="cursor:pointer"' : '') + '>'
+      + buildVisiteLabel(bk) + '</div>'
+      + addBtn;
   }
   // Plusieurs réservations au même horaire → une seule ligne inline : "time : p1 + p2 + p3"
   const timePart = group.time || '—';
@@ -2557,9 +2561,15 @@ function renderGroupCell(group, b, k, isLast) {
     return '<span ' + (onclick ? 'onclick="event.stopPropagation();' + onclick + '" style="cursor:pointer;white-space:nowrap"' : 'style="white-space:nowrap"') + '>'
       + buildVisiteBody(bk) + '</span>';
   }).join(' <span style="color:#94a3b8;font-weight:700;padding:0 1px"> + </span> ');
+  return '<div class="visite-line"><strong>' + timePart + '</strong> : ' + partsHtml + '</div>'
+    + addBtn;
+}
+
+// ── Cellule unique regroupant TOUS les horaires du jour (rowspan=rows) ──
+function renderGroupCell(group, b, k, isLast) {
+  // Kept for renderVisiteCell compatibility — wraps buildGroupCellContent in a <td>
   return '<td class="visite-cell" data-col="visite" style="line-height:1.6">'
-    + '<div class="visite-line"><strong>' + timePart + '</strong> : ' + partsHtml + '</div>'
-    + addBtn + '</td>';
+    + buildGroupCellContent(group, b, k, isLast) + '</td>';
 }
 
 // ── Cellule d'une seule réservation (appelée depuis renderGroupCell) ──
@@ -3234,7 +3244,7 @@ function openBookingModal(b, k, idx) {
       <input id="f-via" class="form-input" list="dl-via" maxlength="30" placeholder="RDV, GYG, Winalist…" value="${esc(bk.via||'')}" oninput="onViaChange()">
       <datalist id="dl-via">${viaList.map(v=>`<option value="${v}">`).join('')}</datalist>
     </div>
-    <div class="form-group"><label class="form-label">Groupe / Client</label><input id="f-desc" class="form-input" type="text" placeholder="Famille Martin…" value="${esc(bk.description||'')}"></div>
+    <div class="form-group"><label class="form-label">Groupe / Client</label><input id="f-desc" class="form-input" type="text" placeholder="Famille Martin…" value="${esc(bk.description||'')}" oninput="onDescChange()"></div>
     <div class="form-group"><label class="form-label">Commentaire</label><textarea id="f-comment" class="form-textarea" placeholder="Notes internes…">${bk.comment||''}</textarea></div>
     <div class="form-group"><label class="form-label">Tarif</label><input id="f-price" class="form-input" type="text" inputmode="decimal" placeholder="par personne" value="${bk.price||''}" onblur="fmtPrice(this)"></div>`;
   document.getElementById('modal-actions').innerHTML = edit
@@ -3266,6 +3276,15 @@ function onViaChange() {
     const pr = document.getElementById('f-price');
     if (st) st.value = 'confirmed';
     if (pr) pr.value = '0,00 €';
+  }
+}
+function onDescChange() {
+  const desc = (document.getElementById('f-desc')?.value || '').trim().toLowerCase();
+  if (desc === 'client de passage') {
+    const via = document.getElementById('f-via');
+    const st  = document.getElementById('f-status');
+    if (via && !via.value) via.value = 'Direct';
+    if (st)  st.value = 'a_regler';
   }
 }
 function toggleGuideRow() {
