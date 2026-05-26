@@ -2303,8 +2303,9 @@ function render() {
     html += '</td>';
 
     // First visite (or empty + add btn)
+    const _canAddBooking = currentUserRole !== 'viewer';
     if (timeGroups.length === 0) {
-      html += '<td class="visite-cell" data-col="visite"><span class="visite-empty">—</span><br><span class="add-visite-btn" onclick="openBookingModal(\'' + b + '\',\'' + k + '\',null)">+ ajouter</span></td>';
+      html += '<td class="visite-cell" data-col="visite"><span class="visite-empty">—</span>' + (_canAddBooking ? '<br><span class="add-visite-btn" onclick="openBookingModal(\'' + b + '\',\'' + k + '\',null)">+ ajouter</span>' : '') + '</td>';
       html += '<td class="pax-cell" data-col="pax"></td>';
     } else {
       const g0 = timeGroups[0];
@@ -2518,7 +2519,8 @@ function buildVisiteLabel(bk, showTime = true) {
 
 // ── Cellule d'un groupe horaire (1 ou plusieurs réservations à la même heure) ──
 function renderGroupCell(group, b, k, isLast) {
-  const addBtn = isLast
+  const _canAdd = currentUserRole !== 'viewer';
+  const addBtn = (isLast && _canAdd)
     ? '<div onclick="event.stopPropagation();openBookingModal(\'' + b + '\',\'' + k + '\',null)" style="display:inline-block"><span class="add-visite-btn">+ ajouter</span></div>'
     : '';
   if (group.items.length === 1) {
@@ -2528,7 +2530,7 @@ function renderGroupCell(group, b, k, isLast) {
     const manualIdx = isFH ? group.startIdx : (bk._manualIdx !== undefined ? bk._manualIdx : group.startIdx);
     const onclick = isFH
       ? 'openFHDetail(\'' + k + '\',' + group.startIdx + ')'
-      : 'openBookingModal(\'' + b + '\',\'' + k + '\',' + manualIdx + ')';
+      : (_canAdd ? 'openBookingModal(\'' + b + '\',\'' + k + '\',' + manualIdx + ')' : '');
     return '<td class="visite-cell" data-col="visite" onclick="' + onclick + '" style="cursor:pointer;line-height:1.6">'
       + '<div class="visite-line">' + buildVisiteLabel(bk) + '</div>'
       + addBtn + '</td>';
@@ -2541,8 +2543,8 @@ function renderGroupCell(group, b, k, isLast) {
     const manualIdx = isFH ? globalIdx : (bk._manualIdx !== undefined ? bk._manualIdx : globalIdx);
     const onclick = isFH
       ? 'openFHDetail(\'' + k + '\',' + globalIdx + ')'
-      : 'openBookingModal(\'' + b + '\',\'' + k + '\',' + manualIdx + ')';
-    return '<span onclick="event.stopPropagation();' + onclick + '" style="cursor:pointer;white-space:nowrap">'
+      : (_canAdd ? 'openBookingModal(\'' + b + '\',\'' + k + '\',' + manualIdx + ')' : '');
+    return '<span ' + (onclick ? 'onclick="event.stopPropagation();' + onclick + '" style="cursor:pointer;white-space:nowrap"' : 'style="white-space:nowrap"') + '>'
       + buildVisiteBody(bk) + '</span>';
   }).join(' <span style="color:#94a3b8;font-weight:700;padding:0 1px"> + </span> ');
   return '<td class="visite-cell" data-col="visite" style="line-height:1.6">'
@@ -2552,15 +2554,16 @@ function renderGroupCell(group, b, k, isLast) {
 
 // ── Cellule d'une seule réservation (appelée depuis renderGroupCell) ──
 function renderVisiteCell(bk, b, k, idx, isLast) {
+  const _canAdd = currentUserRole !== 'viewer';
   const isFH = bk.source === 'fareharbor';
   const manualIdx = isFH ? idx : (bk._manualIdx !== undefined ? bk._manualIdx : idx);
   const onclick = isFH
     ? 'openFHDetail(\'' + k + '\',' + idx + ')'
-    : 'openBookingModal(\'' + b + '\',\'' + k + '\',' + manualIdx + ')';
-  const addBtn = isLast
+    : (_canAdd ? 'openBookingModal(\'' + b + '\',\'' + k + '\',' + manualIdx + ')' : '');
+  const addBtn = (isLast && _canAdd)
     ? '<div onclick="event.stopPropagation();openBookingModal(\'' + b + '\',\'' + k + '\',null)" style="display:inline-block"><span class="add-visite-btn">+ ajouter</span></div>'
     : '';
-  return '<td class="visite-cell" data-col="visite" onclick="' + onclick + '" style="cursor:pointer;line-height:1.6">'
+  return '<td class="visite-cell" data-col="visite"' + (onclick ? ' onclick="' + onclick + '" style="cursor:pointer;line-height:1.6"' : ' style="line-height:1.6"') + '>'
     + '<div class="visite-line">' + buildVisiteLabel(bk) + '</div>'
     + addBtn + '</td>';
 }
@@ -2844,6 +2847,7 @@ function saveRenameCol() {
 // ═══ RENFORT MODAL ════════════════════════════
 function getRenfort(b, k) { return state.boutiques[b].renforts?.[k] || ['','']; }
 function openRenfortModal(b, k, slot) {
+  if (currentUserRole === 'viewer') return;
   modalCtx = { type:'renfort', b, k, slot };
   const date = fromKey(k);
   const rf   = getRenfort(b, k);
@@ -2865,6 +2869,7 @@ function openRenfortModal(b, k, slot) {
   setTimeout(() => { const el=document.getElementById('f-renfort'); if(el){el.focus();el.select();} }, 80);
 }
 function saveRenfort() {
+  if (currentUserRole === 'viewer') return;
   if (!modalCtx || modalCtx.type !== 'renfort') return;
   const { b, k, slot } = modalCtx;
   const val = document.getElementById('f-renfort').value.trim();
@@ -2875,6 +2880,7 @@ function saveRenfort() {
   clearDraft(); scheduleSave(); closeModal(); render();
 }
 function clearRenfort() {
+  if (currentUserRole === 'viewer') return;
   if (!modalCtx || modalCtx.type !== 'renfort') return;
   const { b, k, slot } = modalCtx;
   if (!state.boutiques[b].renforts) state.boutiques[b].renforts = {};
@@ -2886,6 +2892,7 @@ function clearRenfort() {
 
 // ═══ NOTE MODAL ═══════════════════════════════
 function openNoteModal(b, k) {
+  if (currentUserRole === 'viewer') return;
   modalCtx = { type:'note', b, k };
   const date = fromKey(k);
   document.getElementById('modal-title').textContent = 'Note · ' + DAYS_FR[date.getDay()] + ' ' + date.getDate() + ' ' + MONTHS_FR[date.getMonth()];
@@ -2893,8 +2900,8 @@ function openNoteModal(b, k) {
   document.getElementById('modal-actions').innerHTML = '<button class="btn-md" onclick="clearNote()">Effacer</button><button class="btn-ms" onclick="closeModal()">Annuler</button><button class="btn-mp" onclick="saveNote()">Enregistrer</button>';
   openModal();
 }
-function saveNote()  { const {b,k}=modalCtx; setNote(b,k,document.getElementById('f-note').value.trim()); clearDraft(); scheduleSave(); closeModal(); render(); }
-function clearNote() { const {b,k}=modalCtx; setNote(b,k,''); clearDraft(); scheduleSave(); closeModal(); render(); }
+function saveNote()  { if (currentUserRole==='viewer') return; const {b,k}=modalCtx; setNote(b,k,document.getElementById('f-note').value.trim()); clearDraft(); scheduleSave(); closeModal(); render(); }
+function clearNote() { if (currentUserRole==='viewer') return; const {b,k}=modalCtx; setNote(b,k,''); clearDraft(); scheduleSave(); closeModal(); render(); }
 
 // ═══ PRIORITÉ ABSENCE ═════════════════════════
 // Retourne le 1er collègue qui a priorité (CP ou REPOS+NPB) ce jour.
@@ -3067,6 +3074,7 @@ function selectPeriod(p)  { pendingPeriod = p; }
 function selectStatus(s)  { pendingStatus = (s === null || pendingStatus === s) ? null : s; }
 
 function saveStatus() {
+  if (currentUserRole === 'viewer') return;
   const {b, k, emp} = modalCtx;
   const defWork = b === 'bulle' ? 'va' : 'ad';
 
@@ -3116,6 +3124,7 @@ function saveStatus() {
 
 // ═══ BOOKING MODAL ════════════════════════════
 function openBookingModal(b, k, idx) {
+  if (currentUserRole === 'viewer') return;
   const bks = getManualBookings(b, k);
   const bk  = idx!==null && idx>=0 ? bks[idx] : {};
   modalCtx  = { type:'booking', b, k, idx };
@@ -3253,6 +3262,7 @@ function toggleGuideRow() {
   if (guideRow) guideRow.style.display = (langEl && langEl.value === 'GUIDÉE|') ? 'grid' : 'none';
 }
 function saveBooking() {
+  if (currentUserRole === 'viewer') return;
   const {b,k,idx}=modalCtx;
   const timeInp = document.getElementById('f-time'); fmtTime(timeInp);
   const langVal = (document.getElementById('f-lang').value||'').split('|');
@@ -3264,7 +3274,7 @@ function saveBooking() {
   clearDraft(); scheduleSave(); closeModal(); render();
   if (isNew) sendBookingPush(bk, b, k); // notif push si réservation ajoutée pour aujourd'hui
 }
-function deleteBooking() { const {b,k,idx}=modalCtx; state.boutiques[b].bookings[k].splice(idx,1); clearDraft(); scheduleSave(); closeModal(); render(); }
+function deleteBooking() { if (currentUserRole==='viewer') return; const {b,k,idx}=modalCtx; state.boutiques[b].bookings[k].splice(idx,1); clearDraft(); scheduleSave(); closeModal(); render(); }
 
 // ═══ FH DETAIL MODAL ══════════════════════════
 function openFHDetail(k, idx) {
