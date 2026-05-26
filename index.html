@@ -1354,16 +1354,18 @@ function getGroupedFHBookings(k) {
   const keyMap = {};
   for (const bk of raw) {
     const gKey = (bk.time||'') + '§§' + (bk.activity||'');
+    const resolvedVia = (bk.bookingPk && fhTags[bk.bookingPk] !== undefined) ? fhTags[bk.bookingPk] : bk.via;
+    const part = { pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, via: resolvedVia, comment: bk.comment, bookingPk: bk.bookingPk, status: bk.status };
     if (gKey in keyMap) {
       const g = groups[keyMap[gKey]];
       g.pax += (bk.pax || 0);
-      g.participants.push({ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, via: bk.via, comment: bk.comment, bookingPk: bk.bookingPk, status: bk.status });
+      g.participants.push(part);
     } else {
       keyMap[gKey] = groups.length;
       groups.push({
         dateKey: bk.dateKey, time: bk.time, activity: bk.activity,
         pax: bk.pax || 0, status: bk.status, source: 'fareharbor',
-        participants: [{ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, via: bk.via, comment: bk.comment, bookingPk: bk.bookingPk, status: bk.status }]
+        participants: [part]
       });
     }
   }
@@ -1608,19 +1610,19 @@ async function syncFareHarbor() {
 async function saveFHTag(bookingPk, via) {
   if (!db || !bookingPk) return;
   bookingPk = parseInt(bookingPk);
-  if (via) {
-    fhTags[bookingPk] = via;
-    await db.ref('piffaut-fh-tags/' + bookingPk).set(via);
-  } else {
-    delete fhTags[bookingPk];
-    await db.ref('piffaut-fh-tags/' + bookingPk).remove();
-  }
-  // Update live fhBookings in memory
+  // Mise à jour mémoire immédiate (avant tout await)
+  if (via) fhTags[bookingPk] = via;
+  else delete fhTags[bookingPk];
   Object.values(fhBookings).forEach(dayEvs => dayEvs.forEach(ev => {
     if (ev.bookingPk === bookingPk) ev.via = via || '';
   }));
   render();
   toast('✅ ' + (via ? '(' + via + ') enregistré' : 'Tag retiré'), '#16a34a');
+  // Sauvegarde Firebase en arrière-plan
+  try {
+    if (via) await db.ref('piffaut-fh-tags/' + bookingPk).set(via);
+    else     await db.ref('piffaut-fh-tags/' + bookingPk).remove();
+  } catch(e) { console.error('saveFHTag:', e); }
 }
 
 async function saveFHNote(bookingPk, note) {
