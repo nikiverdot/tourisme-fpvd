@@ -388,6 +388,15 @@ thead th { position: sticky; top: 0; z-index: 200; }
 .btn-md  { padding: 7px 12px; background: #fef2f2; color: #dc2626; border-radius: 7px; font-weight: 600; cursor: pointer; border: 1px solid #fca5a5; font-size: 12px; }
 .btn-mfh { padding: 7px 12px; background: #fff7ed; color: #c2410c; border-radius: 7px; font-weight: 600; cursor: pointer; border: 1px solid #fed7aa; font-size: 12px; }
 .fh-note { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 7px; padding: 8px 10px; font-size: 11px; color: #92400e; margin-bottom: 10px; }
+
+/* ── Modal périodes 3-sections ── */
+.period-section { background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:8px; padding:8px 10px; margin-bottom:7px; }
+.period-section-hd { font-size:12px; font-weight:700; color:#334155; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between; }
+.period-section-clear { font-size:10px; color:#dc2626; cursor:pointer; background:#fef2f2; border:1px solid #fca5a5; border-radius:4px; padding:1px 7px; line-height:1.6; }
+.status-picker-mini { display:flex; flex-wrap:wrap; gap:3px; margin-bottom:5px; }
+.status-picker-mini .status-option { font-size:10px !important; padding:3px 7px !important; border-radius:5px; cursor:pointer; font-weight:700; }
+.status-note-sm { font-size:9px; font-style:italic; color:#334155; display:block; margin-top:1px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; opacity:.85; }
+.period-full-bar { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:10px; padding:6px 8px; background:#fffbf0; border:1.5px dashed #f59e0b; border-radius:8px; }
 /* ── AUTH OVERLAY ── */
 #auth-overlay {
   position: fixed; inset: 0; z-index: 9999;
@@ -743,12 +752,14 @@ let state = {
     bulle: {
       name: 'Atelier de la Bulle', color: '#0e5c5c',
       employees: ['Loic','Estelle','Alice','Agathe','Monique'],
-      schedule: {}, schedulePM: {}, bookings: {}, notes: {}, renforts: {}, statusNotes: {}
+      schedule: {}, schedulePM: {}, bookings: {}, notes: {}, renforts: {}, statusNotes: {},
+      statusNotesAM: {}, statusNotesPM: {}, statusNotesSoir: {}
     },
     delorme: {
       name: 'Caveau André Delorme', color: '#0891b2',
       employees: ['Julie','Monique','Agathe','Poste ouvert (CDD)'],
-      schedule: {}, schedulePM: {}, bookings: {}, notes: {}, exceptions: {}, renforts: {}, statusNotes: {}
+      schedule: {}, schedulePM: {}, bookings: {}, notes: {}, exceptions: {}, renforts: {}, statusNotes: {},
+      statusNotesAM: {}, statusNotesPM: {}, statusNotesSoir: {}
     }
   }
 };
@@ -917,8 +928,11 @@ function initFirebaseData() {
           state.boutiques[b].notes        = data.boutiques[b].notes        || {};
           state.boutiques[b].exceptions   = data.boutiques[b].exceptions   || {};
           state.boutiques[b].renforts     = data.boutiques[b].renforts     || {};
-          state.boutiques[b].statusNotes  = data.boutiques[b].statusNotes  || {};
-          state.boutiques[b].schedulePM   = data.boutiques[b].schedulePM   || {};
+          state.boutiques[b].statusNotes    = data.boutiques[b].statusNotes    || {};
+          state.boutiques[b].statusNotesAM  = data.boutiques[b].statusNotesAM  || {};
+          state.boutiques[b].statusNotesPM  = data.boutiques[b].statusNotesPM  || {};
+          state.boutiques[b].statusNotesSoir= data.boutiques[b].statusNotesSoir|| {};
+          state.boutiques[b].schedulePM     = data.boutiques[b].schedulePM     || {};
           if (data.boutiques[b].employees && data.boutiques[b].employees.length)
             state.boutiques[b].employees = data.boutiques[b].employees;
         }
@@ -950,8 +964,11 @@ function buildPayload() {
       notes:        state.boutiques[b].notes        || {},
       exceptions:   state.boutiques[b].exceptions   || {},
       renforts:     state.boutiques[b].renforts     || {},
-      statusNotes:  state.boutiques[b].statusNotes  || {},
-      schedulePM:   state.boutiques[b].schedulePM   || {},
+      statusNotes:     state.boutiques[b].statusNotes     || {},
+      statusNotesAM:   state.boutiques[b].statusNotesAM   || {},
+      statusNotesPM:   state.boutiques[b].statusNotesPM   || {},
+      statusNotesSoir: state.boutiques[b].statusNotesSoir || {},
+      schedulePM:      state.boutiques[b].schedulePM      || {},
       employees:    state.boutiques[b].employees    || []
     };
   });
@@ -1406,6 +1423,20 @@ function setStatusNote(b,k,e,v) {
   if(v) state.boutiques[b].statusNotes[k][e]=v;
   else delete state.boutiques[b].statusNotes[k][e];
 }
+// ── Notes par période (Matin / Après-midi / Soir) ────────────────────
+function _getNoteP(field,b,k,e) { return state.boutiques[field]?.[k]?.[e] || ''; }  // inutilisé
+function getStatusNoteAM(b,k,e)   { return state.boutiques[b].statusNotesAM?.[k]?.[e]   || state.boutiques[b].statusNotes?.[k]?.[e] || ''; } // fallback ancien champ
+function getStatusNotePM(b,k,e)   { return state.boutiques[b].statusNotesPM?.[k]?.[e]   || ''; }
+function getStatusNoteSoir(b,k,e) { return state.boutiques[b].statusNotesSoir?.[k]?.[e] || ''; }
+function _setNoteField(stateField, b, k, e, v) {
+  if (!state.boutiques[b][stateField])    state.boutiques[b][stateField] = {};
+  if (!state.boutiques[b][stateField][k]) state.boutiques[b][stateField][k] = {};
+  if (v) state.boutiques[b][stateField][k][e] = v;
+  else   delete state.boutiques[b][stateField][k][e];
+}
+function setStatusNoteAM(b,k,e,v)   { _setNoteField('statusNotesAM',   b, k, e, v); }
+function setStatusNotePM(b,k,e,v)   { _setNoteField('statusNotesPM',   b, k, e, v); }
+function setStatusNoteSoir(b,k,e,v) { _setNoteField('statusNotesSoir', b, k, e, v); }
 function getManualBookings(b,k) { return state.boutiques[b].bookings?.[k] || []; }
 function getFHBookings(k) {
   const b = state.currentBoutique;
@@ -2147,8 +2178,12 @@ function render() {
       const canEdit  = (isAdminUser || !ferme) && canEditEmployee(b, emp);
       const clickEvt = canEdit ? 'onclick="openStatusModal(\'' + b + '\',\'' + k + '\',\'' + emp.replace(/'/g,"\\'") + '\')"' : '';
       const lockedCls = canEdit ? '' : ' emp-cell-locked';
-      const sn = getStatusNote(b, k, emp);
-      const noteHtml = sn ? '<span class="status-note">' + esc(sn) + '</span>' : '';
+      const snAM   = getStatusNoteAM(b, k, emp);   // note matin (fallback → statusNotes)
+      const snPM   = getStatusNotePM(b, k, emp);   // note après-midi
+      const snSoir = getStatusNoteSoir(b, k, emp); // note soir
+      const noteHtmlAM   = snAM   ? '<span class="status-note-sm">' + esc(snAM)   + '</span>' : '';
+      const noteHtmlPM   = snPM   ? '<span class="status-note-sm">' + esc(snPM)   + '</span>' : '';
+      const noteHtmlSoir = snSoir ? '<span class="status-note-sm">' + esc(snSoir) + '</span>' : '';
       const consecHtml = consec>=6 ? '<span style="font-size:7px;opacity:.8">'+consec+'j</span>' : '';
       const cpHtml = s === 'conges' ? '<span style="font-size:7px;font-weight:700;opacity:.85">' + (CP_TOTAL - countCPUsed(b, emp, k)) + 'j</span>' : '';
       const sPM   = getStatusPM(b, k, emp);
@@ -2166,9 +2201,9 @@ function render() {
         const sSoirLabel = STATUS_LABELS[sSoir]  || '—';
         html += '<td class="emp-cell' + lockedCls + '" data-col="emp-' + empIdx + '" data-key="' + k + '" data-emp="' + esc(emp) + '" rowspan="' + rows + '">' +
           '<div class="status-cell' + warnCls + '" style="padding:0;gap:0;overflow:hidden;border-color:#94a3b8" ' + clickEvt + ' title="Matin: ' + sLabel + ' · Après-midi: ' + sPMLabel + ' · Soir: ' + sSoirLabel + warnTip + '">' +
-          '<div class="status-third ' + sClass      + '" style="border-bottom:1px solid rgba(0,0,0,.08)">' + sAbbr     + '<span class="half-tag">M</span></div>' +
-          '<div class="status-third ' + sPMClass    + '" style="border-bottom:1px solid rgba(0,0,0,.08)">' + sPMAbbr   + '<span class="half-tag">A</span></div>' +
-          '<div class="status-third ' + sSoirClass  + '">' + sSoirAbbr + '<span class="half-tag">S</span>' + noteHtml + '</div>' +
+          '<div class="status-third ' + sClass      + '" style="border-bottom:1px solid rgba(0,0,0,.08)">' + sAbbr   + '<span class="half-tag">M</span>' + noteHtmlAM   + '</div>' +
+          '<div class="status-third ' + sPMClass    + '" style="border-bottom:1px solid rgba(0,0,0,.08)">' + sPMAbbr + '<span class="half-tag">A</span>' + noteHtmlPM   + '</div>' +
+          '<div class="status-third ' + sSoirClass  + '">' + sSoirAbbr + '<span class="half-tag">S</span>' + noteHtmlSoir + '</div>' +
           '</div></td>';
       } else if (sPM !== null && !ferme) {
         // Cellule demi-journée : AM en haut, PM en bas
@@ -2177,11 +2212,11 @@ function render() {
         const sPMLabel = STATUS_LABELS[sPM]  || '—';
         html += '<td class="emp-cell' + lockedCls + '" data-col="emp-' + empIdx + '" data-key="' + k + '" data-emp="' + esc(emp) + '" rowspan="' + rows + '">' +
           '<div class="status-cell' + warnCls + '" style="padding:0;gap:0;overflow:hidden;border-color:#94a3b8" ' + clickEvt + ' title="Matin: ' + sLabel + ' · Après-midi: ' + sPMLabel + warnTip + '">' +
-          '<div class="status-half ' + sClass   + '" style="border-bottom:1px solid rgba(0,0,0,.08)">' + sAbbr   + '<span class="half-tag">M</span></div>' +
-          '<div class="status-half ' + sPMClass + '">' + sPMAbbr + '<span class="half-tag">A</span>' + noteHtml + '</div>' +
+          '<div class="status-half ' + sClass   + '" style="border-bottom:1px solid rgba(0,0,0,.08)">' + sAbbr   + '<span class="half-tag">M</span>' + noteHtmlAM + '</div>' +
+          '<div class="status-half ' + sPMClass + '">' + sPMAbbr + '<span class="half-tag">A</span>' + noteHtmlPM + '</div>' +
           '</div></td>';
       } else {
-        html += '<td class="emp-cell' + lockedCls + '" data-col="emp-' + empIdx + '" data-key="' + k + '" data-emp="' + esc(emp) + '" rowspan="' + rows + '"><div class="status-cell ' + sClass + (alert?' cell-alert':'') + warnCls + '" ' + clickEvt + ' title="' + sLabel + warnTip + '">' + sAbbr + cpHtml + consecHtml + noteHtml + '</div></td>';
+        html += '<td class="emp-cell' + lockedCls + '" data-col="emp-' + empIdx + '" data-key="' + k + '" data-emp="' + esc(emp) + '" rowspan="' + rows + '"><div class="status-cell ' + sClass + (alert?' cell-alert':'') + warnCls + '" ' + clickEvt + ' title="' + sLabel + warnTip + '">' + sAbbr + cpHtml + consecHtml + noteHtmlAM + '</div></td>';
       }
     });
 
@@ -2649,10 +2684,10 @@ function updatePriorityWarning() {
   const warn = document.getElementById('priority-warning');
   if (!warn || !modalCtx) return;
   const { b, k, emp } = modalCtx;
-  const s = pendingStatus || getStatus(b, k, emp);
-  // Seulement pour CP et REPOS journée entière ou matin ; ÉCOLE exemptée
+  // Lire le statut AM depuis le DOM (nouveau modal) ou pendingStatus (compat)
+  const amEl = document.querySelector('#ps-am .status-option[data-status].selected');
+  const s = amEl ? amEl.dataset.status : (pendingStatus || getStatus(b, k, emp));
   if (s !== 'conges' && s !== 'repos') { warn.style.display = 'none'; return; }
-  if (pendingPeriod === 'pm') { warn.style.display = 'none'; return; } // PM-only pas prioritaire
   const conflict = getAbsencePriority(b, k, emp);
   if (conflict) {
     const label = conflict.status === 'conges'
@@ -2665,110 +2700,153 @@ function updatePriorityWarning() {
   }
 }
 
-// ═══ STATUS MODAL ══════════════════════════════
+// ═══ STATUS MODAL — 3 PÉRIODES INDÉPENDANTES ═══
 function openStatusModal(b, k, emp) {
-  if (!canEditEmployee(b, emp)) return; // sécurité côté client
+  if (!canEditEmployee(b, emp)) return;
   setActivity(b, k, emp);
   modalCtx = { type:'status', b, k, emp };
   pendingStatus = null;
-  const date    = fromKey(k);
-  const curAM   = getStatus(b, k, emp);
-  const curPM   = getStatusPM(b, k, emp);
-  const curSoir = getStatusSoir(b, k, emp);
-  const curNote = getStatusNote(b, k, emp);
-  const defWork = b === 'bulle' ? 'va' : 'ad';
+  const date       = fromKey(k);
+  const curAM      = getStatus(b, k, emp);
+  const curPM      = getStatusPM(b, k, emp);    // null = journée entière
+  const curSoir    = getStatusSoir(b, k, emp);  // null = pas de soir
+  const curNoteAM  = getStatusNoteAM(b, k, emp);
+  const curNotePM  = getStatusNotePM(b, k, emp);
+  const curNoteSoir= getStatusNoteSoir(b, k, emp);
 
-  // Déduire la période initiale
-  let initPeriod, initStatus;
-  if (curSoir !== null) {
-    initPeriod = 'soir'; initStatus = curSoir; // statut spécial le soir
-  } else if (curPM === null) {
-    initPeriod = 'full'; initStatus = curAM;
-  } else if (curPM === defWork) {
-    initPeriod = 'am';   initStatus = curAM;   // statut spécial le matin
-  } else if (curAM === defWork) {
-    initPeriod = 'pm';   initStatus = curPM;   // statut spécial l'après-midi
-  } else {
-    initPeriod = 'am';   initStatus = curAM;
-  }
-  pendingPeriod = initPeriod;
-  pendingStatus = initStatus;
+  const miniPicker = (period, sel) =>
+    STATUSES.map(s =>
+      '<div class="status-option ' + SO_CLASSES[s] + (sel===s?' selected':'') + '" ' +
+      'data-period="' + period + '" data-status="' + s + '" ' +
+      'onclick="selectPeriodStatus(\'' + period + '\',\'' + s + '\')">' + STATUS_ABBR[s] + '</div>'
+    ).join('');
 
   document.getElementById('modal-title').textContent = emp + ' · ' + DAYS_FR[date.getDay()] + ' ' + date.getDate() + ' ' + MONTHS_FR[date.getMonth()];
   document.getElementById('modal-body').innerHTML =
-    // Sélecteur de période
-    '<p style="font-size:11px;color:#64748b;margin-bottom:6px">Période :</p>' +
-    '<div style="display:flex;gap:6px;margin-bottom:12px">' +
-    '<div class="period-btn' + (initPeriod==='full'?' selected':'') + '" id="per-full" onclick="selectPeriod(\'full\')">☀ Journée</div>' +
-    '<div class="period-btn' + (initPeriod==='am'?' selected':'') + '" id="per-am"   onclick="selectPeriod(\'am\')">🌅 Matin</div>' +
-    '<div class="period-btn' + (initPeriod==='pm'?' selected':'') + '" id="per-pm"   onclick="selectPeriod(\'pm\')">🌆 Après-midi</div>' +
-    '<div class="period-btn' + (initPeriod==='soir'?' selected':'') + '" id="per-soir" onclick="selectPeriod(\'soir\')">🌙 Soir</div>' +
+    // ── Raccourci "Journée entière" ──
+    '<div class="period-full-bar">' +
+    '<span style="font-size:11px;font-weight:700;color:#78350f;margin-right:6px;white-space:nowrap;flex-shrink:0">☀ Journée :</span>' +
+    STATUSES.map(s => '<div class="status-option ' + SO_CLASSES[s] + '" onclick="applyFullDay(\'' + s + '\')" style="font-size:10px;padding:3px 7px">' + STATUS_ABBR[s] + '</div>').join('') +
+    '<span onclick="applyFullDay(null)" style="font-size:10px;padding:3px 8px;background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:5px;cursor:pointer;font-weight:700;white-space:nowrap;flex-shrink:0">✕ Effacer tout</span>' +
     '</div>' +
-    // Sélecteur de statut
-    '<p style="font-size:11px;color:#64748b;margin-bottom:9px">Statut :</p>' +
-    '<div class="status-picker">' +
-    STATUSES.map(s => '<div class="status-option ' + SO_CLASSES[s] + (s===initStatus?' selected':'') + '" onclick="selectStatus(\'' + s + '\')" id="so-' + s + '">' + STATUS_LABELS[s] + '</div>').join('') +
+
+    // ── Matin ──
+    '<div class="period-section" id="ps-am">' +
+    '<div class="period-section-hd">🌅 Matin <span class="period-section-clear" onclick="clearPeriodSection(\'am\')">✕ effacer</span></div>' +
+    '<div class="status-picker-mini">' + miniPicker('am', curAM) + '</div>' +
+    '<input id="note-am" class="form-input" type="text" placeholder="Message matin… (ex : Soutenance, NPB)" maxlength="50" value="' + esc(curNoteAM) + '" style="font-size:11px;padding:5px 8px;margin-top:4px" oninput="updatePriorityWarning()">' +
     '</div>' +
-    '<div style="text-align:right;margin-top:6px">' +
-    '<span id="so-clear" onclick="selectStatus(null)" style="cursor:pointer;font-size:11px;font-weight:700;color:#dc2626;border:1px solid #fca5a5;background:#fef2f2;border-radius:20px;padding:2px 9px;opacity:' + (initStatus===null?'1':'0.45') + ';transition:opacity .15s">✕ Effacer</span>' +
+
+    // ── Après-midi ──
+    '<div class="period-section" id="ps-pm">' +
+    '<div class="period-section-hd">🌆 Après-midi <span style="font-size:10px;color:#94a3b8;font-weight:400">(vide = même que matin)</span><span class="period-section-clear" onclick="clearPeriodSection(\'pm\')">✕</span></div>' +
+    '<div class="status-picker-mini">' + miniPicker('pm', curPM) + '</div>' +
+    '<input id="note-pm" class="form-input" type="text" placeholder="Message après-midi…" maxlength="50" value="' + esc(curNotePM) + '" style="font-size:11px;padding:5px 8px;margin-top:4px">' +
     '</div>' +
-    '<div class="form-group" style="margin-top:12px">' +
-    '<label class="form-label" style="font-size:11px">Note (ex : REPOS NPB)</label>' +
-    '<input id="f-status-note" class="form-input" type="text" placeholder="Note libre…" maxlength="40" value="' + esc(curNote) + '" oninput="updatePriorityWarning()">' +
+
+    // ── Soir ──
+    '<div class="period-section" id="ps-soir">' +
+    '<div class="period-section-hd">🌙 Soir <span style="font-size:10px;color:#94a3b8;font-weight:400">(optionnel)</span><span class="period-section-clear" onclick="clearPeriodSection(\'soir\')">✕</span></div>' +
+    '<div class="status-picker-mini">' + miniPicker('soir', curSoir) + '</div>' +
+    '<input id="note-soir" class="form-input" type="text" placeholder="Message soir… (ex : CSA SOIRÉE VIP)" maxlength="50" value="' + esc(curNoteSoir) + '" style="font-size:11px;padding:5px 8px;margin-top:4px">' +
     '</div>' +
-    '<div id="priority-warning" style="display:none;margin-top:10px;padding:9px 12px;background:#fef3c7;border:1.5px solid #f59e0b;border-radius:8px;font-size:12px;color:#92400e;gap:6px;align-items:flex-start"></div>';
+
+    '<div id="priority-warning" style="display:none;margin-top:8px;padding:9px 12px;background:#fef3c7;border:1.5px solid #f59e0b;border-radius:8px;font-size:12px;color:#92400e;gap:6px;align-items:flex-start"></div>';
+
   document.getElementById('modal-actions').innerHTML = '<button class="btn-ms" onclick="closeModal()">Annuler</button><button class="btn-mp" onclick="saveStatus()">Enregistrer</button>';
   openModal();
   updatePriorityWarning();
 }
-let pendingStatus = null;
-let pendingPeriod = 'full';
-function selectPeriod(p) {
-  pendingPeriod = p;
-  ['full','am','pm','soir'].forEach(x => document.getElementById('per-'+x)?.classList.toggle('selected', x===p));
+
+let pendingStatus = null;   // conservé pour compat draft
+let pendingPeriod = 'full'; // conservé pour compat draft
+
+// Sélection indépendante par période (toggle : reclicker désélectionne)
+function selectPeriodStatus(period, status) {
+  const container = document.getElementById('ps-' + period);
+  if (!container) return;
+  const wasSelected = container.querySelector('[data-status="' + status + '"].selected');
+  container.querySelectorAll('.status-option[data-status]').forEach(b => b.classList.remove('selected'));
+  if (!wasSelected) {
+    const btn = container.querySelector('[data-status="' + status + '"]');
+    if (btn) btn.classList.add('selected');
+  }
+  if (period === 'am') updatePriorityWarning();
+}
+
+// Raccourci Journée entière : applique le même statut à AM + PM, efface Soir
+function applyFullDay(status) {
+  if (status === null) {
+    ['am','pm','soir'].forEach(p => {
+      const c = document.getElementById('ps-' + p);
+      if (c) c.querySelectorAll('.status-option[data-status]').forEach(b => b.classList.remove('selected'));
+    });
+    ['note-am','note-pm','note-soir'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  } else {
+    selectPeriodStatus('am',   status);
+    selectPeriodStatus('pm',   status);
+    clearPeriodSection('soir');
+  }
   updatePriorityWarning();
 }
-function selectStatus(s) {
-  // null = effacement explicite ; sinon toggle si on reclique sur l'option déjà sélectionnée
-  pendingStatus = (s === null || pendingStatus === s) ? null : s;
-  STATUSES.forEach(st => { const el = document.getElementById('so-'+st); if(el) el.classList.toggle('selected', st===pendingStatus); });
-  const clrEl = document.getElementById('so-clear');
-  if (clrEl) clrEl.style.opacity = pendingStatus === null ? '1' : '0.45';
-  updatePriorityWarning();
+
+// Efface la sélection et la note d'une section
+function clearPeriodSection(period) {
+  const c = document.getElementById('ps-' + period);
+  if (c) c.querySelectorAll('.status-option[data-status]').forEach(b => b.classList.remove('selected'));
+  const n = document.getElementById('note-' + period);
+  if (n) n.value = '';
 }
+
+// Compat draft (ancien système mono-période) — conservé pour ne pas casser les drafts
+function selectPeriod(p)  { pendingPeriod = p; }
+function selectStatus(s)  { pendingStatus = (s === null || pendingStatus === s) ? null : s; }
+
 function saveStatus() {
-  const {b,k,emp} = modalCtx;
-  const note    = (document.getElementById('f-status-note')?.value || '').trim();
-  const period  = pendingPeriod || 'full';
+  const {b, k, emp} = modalCtx;
   const defWork = b === 'bulle' ? 'va' : 'ad';
 
-  if (pendingStatus !== null) {
-    if (period === 'am') {
-      setStatus(b, k, emp, pendingStatus);  // AM = statut choisi (cross-sync inclus)
-      setStatusPM(b, k, emp, defWork);      // PM = présent à la boutique
-      clearStatusSoir(b, k, emp);
-    } else if (period === 'pm') {
-      setStatus(b, k, emp, defWork);        // AM = présent à la boutique
-      setStatusPM(b, k, emp, pendingStatus);// PM = statut choisi
-      clearStatusSoir(b, k, emp);
-    } else if (period === 'soir') {
-      setStatus(b, k, emp, defWork);        // AM = présent
-      setStatusPM(b, k, emp, defWork);      // PM = présent
-      setStatusSoir(b, k, emp, pendingStatus); // Soir = statut choisi
-    } else {
-      setStatus(b, k, emp, pendingStatus);  // Journée entière
-      clearStatusPM(b, k, emp);
-      clearStatusSoir(b, k, emp);
-    }
+  const amEl   = document.querySelector('#ps-am .status-option[data-status].selected');
+  const pmEl   = document.querySelector('#ps-pm .status-option[data-status].selected');
+  const soirEl = document.querySelector('#ps-soir .status-option[data-status].selected');
+  const amS    = amEl   ? amEl.dataset.status   : null;
+  const pmS    = pmEl   ? pmEl.dataset.status   : null;
+  const soirS  = soirEl ? soirEl.dataset.status : null;
+
+  const noteAM   = (document.getElementById('note-am')?.value   || '').trim();
+  const notePM   = (document.getElementById('note-pm')?.value   || '').trim();
+  const noteSoir = (document.getElementById('note-soir')?.value || '').trim();
+
+  // Appliquer les statuts
+  if (amS) setStatus(b, k, emp, amS); else clearStatus(b, k, emp);
+
+  if (pmS && pmS !== amS) {
+    setStatusPM(b, k, emp, pmS);
+  } else if (pmS && pmS === amS && !soirS) {
+    clearStatusPM(b, k, emp); // AM=PM sans soir → journée entière (compact)
+  } else if (pmS) {
+    setStatusPM(b, k, emp, pmS);
   } else {
-    // Effacer : supprimer le statut explicite (retour à la valeur par défaut de l'employé)
-    clearStatus(b, k, emp);
     clearStatusPM(b, k, emp);
+  }
+
+  if (soirS) {
+    if (!amS) setStatus(b, k, emp, defWork);
+    if (!pmS) setStatusPM(b, k, emp, defWork);
+    setStatusSoir(b, k, emp, soirS);
+  } else {
     clearStatusSoir(b, k, emp);
   }
-  setStatusNote(b, k, emp, note);
+
+  // Sauvegarder les notes par période
+  setStatusNoteAM(b, k, emp, noteAM);
+  setStatusNotePM(b, k, emp, notePM);
+  setStatusNoteSoir(b, k, emp, noteSoir);
+  // Compat: statusNotes = note AM (pour détection NPB / priorité)
+  setStatusNote(b, k, emp, noteAM);
   const other = b === 'bulle' ? 'delorme' : 'bulle';
-  if (state.boutiques[other].employees.includes(emp)) setStatusNote(other, k, emp, note);
+  if (state.boutiques[other].employees.includes(emp)) setStatusNote(other, k, emp, noteAM);
+
   clearDraft(); scheduleSave(); closeModal(); render();
 }
 
