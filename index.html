@@ -25,6 +25,7 @@ const FIREBASE_CONFIG = {
 };
 const FAREHARBOR_ICS_DELORME = "https://fareharbor.com/integrations/ics/andre-delorme/calendar/?token=cc1ce7f0-f5f4-43d8-b6ec-b0d86f86f062";
 const FAREHARBOR_ICS_BULLE   = "https://fareharbor.com/integrations/ics/les-petits-veuve-ambal/calendar/?token=b2355683-6798-4049-8de9-46fdf9311166";
+const WINALIST_ICS_BULLE     = "https://www.winalist.fr/ics/experiences/feed/148/5KXKToGoHt4YYyBdjoqXpnlBUk5Ko8";
 </script>
 <style>
 :root { color-scheme: light; }
@@ -1623,22 +1624,24 @@ async function syncFareHarbor() {
   btn.disabled = true; btn.textContent = '⏳…';
   msg.style.color = '#64748b'; msg.textContent = '⏳ Récupération des calendriers…';
 
-  // Fetch both boutiques in parallel
-  const [txtDelorme, txtBulle] = await Promise.all([
+  // Fetch all sources in parallel (FH Delorme, FH Bulle, Winalist Bulle)
+  const [txtDelorme, txtBulle, txtWinalist] = await Promise.all([
     fetchICS(FAREHARBOR_ICS_DELORME),
-    fetchICS(FAREHARBOR_ICS_BULLE)
+    fetchICS(FAREHARBOR_ICS_BULLE),
+    fetchICS(WINALIST_ICS_BULLE)
   ]);
 
-  if (!txtDelorme && !txtBulle) {
-    msg.style.color = '#dc2626'; msg.textContent = '⚠ FareHarbor inaccessible (CORS). Fonctionne depuis un serveur web.';
+  if (!txtDelorme && !txtBulle && !txtWinalist) {
+    msg.style.color = '#dc2626'; msg.textContent = '⚠ Calendriers inaccessibles (CORS). Fonctionne depuis un serveur web.';
     btn.disabled = false; btn.textContent = '🔄 Sync FareHarbor';
     return;
   }
 
   // Parse each ICS and tag with boutique
-  const eventsDelorme = txtDelorme ? parseICS(txtDelorme).map(ev => ({ ...ev, boutique: 'delorme' })) : [];
-  const eventsBulle   = txtBulle   ? parseICS(txtBulle).map(ev =>   ({ ...ev, boutique: 'bulle'   })) : [];
-  const allEvents     = [...eventsDelorme, ...eventsBulle];
+  const eventsDelorme  = txtDelorme  ? parseICS(txtDelorme).map(ev =>      ({ ...ev, boutique: 'delorme' })) : [];
+  const eventsBulle    = txtBulle    ? parseICS(txtBulle).map(ev =>        ({ ...ev, boutique: 'bulle'   })) : [];
+  const eventsWinalist = txtWinalist ? parseWinalist(txtWinalist).map(ev => ({ ...ev, boutique: 'bulle'   })) : [];
+  const allEvents      = [...eventsDelorme, ...eventsBulle, ...eventsWinalist];
 
   // Enrich with partner/channel from FH API (if keys configured)
   msg.style.color = '#64748b'; msg.textContent = '⏳ Récupération des canaux…';
@@ -1665,12 +1668,13 @@ async function syncFareHarbor() {
   allEvents.forEach(ev => { if (!fhBookings[ev.dateKey]) fhBookings[ev.dateKey] = []; fhBookings[ev.dateKey].push(ev); });
 
   // Status message
-  const cntD = eventsDelorme.length, cntB = eventsBulle.length, cntTotal = cntD + cntB;
+  const cntD = eventsDelorme.length, cntB = eventsBulle.length, cntW = eventsWinalist.length;
+  const cntTotal = cntD + cntB + cntW;
   const channelCnt = Object.keys(channelMap).length;
   const tagCnt     = Object.keys(fhTags).length;
-  const sourceParts = [cntD > 0 ? cntD + ' AD' : '', cntB > 0 ? cntB + ' ADB' : ''].filter(Boolean).join(' + ');
+  const sourceParts = [cntD > 0 ? cntD + ' AD' : '', cntB > 0 ? cntB + ' ADB (FH)' : '', cntW > 0 ? cntW + ' ADB (Winalist)' : ''].filter(Boolean).join(' · ');
   msg.style.color = '#16a34a';
-  msg.textContent = '✓ ' + sourceParts + ' réservation' + (cntTotal !== 1 ? 's' : '') + ' importée' + (cntTotal !== 1 ? 's' : '')
+  msg.textContent = '✓ ' + sourceParts + (cntTotal ? ' — ' + cntTotal + ' réservation' + (cntTotal !== 1 ? 's' : '') : '')
     + (channelCnt > 0 ? ' · ' + channelCnt + ' canal' + (channelCnt > 1 ? 'x' : '') : '')
     + (tagCnt     > 0 ? ' · ' + tagCnt     + ' tag'   + (tagCnt     > 1 ? 's' : '') : '');
 
@@ -1930,6 +1934,67 @@ function parseICS(raw) {
 
       events.push({ dateKey, time, pax, status:evStatus, activity, langFlag, langCode, clientName, via, comment, bookingPk, source:'fareharbor' });
     }
+  });
+  return events.sort((a,b)=>(a.dateKey+a.time).localeCompare(b.dateKey+b.time));
+}
+
+// ═══ WINALIST ICS PARSER ═══════════════════════
+// Format Winalist :
+//   SUMMARY  : "<Activité> - N personne(s) - Payé|Non payé|Option"
+//   DESCRIPTION : "<idem>\n\n<Nom Client> - <Téléphone>"
+//   DTSTART  : heure locale Paris (pas de Z)
+function parseWinalist(raw) {
+  const events = [];
+  const text = raw.replace(/\r\n[ \t]/g,'').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  text.split('BEGIN:VEVENT').slice(1).forEach(block => {
+    const get = key => { const m=block.match(new RegExp('^'+key+'(?:;[^:]+)?:(.+)$','m')); return m?m[1].trim():''; };
+    const dtstart = get('DTSTART');
+    const rawSum  = get('SUMMARY').replace(/\\n/g,' ').replace(/\\,/g,',').replace(/\\;/g,';');
+    const rawDesc = get('DESCRIPTION').replace(/\\n/g,'\n').replace(/\\,/g,',');
+    const status  = get('STATUS');
+    if (!dtstart) return;
+    if (status === 'CANCELLED' || /annul[eé]/i.test(rawSum)) return;
+
+    // Date & time — Winalist envoie l'heure locale Paris (pas UTC)
+    let dateKey, time = '';
+    const dt = dtstart.replace('Z','');
+    if (dt.includes('T')) {
+      const [y,mo,d,h,mi] = [dt.slice(0,4),dt.slice(4,6),dt.slice(6,8),dt.slice(9,11),dt.slice(11,13)];
+      dateKey = y+'-'+mo+'-'+d;
+      time    = h+'h'+(mi && mi!=='00' ? mi : '');
+    } else {
+      dateKey = dt.slice(0,4)+'-'+dt.slice(4,6)+'-'+dt.slice(6,8);
+    }
+
+    // Pax — "N personne(s)"
+    const paxM = rawSum.match(/(\d+)\s*personne/i);
+    const pax  = paxM ? parseInt(paxM[1]) : 1;
+
+    // Statut de paiement → status interne
+    let evStatus = 'confirmed';
+    if (/non\s*pay[eé]/i.test(rawSum))  evStatus = 'a_regler';
+    else if (/option/i.test(rawSum))    evStatus = 'option';
+
+    // Nom d'activité — partie avant " - N personne"
+    const actM   = rawSum.match(/^(.+?)\s*-\s*\d+\s*personne/i);
+    const activity = actM ? actM[1].trim() : 'Dégustation';
+
+    // Nom client — après double saut de ligne dans DESCRIPTION
+    let clientName = '';
+    const descParts = rawDesc.split('\n\n');
+    if (descParts.length >= 2) {
+      const clientLine = descParts[descParts.length - 1].trim();
+      clientName = clientLine.split(/\s*-\s*/)[0].trim().slice(0, 35);
+    }
+
+    // Détection de langue
+    const lang     = detectLang(rawSum + ' ' + rawDesc);
+    const langFlag = lang ? lang.flag : '';
+    const langCode = lang ? lang.code : '';
+
+    events.push({ dateKey, time, pax, status: evStatus, activity,
+      langFlag, langCode, clientName,
+      via: 'Winalist', comment: '', bookingPk: 0, source: 'winalist' });
   });
   return events.sort((a,b)=>(a.dateKey+a.time).localeCompare(b.dateKey+b.time));
 }
