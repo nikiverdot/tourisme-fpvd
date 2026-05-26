@@ -397,6 +397,11 @@ thead th { position: sticky; top: 0; z-index: 200; }
 .status-picker-mini .status-option { font-size:10px !important; padding:3px 7px !important; border-radius:5px; cursor:pointer; font-weight:700; }
 .status-note-sm { font-size:9px; font-style:italic; color:#334155; display:block; margin-top:1px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; opacity:.85; }
 .period-full-bar { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:10px; padding:6px 8px; background:#fffbf0; border:1.5px dashed #f59e0b; border-radius:8px; }
+/* ── Badges contrat dans l'en-tête employé ── */
+.contract-badge { display:block; font-size:7px; font-weight:700; padding:1px 4px; border-radius:3px; margin-top:2px; line-height:1.4; text-align:center; }
+.contract-alt   { background:#ede9fe; color:#6d28d9; border:1px solid #c4b5fd; }
+.contract-cdd   { background:#fef9c3; color:#854d0e; border:1px solid #fde68a; }
+.contract-cdi   { background:#dcfce7; color:#15803d; border:1px solid #86efac; }
 /* ── AUTH OVERLAY ── */
 #auth-overlay {
   position: fixed; inset: 0; z-index: 9999;
@@ -1286,21 +1291,83 @@ async function saveMyName() {
   }
 }
 
-// ═══ CONSECUTIVE WORK DAYS ════════════════════
+// ═══ CONTRATS & CONGÉS PAYÉS ═════════════════
 const WORK_STATUSES = new Set(['va','ad','formation']);
-const CP_TOTAL = 25;
+const CP_TOTAL = 25; // fallback employés permanents
+
+// Configuration par employé : périodes de contrat avec quotas CP+RÉVISION
+const CP_CONFIG = {
+  'Alice': [
+    // Alternance : sep 2025 → août 2026 · 25 CP + 5 jours de révision
+    { from:'2025-09-01', to:'2026-08-31', cpTotal:25, revTotal:5, label:'Alternance' },
+    // CDD : 1 sept → 31 déc 2026 · CP repart de 0 (2.5j/mois × 4 mois = 10j)
+    { from:'2026-09-01', to:'2026-12-31', cpTotal:10, revTotal:0, label:'CDD' }
+  ],
+  'Agathe': [
+    // Alternance 1 an : 1 fév 2026 → 31 jan 2027 · 25 CP + 5 révision
+    { from:'2026-02-01', to:'2027-01-31', cpTotal:25, revTotal:5, label:'Alternance' }
+  ],
+  'Julie': [
+    // Alternance : août 2025 → 31 août 2026 · 25 CP + 5 révision
+    { from:'2025-08-01', to:'2026-08-31', cpTotal:25, revTotal:5, label:'Alternance' },
+    // CDI à partir du 1 sept 2026 · année CP standard juin-mai
+    { from:'2026-09-01', to:null, cpTotal:25, revTotal:0, label:'CDI', useYearBounds:true }
+  ]
+};
+
+// Retourne la période de contrat de l'employé à la date k (ou null)
+function getCPPeriod(emp, k) {
+  const periods = CP_CONFIG[emp];
+  if (!periods) return null;
+  for (const p of periods) {
+    if (k >= p.from && (p.to === null || k <= p.to)) return p;
+  }
+  return null;
+}
+
 function cpYearBounds(k) {
   const d = fromKey(k);
   const yr = d.getMonth() >= 5 ? d.getFullYear() : d.getFullYear() - 1; // année CP : juin→mai
   return { start: yr + '-06-01', end: (yr + 1) + '-05-31' };
 }
+
 function countCPUsed(b, emp, k) {
-  const { start, end } = cpYearBounds(k);
+  const period = getCPPeriod(emp, k);
+  let start, end;
+  if (period) {
+    if (period.useYearBounds) {
+      const bnds = cpYearBounds(k);
+      start = period.from > bnds.start ? period.from : bnds.start; // max(contractStart, cpYearStart)
+      end   = bnds.end;
+    } else {
+      start = period.from;
+      end   = period.to || k;
+    }
+  } else {
+    const bnds = cpYearBounds(k);
+    start = bnds.start;
+    end   = bnds.end;
+  }
   const sched = state.boutiques[b].schedule || {};
   let count = 0;
   for (const dk in sched) {
     if (dk < start || dk > end || dk > k) continue;
     if (sched[dk]?.[emp] === 'conges') count++;
+  }
+  return count;
+}
+
+// Compte les jours ÉCOLE (formation) utilisés comme jours de révision sur la période
+function countRevisionUsed(b, emp, k) {
+  const period = getCPPeriod(emp, k);
+  if (!period || !period.revTotal) return 0;
+  const start = period.from;
+  const end   = period.to || k;
+  const sched = state.boutiques[b].schedule || {};
+  let count = 0;
+  for (const dk in sched) {
+    if (dk < start || dk > end || dk > k) continue;
+    if (sched[dk]?.[emp] === 'formation') count++;
   }
   return count;
 }
@@ -1542,7 +1609,7 @@ function getEffectiveStatus(b, k, emp, ferme) {
   // Règles absolues — priorité sur les données Firebase
   if (emp === 'Estelle' && k < '2026-01-21') return null;
   if (emp === 'Agathe'  && k < '2026-02-02') return null;
-  if (emp === 'Agathe'  && k > '2027-02-28') return null;   // fin contrat toutes boutiques
+  if (emp === 'Agathe'  && k > '2027-01-31') return null;   // fin alternance (1 an depuis 1 fév 2026)
   if (emp === 'Alice'   && b === 'bulle' && k > '2026-12-31') return null;
   if (ferme && fromKey(k).getDay() === 0 && emp !== 'Monique' && !emp.includes('CDD')) return 'repos'; // dimanche fermé → REPOS (sauf Monique/CDD)
 
@@ -2066,7 +2133,18 @@ function render() {
   html += '<th data-col="pax"><div class="th-inner">Pax' + rh('pax') + '</div></th>';
   emps.forEach((e, idx) => {
     const label = e.length > 10 ? e.split(' ')[0] : e;
-    html += '<th class="th-emp" data-col="emp-' + idx + '" onclick="openRenameEmpModal(\'' + b + '\',' + idx + ')" title="Renommer : ' + esc(e) + '"><div class="th-inner">' + esc(label) + rh('emp-' + idx) + '</div></th>';
+    const today = toKey(new Date());
+    const cpP   = getCPPeriod(e, today);
+    let contractBadge = '';
+    if (cpP) {
+      const typeClass = cpP.label === 'Alternance' ? 'contract-alt'
+                      : cpP.label === 'CDD'        ? 'contract-cdd'
+                      : 'contract-cdi';
+      const endStr = cpP.to ? cpP.to.slice(5).replace('-', '/') : '∞';
+      contractBadge = '<div class="contract-badge ' + typeClass + '">' + cpP.label.slice(0,3).toUpperCase() + ' ' + endStr + '</div>';
+    }
+    const titleTip = 'Renommer : ' + esc(e) + (cpP ? ' · ' + cpP.label + (cpP.to ? ' → ' + cpP.to : ' (CDI)') + ' · CP: ' + cpP.cpTotal + 'j' + (cpP.revTotal ? ' + ' + cpP.revTotal + 'j révision' : '') : '');
+    html += '<th class="th-emp" data-col="emp-' + idx + '" onclick="openRenameEmpModal(\'' + b + '\',' + idx + ')" title="' + titleTip + '"><div class="th-inner">' + esc(label) + contractBadge + rh('emp-' + idx) + '</div></th>';
   });
   html += '<th class="th-renfort" data-col="renfort-0"><div class="th-inner">Renfort 1' + rh('renfort-0') + '</div></th>';
   html += '<th class="th-renfort" data-col="renfort-1"><div class="th-inner">Renfort 2' + rh('renfort-1') + '</div></th>';
@@ -2185,7 +2263,15 @@ function render() {
       const noteHtmlPM   = snPM   ? '<span class="status-note-sm">' + esc(snPM)   + '</span>' : '';
       const noteHtmlSoir = snSoir ? '<span class="status-note-sm">' + esc(snSoir) + '</span>' : '';
       const consecHtml = consec>=6 ? '<span style="font-size:7px;opacity:.8">'+consec+'j</span>' : '';
-      const cpHtml = s === 'conges' ? '<span style="font-size:7px;font-weight:700;opacity:.85">' + (CP_TOTAL - countCPUsed(b, emp, k)) + 'j</span>' : '';
+      const cpPeriod = getCPPeriod(emp, k);
+      const cpTot    = cpPeriod ? cpPeriod.cpTotal : CP_TOTAL;
+      let cpHtml = '';
+      if (s === 'conges') {
+        cpHtml = '<span style="font-size:7px;font-weight:700;opacity:.85">' + (cpTot - countCPUsed(b, emp, k)) + 'j</span>';
+      } else if (s === 'formation' && cpPeriod && cpPeriod.revTotal > 0) {
+        const revRem = cpPeriod.revTotal - countRevisionUsed(b, emp, k);
+        cpHtml = '<span style="font-size:7px;font-weight:700;opacity:.85;color:#7c3aed">' + revRem + 'r</span>';
+      }
       const sPM   = getStatusPM(b, k, emp);
       const sSoir = getStatusSoir(b, k, emp);
       const sClass  = STATUS_CLASSES[s]  || '';
