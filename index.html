@@ -136,16 +136,8 @@ tr.row-ferie .s-off { background: #fef08a !important; color: #a16207 !important;
 tr.row-today  td { background: #f0f8f7 !important; }
 tr.row-sunday td { background: #fffbf5; }
 tr.row-saturday td { background: #fffbf5; }
-/* Séparateur de semaine : moldura complète dim→sam */
-tr.row-sunday.day-first td { border-top: 2px solid #64748b !important; }
-/* Seulement les cellules avec rowspan (pas visite/pax qui créent une ligne au milieu) */
-tr.row-saturday.day-first .jour-cell,
-tr.row-saturday.day-first .date-cell,
-tr.row-saturday.day-first .rdv-cell,
-tr.row-saturday.day-first .emp-cell,
-tr.row-saturday.day-first .renfort-cell { border-bottom: 2px solid #64748b !important; }
-/* Dernière ligne de réservation du samedi */
-tr.week-end td { border-bottom: 2px solid #64748b !important; }
+/* Séparateur de semaine : 3px sur la 1re ligne du lundi (3px > 2px → gagne toujours en border-collapse) */
+tr.row-monday.day-first td { border-top: 3px solid #334155 !important; }
 tr.row-alert td { background: #fff5f5 !important; }
 .ferie-label { display: block; font-size: 10px; font-weight: 800; color: #a16207; text-transform: uppercase; letter-spacing: 0.04em; line-height: 1.2; margin-top: 2px; word-break: break-word; white-space: normal; }
 tr.row-ferme .ferie-label { color: #fde68a !important; }
@@ -162,6 +154,8 @@ tr.row-ferme .add-visite-btn   { color: #94a3b8 !important; }
 tr.row-ferme .visite-line      { color: #cbd5e1 !important; border-color: #475569 !important; }
 tr.row-ferme .status-cell      { background: #475569 !important; color: #64748b !important; border-color: #4b5563 !important; pointer-events: none; }
 tr.row-ferme .status-cell:hover{ transform: none !important; opacity: 1 !important; }
+body.is-admin tr.row-ferme .status-cell { pointer-events: auto !important; opacity: 0.85; }
+body.is-admin tr.row-ferme .status-cell:hover { transform: scale(1.05) !important; opacity: 1 !important; }
 tr.row-ferme.row-sunday .status-cell.s-repos { background: #ede9fe !important; color: #6d28d9 !important; border-color: #c4b5fd !important; }
 
 /* Bouton d'exception */
@@ -723,7 +717,8 @@ thead th { position: sticky; top: 0; z-index: 200; }
 <script>
 // ═══ CONSTANTS ════════════════════════════════
 const DAYS_FR   = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
-const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+const MONTHS_FR    = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+const MONTHS_SHORT = ['JAN','FÉV','MAR','AVR','MAI','JUIN','JUILLET','AOÛ','SEP','OCT','NOV','DÉC'];
 const STATUSES       = ['va','ad','csa','repos','conges','formation','maladie','off'];
 const STATUS_LABELS  = { va:'Veuve Ambal', ad:'André Delorme', csa:'CSA', repos:'Repos', conges:'Congés', formation:'École', maladie:'Maladie', jf:'Jour Férié', off:'Off' };
 const STATUS_ABBR    = { va:'VA', ad:'AD', csa:'CSA', repos:'REPOS', conges:'CP', formation:'ÉCOLE', maladie:'MAL', jf:'JF', off:'OFF' };
@@ -738,7 +733,7 @@ let state = {
   boutiques: {
     bulle: {
       name: 'Atelier de la Bulle', color: '#0e5c5c',
-      employees: ['Loic','Estelle','Agathe','Alice','Monique'],
+      employees: ['Loic','Estelle','Alice','Agathe','Monique'],
       schedule: {}, schedulePM: {}, bookings: {}, notes: {}, renforts: {}, statusNotes: {}
     },
     delorme: {
@@ -1936,6 +1931,7 @@ function render() {
       ferme  ? 'row-ferme'    : '',
       today  ? 'row-today'    : '',
       dow===0 ? 'row-sunday'  : '',
+      dow===1 ? 'row-monday'  : '',
       dow===6 ? 'row-saturday': '',
       alert  ? 'row-alert'   : ''
     ].filter(Boolean).join(' ');
@@ -1945,17 +1941,18 @@ function render() {
       ferme  ? 'row-ferme'    : '',
       today  ? 'row-today'    : '',
       dow===0 ? 'row-sunday'  : '',
+      dow===1 ? 'row-monday'  : '',
       dow===6 ? 'row-saturday': '',
       alert  ? 'row-alert'   : ''
     ].filter(Boolean).join(' ');
 
     // ── FIRST ROW ──
-    const weekEndCls = (dow === 6 && rows === 1) ? ' week-end' : '';
+    const weekEndCls = '';
     html += '<tr class="' + rowCls + weekEndCls + '" id="day-' + k + '">';
 
     // Jour (rowspan) + bouton exception (toutes boutiques)
     let jourContent = DAYS_FR[dow];
-    if (dow === 0) {
+    if (dow === 1) {
       const wn = getISOWeek(d);
       jourContent += '<span style="display:block;font-size:8px;font-weight:800;background:#cbd5e1;color:#334155;border-radius:3px;padding:0 3px;margin-top:1px;letter-spacing:.03em">S' + wn + '</span>';
     }
@@ -1971,7 +1968,7 @@ function render() {
     html += '<td class="jour-cell" rowspan="' + rows + '">' + jourContent + '</td>';
 
     // Date (rowspan)
-    html += '<td class="date-cell" rowspan="' + rows + '"><span class="date-num">' + d.getDate() + '</span><span class="date-month">' + MONTHS_FR[m].substring(0,3) + '</span>' + (ferie ? '<span class="ferie-label">' + esc(ferie) + '</span>' : '') + '</td>';
+    html += '<td class="date-cell" rowspan="' + rows + '"><span class="date-num">' + d.getDate() + '</span><span class="date-month">' + MONTHS_SHORT[m] + '</span>' + (ferie ? '<span class="ferie-label">' + esc(ferie) + '</span>' : '') + '</td>';
 
     // RDV/Notes (rowspan)
     html += '<td class="rdv-cell' + (note?' has-note':'') + '" data-col="rdv" rowspan="' + rows + '" onclick="openNoteModal(\'' + b + '\',\'' + k + '\')">';
@@ -1994,7 +1991,8 @@ function render() {
       const consec = consecutiveWorkDays(b, k, emp);
       const warnCls = consec >= 7 ? ' cell-warn-7' : (consec >= 6 ? ' cell-warn-6' : '');
       const warnTip = consec >= 7 ? ' ⚠ 7 jours consécutifs !' : (consec >= 6 ? ' ⚠ 6 jours : repos obligatoire demain' : '');
-      const canEdit  = !ferme && canEditEmployee(b, emp);
+      const isAdminUser = authUser && authUser.email.toLowerCase() === ADMIN_EMAIL;
+      const canEdit  = (isAdminUser || !ferme) && canEditEmployee(b, emp);
       const clickEvt = canEdit ? 'onclick="openStatusModal(\'' + b + '\',\'' + k + '\',\'' + emp.replace(/'/g,"\\'") + '\')"' : '';
       const lockedCls = canEdit ? '' : ' emp-cell-locked';
       const sn = getStatusNote(b, k, emp);
@@ -2054,7 +2052,7 @@ function render() {
     for (let gi = 1; gi < timeGroups.length; gi++) {
       const g = timeGroups[gi];
       const isLast = (gi === timeGroups.length - 1);
-      const weCls = (dow === 6 && isLast) ? ' week-end' : '';
+      const weCls = '';
       html += '<tr class="' + subCls + weCls + '">';
       html += renderGroupCell(g, b, k, isLast);
       html += '<td class="pax-cell' + (g.totalPax>=10?' pax-big':'') + '" data-col="pax">' + (g.totalPax||'') + '</td>';
