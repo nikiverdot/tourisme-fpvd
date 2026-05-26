@@ -762,8 +762,9 @@ let db          = null;
 let isFirebase  = false;
 let saveTimer   = null;
 let pendingSave = false;
-let authUser    = null;
-let currentUserRole = null; // 'admin' | 'manager' | 'employee' | 'viewer'
+let authUser         = null;
+let currentUserRole    = null; // 'admin' | 'manager' | 'employee' | 'viewer'
+let currentUserBoutique = null; // boutique du manager ('bulle' | 'delorme') chargée depuis ACL
 let currentUser = localStorage.getItem('piffaut-user') || '';
 let authTab     = 'login';
 
@@ -777,22 +778,31 @@ const ACL_PATH    = 'piffaut-acl';
 const PRES_PATH   = 'piffaut-presence';
 
 // ── Permissions ──────────────────────────────────────────────────────────────
+// Logique manager : boutiqueGérée + règles par boutique (Monique = admin uniquement)
+function _managerCanEdit(boutiqueGérée, b, empName) {
+  if (b !== boutiqueGérée) return false;                     // autre boutique → non
+  if (empName === 'Monique') return false;                   // Monique → admin seulement
+  if (boutiqueGérée === 'delorme') {
+    return empName === 'Julie'                               // Julie
+        || empName.toLowerCase().includes('cdd')            // CDD
+        || empName.toLowerCase().includes('renfort');        // Renfort
+  }
+  return true; // Bulle : tout sauf Monique (déjà exclu ci-dessus)
+}
+
 // Renvoie true si l'utilisateur connecté peut modifier la cellule d'un employé
 function canEditEmployee(b, empName) {
   if (!authUser) return false;
   if (currentUserRole === 'viewer') return false;            // viewer → lecture seule
   const email = authUser.email.toLowerCase();
-  if (email === ADMIN_EMAIL) return true;                    // admin → tout
-  if (email === MANAGER_BULLE) {
-    return b === 'bulle' && empName !== 'Monique';           // Bulle sauf Monique
-  }
-  if (email === MANAGER_DELORME) {
-    if (b !== 'delorme') return false;
-    return empName === 'Julie'                               // Julie
-        || empName.toLowerCase().includes('cdd')            // CDD
-        || empName.toLowerCase().includes('renfort');        // Renfort
-  }
-  // Autres utilisateurs : uniquement leur propre colonne
+  if (email === ADMIN_EMAIL) return true;                    // admin → tout, y compris Monique
+  // Managers hardcodés (compatibilité) + rôle ACL 'manager'
+  const mgBoutique = email === MANAGER_BULLE    ? 'bulle'
+                   : email === MANAGER_DELORME  ? 'delorme'
+                   : currentUserRole === 'manager' ? currentUserBoutique
+                   : null;
+  if (mgBoutique) return _managerCanEdit(mgBoutique, b, empName);
+  // Employé : uniquement sa propre colonne
   const myName = (authUser.displayName || '').trim().toLowerCase();
   return myName !== '' && empName.trim().toLowerCase() === myName;
 }
@@ -802,8 +812,11 @@ function canEditRenfort(b) {
   if (currentUserRole === 'viewer') return false;            // viewer → lecture seule
   const email = authUser.email.toLowerCase();
   if (email === ADMIN_EMAIL)     return true;
-  if (email === MANAGER_BULLE)   return b === 'bulle';
-  if (email === MANAGER_DELORME) return b === 'delorme';
+  const mgBoutique = email === MANAGER_BULLE    ? 'bulle'
+                   : email === MANAGER_DELORME  ? 'delorme'
+                   : currentUserRole === 'manager' ? currentUserBoutique
+                   : null;
+  if (mgBoutique) return b === mgBoutique;
   return false; // autres utilisateurs ne peuvent pas modifier les renforts
 }
 
@@ -3058,10 +3071,16 @@ function init() {
         // Appliquer la boutique par défaut et le rôle de cet utilisateur
         const aclData = snap.val();
         if (aclData?.defaultBoutique) state.currentBoutique = aclData.defaultBoutique;
-        currentUserRole = aclData?.role || 'employee';
+        // Rôle : en priorité depuis ACL ; sinon inféré depuis l'email (rétro-compat)
+        const emailLc = user.email.toLowerCase();
+        currentUserRole = aclData?.role
+          || (emailLc === MANAGER_BULLE || emailLc === MANAGER_DELORME ? 'manager' : 'employee');
+        currentUserBoutique = aclData?.defaultBoutique
+          || (emailLc === MANAGER_BULLE ? 'bulle' : emailLc === MANAGER_DELORME ? 'delorme' : null);
       } catch(e) { /* Si règles pas encore configurées, on laisse passer */ }
     } else {
-      currentUserRole = 'admin';
+      currentUserRole    = 'admin';
+      currentUserBoutique = null;
     }
 
     authUser = user;
