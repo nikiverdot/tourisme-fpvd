@@ -1680,6 +1680,7 @@ async function syncFareHarbor() {
 
 // ═══ FH MANUAL TAGS ══════════════════════════
 async function saveFHTag(bookingPk, via) {
+  if (currentUserRole === 'viewer') return toast('⛔ Accès lecture seule','#dc2626');
   if (!db || !bookingPk) return;
   bookingPk = parseInt(bookingPk);
   // Mise à jour mémoire immédiate (avant tout await)
@@ -1698,6 +1699,7 @@ async function saveFHTag(bookingPk, via) {
 }
 
 async function saveFHNote(bookingPk, note) {
+  if (currentUserRole === 'viewer') return toast('⛔ Accès lecture seule','#dc2626');
   if (!db || !bookingPk) return;
   bookingPk = parseInt(bookingPk);
   note = (note || '').trim();
@@ -1711,6 +1713,7 @@ async function saveFHNote(bookingPk, note) {
 }
 
 async function saveFHOverride(bookingPk, fields) {
+  if (currentUserRole === 'viewer') return toast('⛔ Accès lecture seule','#dc2626');
   if (!db || !bookingPk) return;
   bookingPk = parseInt(bookingPk);
   const cur = fhOverrides[bookingPk] || {};
@@ -2045,8 +2048,9 @@ function render() {
     html += '<td class="date-cell" rowspan="' + rows + '"><span class="date-num">' + d.getDate() + '</span><span class="date-month">' + MONTHS_SHORT[m] + '</span>' + (ferie ? '<span class="ferie-label">' + esc(ferie) + '</span>' : '') + '</td>';
 
     // RDV/Notes (rowspan)
-    html += '<td class="rdv-cell' + (note?' has-note':'') + '" data-col="rdv" rowspan="' + rows + '" onclick="openNoteModal(\'' + b + '\',\'' + k + '\')">';
-    html += note ? '<span class="rdv-text">' + esc(note) + '</span>' : '<span class="rdv-add">+ note</span>';
+    const canEditNote = currentUserRole !== 'viewer';
+    html += '<td class="rdv-cell' + (note?' has-note':'') + '" data-col="rdv" rowspan="' + rows + '"' + (canEditNote ? ' onclick="openNoteModal(\'' + b + '\',\'' + k + '\')"' : '') + '>';
+    html += note ? '<span class="rdv-text">' + esc(note) + '</span>' : (canEditNote ? '<span class="rdv-add">+ note</span>' : '');
     html += '</td>';
 
     // First visite (or empty + add btn)
@@ -2882,9 +2886,12 @@ function openFHDetail(k, idx) {
     ['🇺🇸', '🇺🇸 English (US)'],
   ];
 
+  const fhCanEdit = currentUserRole !== 'viewer'; // viewer → lecture seule dans le modal FH
+
   const tagSelect = (p) => {
     if (!p.bookingPk) return '';
     const cur = fhTags[p.bookingPk] !== undefined ? fhTags[p.bookingPk] : (p.via || '');
+    if (!fhCanEdit) return '<div class="form-group"><label class="form-label">Canal / Partenaire</label><div style="font-size:12px;padding:5px 0;color:#1e293b;font-weight:600">' + esc(VIA_LABELS[cur] || cur || '—') + '</div></div>';
     let opts = VIA_OPTIONS.map(v => '<option value="'+v+'"'+(cur===v?' selected':'')+'>'+VIA_LABELS[v]+'</option>').join('');
     return '<div class="form-group"><label class="form-label">Canal / Partenaire</label>'
       + '<div style="display:flex;gap:6px;align-items:center">'
@@ -2900,8 +2907,8 @@ function openFHDetail(k, idx) {
     const cur = ov.status !== undefined ? ov.status : (p.status || 'confirmed');
     const isRegler = cur === 'a_regler';
     return '<div class="form-group">'
-      + '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0">'
-      + '<input type="checkbox"' + (isRegler ? ' checked' : '') + ' onchange="saveFHOverride(' + p.bookingPk + ',{status:this.checked?\'a_regler\':\'confirmed\'})" style="width:16px;height:16px;cursor:pointer;accent-color:#dc2626">'
+      + '<label style="display:flex;align-items:center;gap:8px;' + (fhCanEdit ? 'cursor:pointer;' : '') + 'padding:4px 0">'
+      + '<input type="checkbox"' + (isRegler ? ' checked' : '') + (fhCanEdit ? ' onchange="saveFHOverride(' + p.bookingPk + ',{status:this.checked?\'a_regler\':\'confirmed\'})"' : ' disabled') + ' style="width:16px;height:16px;' + (fhCanEdit ? 'cursor:pointer;' : '') + 'accent-color:#dc2626">'
       + '<span style="font-size:12px;font-weight:600;color:' + (isRegler ? '#b91c1c' : '#64748b') + '">💳 Règlement sur place (À RÉGLER)</span>'
       + '</label></div>';
   };
@@ -2910,6 +2917,7 @@ function openFHDetail(k, idx) {
     if (!p.bookingPk) return '';
     const ov = fhOverrides[p.bookingPk] || {};
     const cur = ov.clientName !== undefined ? ov.clientName : (p.clientName || '');
+    if (!fhCanEdit) return cur ? '<div class="form-group"><label class="form-label">👤 Nom client</label><div style="font-size:12px;padding:5px 0;color:#1e293b">' + esc(cur) + '</div></div>' : '';
     return '<div class="form-group"><label class="form-label">👤 Nom client</label>'
       + '<div style="display:flex;gap:5px">'
       + '<input id="fh-name-'+p.bookingPk+'" type="text" value="'+esc(cur)+'" placeholder="Nom du client…" style="flex:1;font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:4px;color:#1e293b;font-family:inherit">'
@@ -2921,6 +2929,7 @@ function openFHDetail(k, idx) {
     if (!p.bookingPk || !isBulle) return '';
     const ov = fhOverrides[p.bookingPk] || {};
     const cur = ov.langFlag !== undefined ? ov.langFlag : (p.langFlag || '');
+    if (!fhCanEdit) return cur ? '<div class="form-group"><label class="form-label">🎧 Audioguide</label><div style="font-size:12px;padding:5px 0">' + esc(cur) + '</div></div>' : '';
     let opts = LANG_OPTIONS.map(([v,l]) => '<option value="'+v+'"'+(cur===v?' selected':'')+'>'+l+'</option>').join('');
     return '<div class="form-group"><label class="form-label">🎧 Audioguide</label>'
       + '<select onchange="saveFHOverride('+p.bookingPk+',{langFlag:this.value})" style="font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:4px;color:#1e293b;cursor:pointer;width:100%">'
@@ -2930,6 +2939,7 @@ function openFHDetail(k, idx) {
   const noteField = (p) => {
     if (!p.bookingPk) return '';
     const cur = fhNotes[p.bookingPk] || '';
+    if (!fhCanEdit) return cur ? '<div class="form-group"><label class="form-label">📝 Note interne</label><div style="font-size:12px;padding:5px 8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:4px;color:#92400e">' + esc(cur) + '</div></div>' : '';
     return '<div class="form-group"><label class="form-label">📝 Note interne</label>'
       + '<div style="display:flex;gap:5px;align-items:flex-start">'
       + '<textarea id="fh-note-'+p.bookingPk+'" rows="2" style="flex:1;font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:4px;resize:vertical;font-family:inherit;color:#1e293b" placeholder="Allergies, préférences, infos équipe…">'+esc(cur)+'</textarea>'
