@@ -1312,8 +1312,9 @@ const CP_CONFIG = {
   'Julie': [
     // Alternance : août 2025 → 31 août 2026 · 25 CP + 5 révision
     { from:'2025-08-01', to:'2026-08-31', cpTotal:25, revTotal:5, label:'Alternance' },
-    // CDI à partir du 1 sept 2026 · année CP standard juin-mai
-    { from:'2026-09-01', to:null, cpTotal:25, revTotal:0, label:'CDI', useYearBounds:true }
+    // CDI 1ère période : 1 sept 2026 → 31 mai 2027 · 25 CP (période incomplète, 9 mois)
+    { from:'2026-09-01', to:'2027-05-31', cpTotal:25, revTotal:0, label:'CDI' }
+    // À partir du 1 juin 2027 : cycles standard juin→mai (CP_TOTAL = 25, cpYearBounds)
   ]
 };
 
