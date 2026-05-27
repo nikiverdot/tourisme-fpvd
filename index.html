@@ -241,6 +241,20 @@ td.visite-cell { padding: 3px 8px; vertical-align: middle !important; }
 .add-visite-btn { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; color: #4a9e9e; cursor: pointer; padding: 2px 6px; border-radius: 4px; margin-top: 1px; }
 .add-visite-btn:hover { background: #f0f8f7; }
 
+/* CHECK-IN badges */
+.visite-line.ck-arrived { background:#f0fdf4; border-left:3px solid #16a34a; padding-left:5px; border-radius:3px; }
+.visite-line.ck-noshow  { background:#fef2f2; border-left:3px solid #dc2626; padding-left:5px; border-radius:3px; opacity:.8; }
+.ck-btn {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:15px; height:15px; border-radius:50%; cursor:pointer;
+  border:1.5px solid #cbd5e1; background:white; font-size:9px;
+  margin-left:5px; vertical-align:middle; flex-shrink:0;
+  transition: background .15s, border-color .15s;
+}
+.ck-btn:hover { border-color:#64748b; }
+.ck-btn.ck-arrived { background:#16a34a; border-color:#16a34a; color:white; }
+.ck-btn.ck-noshow  { background:#dc2626; border-color:#dc2626; color:white; }
+
 /* PAX cell */
 td.pax-cell {
   text-align: center; padding: 4px 4px; vertical-align: middle !important;
@@ -816,6 +830,7 @@ let fhChannelMap = {};   // bookingPk → via code (from FH API)
 let fhTags       = {};   // bookingPk → via code (manuel, persisté Firebase)
 let fhNotes      = {};   // bookingPk → note interne (persisté Firebase)
 let fhOverrides  = {};   // bookingPk → {clientName, langFlag} (persisté Firebase)
+let checkinData  = {};   // { boutique: { dateKey: { timeKey: 'arrived'|'noshow' } } }
 let modalCtx     = null;
 let firstDataLoad = true;
 let db          = null;
@@ -997,6 +1012,12 @@ function initFirebaseData() {
     }
     setSyncBadge('online', '● En ligne');
   }, () => setSyncBadge('error','Erreur sync'));
+
+  // Check-in temps réel
+  db.ref('piffaut-checkin').on('value', snap => {
+    checkinData = snap.val() || {};
+    render();
+  });
 
   // Connexion temps réel Firebase
   db.ref('.info/connected').on('value', snap => {
@@ -2534,6 +2555,28 @@ function buildVisiteLabel(bk, showTime = true) {
   return showTime ? '<strong>' + timePart + '</strong> : ' + body : body;
 }
 
+// ── Check-in helpers ──────────────────────────────────────────────────────────
+function safeFirebaseKey(s) {
+  return (s||'').replace(/[.#$[\]/]/g,'_').replace(/\s+/g,'_').slice(0,100);
+}
+function getCheckin(boutique, dateKey, timeKey) {
+  return (checkinData[boutique] && checkinData[boutique][dateKey] && checkinData[boutique][dateKey][timeKey]) || null;
+}
+function toggleCheckin(boutique, dateKey, timeKey) {
+  if (currentUserRole === 'viewer') return;
+  if (!db) return;
+  const current = getCheckin(boutique, dateKey, timeKey);
+  const next = current === null ? 'arrived' : (current === 'arrived' ? 'noshow' : null);
+  if (!checkinData[boutique]) checkinData[boutique] = {};
+  if (!checkinData[boutique][dateKey]) checkinData[boutique][dateKey] = {};
+  if (next === null) delete checkinData[boutique][dateKey][timeKey];
+  else checkinData[boutique][dateKey][timeKey] = next;
+  const path = 'piffaut-checkin/' + boutique + '/' + dateKey + '/' + timeKey;
+  if (next === null) db.ref(path).remove();
+  else db.ref(path).set(next);
+  render();
+}
+
 // ── Contenu HTML d'un groupe horaire (sans l'enveloppe <td>) ──
 function buildGroupCellContent(group, b, k, isLast) {
   const _canAdd = currentUserRole !== 'viewer';
@@ -2549,8 +2592,15 @@ function buildGroupCellContent(group, b, k, isLast) {
     const onclick = isFH
       ? 'openFHDetail(\'' + k + '\',\'' + fhTime + '\',\'' + fhAct + '\')'
       : (_canAdd ? 'openBookingModal(\'' + b + '\',\'' + k + '\',' + manualIdx + ')' : '');
-    return '<div class="visite-line"' + (onclick ? ' onclick="event.stopPropagation();' + onclick + '" style="cursor:pointer"' : '') + '>'
-      + buildVisiteLabel(bk) + '</div>'
+    const ckKey   = safeFirebaseKey((bk.time||'') + '_' + (isFH ? (bk.activity||'fh') + '_' + manualIdx : 'm' + manualIdx));
+    const ckState = getCheckin(b, k, ckKey);
+    const ckCls   = ckState ? ' ck-' + ckState : '';
+    const ckIcon  = ckState === 'arrived' ? '✓' : (ckState === 'noshow' ? '✗' : '');
+    const ckBtn   = currentUserRole !== 'viewer'
+      ? '<span class="ck-btn' + (ckState ? ' ck-' + ckState : '') + '" onclick="event.stopPropagation();toggleCheckin(\'' + b + '\',\'' + k + '\',\'' + ckKey + '\')" title="Arrivé → No-show → Effacer">' + ckIcon + '</span>'
+      : (ckState ? '<span class="ck-btn ck-' + ckState + '">' + ckIcon + '</span>' : '');
+    return '<div class="visite-line' + ckCls + '"' + (onclick ? ' onclick="event.stopPropagation();' + onclick + '" style="cursor:pointer"' : '') + '>'
+      + buildVisiteLabel(bk) + ckBtn + '</div>'
       + addBtn;
   }
   // Plusieurs réservations au même horaire → une seule ligne inline : "time : p1 + p2 + p3"
@@ -2564,8 +2614,14 @@ function buildGroupCellContent(group, b, k, isLast) {
     const onclick = isFH
       ? 'openFHDetail(\'' + k + '\',\'' + fhTime2 + '\',\'' + fhAct2 + '\')'
       : (_canAdd ? 'openBookingModal(\'' + b + '\',\'' + k + '\',' + manualIdx + ')' : '');
+    const ckKey2   = safeFirebaseKey((bk.time||'') + '_' + (isFH ? (bk.activity||'fh') + '_' + globalIdx : 'm' + globalIdx));
+    const ckState2 = getCheckin(b, k, ckKey2);
+    const ckIcon2  = ckState2 === 'arrived' ? '✓' : (ckState2 === 'noshow' ? '✗' : '');
+    const ckBtn2   = currentUserRole !== 'viewer'
+      ? '<span class="ck-btn' + (ckState2 ? ' ck-' + ckState2 : '') + '" onclick="event.stopPropagation();toggleCheckin(\'' + b + '\',\'' + k + '\',\'' + ckKey2 + '\')" title="Arrivé → No-show → Effacer">' + ckIcon2 + '</span>'
+      : (ckState2 ? '<span class="ck-btn ck-' + ckState2 + '">' + ckIcon2 + '</span>' : '');
     return '<span ' + (onclick ? 'onclick="event.stopPropagation();' + onclick + '" style="cursor:pointer;white-space:nowrap"' : 'style="white-space:nowrap"') + '>'
-      + buildVisiteBody(bk) + '</span>';
+      + buildVisiteBody(bk) + ckBtn2 + '</span>';
   }).join(' <span style="color:#94a3b8;font-weight:700;padding:0 1px"> + </span> ');
   return '<div class="visite-line"><strong>' + timePart + '</strong> : ' + partsHtml + '</div>'
     + addBtn;
