@@ -243,12 +243,18 @@ td.visite-cell { padding: 3px 8px; vertical-align: middle !important; }
 
 /* CHECK-IN badges */
 .visite-line.ck-arrived { background:#f0fdf4; border-left:3px solid #16a34a; padding-left:5px; border-radius:3px; }
-.visite-line.ck-noshow  { background:#fef2f2; border-left:3px solid #dc2626; padding-left:5px; border-radius:3px; opacity:.8; }
+.visite-line.ck-noshow  { background:#fef2f2; border-left:3px solid #dc2626; padding-left:5px; border-radius:3px; text-decoration:line-through; color:#dc2626 !important; }
+.visite-line.ck-noshow strong { color:#dc2626 !important; }
+/* multi-item per-part wrapper */
+.visite-item { display:inline; white-space:nowrap; }
+.visite-item.ck-arrived { color:#15803d; font-weight:600; }
+.visite-item.ck-noshow  { color:#dc2626; text-decoration:line-through; opacity:.85; }
 .ck-btn {
   display:inline-flex; align-items:center; justify-content:center;
   width:15px; height:15px; border-radius:50%; cursor:pointer;
   border:1.5px solid #cbd5e1; background:white; font-size:9px;
-  margin-left:5px; vertical-align:middle; flex-shrink:0;
+  margin-left:4px; vertical-align:middle; flex-shrink:0;
+  text-decoration:none !important;
   transition: background .15s, border-color .15s;
 }
 .ck-btn:hover { border-color:#64748b; }
@@ -2620,8 +2626,14 @@ function buildGroupCellContent(group, b, k, isLast) {
     const ckBtn2   = currentUserRole !== 'viewer'
       ? '<span class="ck-btn' + (ckState2 ? ' ck-' + ckState2 : '') + '" onclick="event.stopPropagation();toggleCheckin(\'' + b + '\',\'' + k + '\',\'' + ckKey2 + '\')" title="Arrivé → No-show → Effacer">' + ckIcon2 + '</span>'
       : (ckState2 ? '<span class="ck-btn ck-' + ckState2 + '">' + ckIcon2 + '</span>' : '');
-    return '<span ' + (onclick ? 'onclick="event.stopPropagation();' + onclick + '" style="cursor:pointer;white-space:nowrap"' : 'style="white-space:nowrap"') + '>'
-      + buildVisiteBody(bk) + ckBtn2 + '</span>';
+    // ck-btn é IRMÃO do span clicável (não filho) → sempre visível independente do conteúdo HTML
+    const itemCls = ckState2 ? ' ck-' + ckState2 : '';
+    return '<span class="visite-item' + itemCls + '">'
+      + '<span ' + (onclick ? 'onclick="event.stopPropagation();' + onclick + '" style="cursor:pointer"' : '') + '>'
+      + buildVisiteBody(bk)
+      + '</span>'
+      + ckBtn2
+      + '</span>';
   }).join(' <span style="color:#94a3b8;font-weight:700;padding:0 1px"> + </span> ');
   return '<div class="visite-line"><strong>' + timePart + '</strong> : ' + partsHtml + '</div>'
     + addBtn;
