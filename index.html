@@ -732,6 +732,7 @@ tr.row-ferme    td.jour-cell,tr.row-ferme    td.date-cell,tr.row-ferme    td.rdv
   <button id="btn-export" class="btn btn-export" onclick="exportData()" style="display:none">⬇ Exporter</button>
   <label  id="btn-import-json" class="btn btn-import" style="display:none">⬆ Importer<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
   <button id="btn-csv-import" class="btn btn-import" onclick="openImportCSVModal()" style="display:none;background:#f0fdf4;color:#15803d;border-color:#86efac">📋 Import CSV 2026</button>
+  <button id="btn-stats" class="btn" onclick="openStatsModal()" style="display:none;background:#f5f3ff;color:#6d28d9;border-color:#c4b5fd">📊 Statistiques</button>
   <div class="col-panel-wrap" style="margin-left:auto">
     <button class="btn" style="background:#f8fafc;border-color:#e2e8f0;color:#475569" onclick="toggleColPanel(event)">⊞ Colonnes</button>
     <div id="col-panel" class="col-panel" style="display:none"></div>
@@ -1288,7 +1289,7 @@ function updateUserChip(user) {
   const isViewer = currentUserRole === 'viewer';
   document.body.classList.toggle('is-admin',  isAdminU);
   document.body.classList.toggle('is-viewer', isViewer);
-  ['btn-admin','btn-export','btn-import-json','btn-csv-import','btn-csv-fh','btn-fh-settings','ics-status'].forEach(id => {
+  ['btn-admin','btn-export','btn-import-json','btn-csv-import','btn-csv-fh','btn-fh-settings','ics-status','btn-stats'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = isAdminU ? '' : 'none';
   });
@@ -3592,6 +3593,110 @@ function init() {
   });
 }
 init();
+
+// ═══ STATISTIQUES PAX PAR PARTENAIRE ══════════════════════════════════════
+function openStatsModal() {
+  if (!authUser || !isAdmin(authUser.email)) return;
+  const b    = state.currentBoutique;
+  const year = state.currentYear;
+  const boutName = b === 'bulle' ? '🫧 Atelier de la Bulle' : '🍾 André Delorme';
+
+  // Agrégation : partenaire → [pax jan..déc]
+  const stats = {};
+  const addPax = (partner, month, pax) => {
+    const p = partner || '—';
+    if (!stats[p]) stats[p] = new Array(12).fill(0);
+    stats[p][month] += (pax || 0);
+  };
+
+  let d = new Date(year, 0, 1);
+  const endDate = new Date(year + 1, 0, 1);
+  while (d < endDate) {
+    const k = toKey(d);
+    const month = d.getMonth();
+
+    // Réservations FH (données brutes)
+    (fhBookings[k] || []).filter(ev => ev.boutique === b).forEach(ev => {
+      addPax(ev.via || 'FH', month, ev.pax);
+    });
+
+    // Réservations manuelles
+    getManualBookings(b, k).forEach(bk => {
+      addPax(bk.via || 'Direct', month, bk.pax);
+    });
+
+    d = addDays(d, 1);
+  }
+
+  const partners = Object.keys(stats).filter(p => stats[p].reduce((a,v)=>a+v,0) > 0)
+    .sort((a,z) => stats[z].reduce((s,v)=>s+v,0) - stats[a].reduce((s,v)=>s+v,0)); // tri par total desc
+
+  const MOIS = ['Jan','Fév','Mar','Avr','Mai','Jui','Jul','Aoû','Sep','Oct','Nov','Déc'];
+  const monthTotals = new Array(12).fill(0);
+  partners.forEach(p => stats[p].forEach((v,m) => { monthTotals[m] += v; }));
+  const grandTotal = monthTotals.reduce((a,v) => a+v, 0);
+
+  const thStyle  = 'padding:5px 8px;background:#f1f5f9;font-size:11px;font-weight:700;text-align:center;white-space:nowrap;border:1px solid #e2e8f0;color:#475569;letter-spacing:.04em';
+  const thLeft   = thStyle + ';text-align:left';
+  const tdStyle  = 'padding:4px 8px;font-size:12px;text-align:right;border:1px solid #e2e8f0;';
+  const tdName   = tdStyle + 'text-align:left;font-weight:600;white-space:nowrap;';
+  const tdTotal  = tdStyle + 'font-weight:800;color:#0e5c5c;background:#f0f8f7;';
+  const tdZero   = tdStyle + 'color:#cbd5e1;';
+  const trTot    = 'background:#0e5c5c;color:#fff;font-weight:800;';
+
+  let html = '<div style="overflow-x:auto;margin:-4px -2px"><table style="border-collapse:collapse;width:100%;min-width:560px">';
+
+  // En-tête
+  html += '<thead><tr>';
+  html += '<th style="' + thLeft + ';min-width:90px">Partenaire</th>';
+  MOIS.forEach(m => html += '<th style="' + thStyle + '">' + m + '</th>');
+  html += '<th style="' + thStyle + ';background:#f0f8f7;color:#0e5c5c">Total</th>';
+  html += '</tr></thead><tbody>';
+
+  // Lignes par partenaire
+  partners.forEach((p, pi) => {
+    const rowTotal = stats[p].reduce((a,v) => a+v, 0);
+    const bg = pi % 2 === 1 ? 'background:#fafafa;' : '';
+    html += '<tr style="' + bg + '">';
+    html += '<td style="' + tdName + bg + '">' + esc(p) + '</td>';
+    stats[p].forEach(v => {
+      html += v > 0
+        ? '<td style="' + tdStyle + bg + '">' + v + '</td>'
+        : '<td style="' + tdZero + bg + '">—</td>';
+    });
+    html += '<td style="' + tdTotal + '">' + rowTotal + '</td>';
+    html += '</tr>';
+  });
+
+  // Ligne totaux
+  html += '<tr style="' + trTot + '">';
+  html += '<td style="padding:5px 8px;font-size:12px;letter-spacing:.04em">TOTAL PAX</td>';
+  monthTotals.forEach(v => {
+    html += '<td style="padding:5px 8px;font-size:12px;text-align:right">' + (v || '—') + '</td>';
+  });
+  html += '<td style="padding:5px 8px;font-size:13px;text-align:right">' + grandTotal + '</td>';
+  html += '</tr></tbody></table></div>';
+
+  if (!grandTotal) html = '<p style="color:#94a3b8;font-size:13px;padding:12px 0">Aucune donnée pour ' + year + '.</p>';
+
+  // Modal plus large
+  const modalEl = document.querySelector('.modal');
+  if (modalEl) { modalEl.style.width = '860px'; modalEl.style.maxWidth = '96vw'; }
+
+  modalCtx = { type: 'stats' };
+  document.getElementById('modal-title').textContent = '📊 Statistiques PAX — ' + boutName + ' — ' + year;
+  document.getElementById('modal-body').innerHTML = html;
+  document.getElementById('modal-actions').innerHTML = '<button class="btn-mp" onclick="closeModal()">Fermer</button>';
+  openModal();
+}
+
+// Remettre la largeur normale à la fermeture
+const _origCloseModal = closeModal;
+closeModal = function() {
+  const modalEl = document.querySelector('.modal');
+  if (modalEl) { modalEl.style.width = ''; modalEl.style.maxWidth = ''; }
+  _origCloseModal();
+};
 
 // ══════════════════════════════════════════════════════
 // ═══ IMPORT CSV 2026 ═══════════════════════════════
