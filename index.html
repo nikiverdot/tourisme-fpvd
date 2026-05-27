@@ -2486,7 +2486,7 @@ function buildVisiteBody(bk) {
       if (status === 'a_regler' || p.via === 'RDV') parts.push(regler);
       return parts.join(' ');
     }).join(' <span style="color:#64748b;font-weight:900"> + </span>');
-    return partStr; // activité masquée partout — on affiche pax + nom + langue + via
+    return isBulle ? partStr : esc(bk.activity || 'Dégustation') + ' — ' + partStr;
   } else {
     // Réservation manuelle
     const desc     = esc(bk.description || '');
@@ -2496,13 +2496,25 @@ function buildVisiteBody(bk) {
     const via      = bk.via || '';
     let langPart = [bk.langCode, bk.langFlag].filter(Boolean).join(' ');
     if (bk.langCode === 'GUIDÉE') langPart = '👤 GUIDÉE' + (bk.guide ? ' (' + esc(bk.guide).toUpperCase() + ')' : '') + (bk.guideLanguage ? ' ' + bk.guideLanguage : '');
-    // Format unifié : pax + langue + nom client + via (activité masquée partout)
-    const body = (paxPart ? paxPart : '')
-      + (langPart ? ' <span style="color:#64748b">' + langPart + '</span>' : '')
-      + (desc     ? (paxPart || langPart ? ' ' : '') + desc : '')
-      + (via      ? ' ' + viaLabel(via) : '')
-      + priceTag
-      + (comm     ? ' <span style="color:#94a3b8;font-size:12px"> · ' + comm + '</span>' : '');
+    let body;
+    if (bk.activity && !isBulle) {
+      // Delorme : afficher le nom de la prestation
+      body = esc(bk.activity)
+        + (langPart ? ' <span style="color:#64748b">' + langPart + '</span>' : '')
+        + (paxPart  ? ' — ' + paxPart : '')
+        + (desc     ? ' ' + desc : '')
+        + (via      ? ' ' + viaLabel(via) : '')
+        + priceTag
+        + (comm     ? ' <span style="color:#94a3b8;font-size:12px"> · ' + comm + '</span>' : '');
+    } else {
+      // Bulle (ou sans prestation) : format court — pax + langue + description + via
+      body = (paxPart ? paxPart : '')
+        + (langPart ? ' <span style="color:#64748b">' + langPart + '</span>' : '')
+        + (desc     ? (paxPart || langPart ? ' ' : '') + desc : '')
+        + (via      ? ' ' + viaLabel(via) : '')
+        + priceTag
+        + (comm     ? ' <span style="color:#94a3b8;font-size:12px"> · ' + comm + '</span>' : '');
+    }
     if (bk.status==='option')   body += ' <span class="visite-badge badge-option">(OPTION)</span>';
     if (bk.status==='a_regler') body += ' ' + regler;
     return body;
