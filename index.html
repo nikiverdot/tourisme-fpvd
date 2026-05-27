@@ -1289,10 +1289,13 @@ function updateUserChip(user) {
   const isViewer = currentUserRole === 'viewer';
   document.body.classList.toggle('is-admin',  isAdminU);
   document.body.classList.toggle('is-viewer', isViewer);
-  ['btn-admin','btn-export','btn-import-json','btn-csv-import','btn-csv-fh','btn-fh-settings','ics-status','btn-stats'].forEach(id => {
+  ['btn-admin','btn-export','btn-import-json','btn-csv-import','btn-csv-fh','btn-fh-settings','ics-status'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = isAdminU ? '' : 'none';
   });
+  // Statistiques : visible pour admins et managers
+  const statsBtn = document.getElementById('btn-stats');
+  if (statsBtn) statsBtn.style.display = (isAdminU || currentUserRole === 'manager') ? '' : 'none';
   // Badge "lecture seule" visible dans le header
   let vb = document.getElementById('viewer-badge');
   if (isViewer) {
@@ -3596,7 +3599,7 @@ init();
 
 // ═══ STATISTIQUES PAX PAR PARTENAIRE ══════════════════════════════════════
 function openStatsModal() {
-  if (!authUser || !isAdmin(authUser.email)) return;
+  if (!authUser || (currentUserRole !== 'admin' && currentUserRole !== 'manager')) return;
   const b    = state.currentBoutique;
   const year = state.currentYear;
   const boutName = b === 'bulle' ? '🫧 Atelier de la Bulle' : '🍾 André Delorme';
