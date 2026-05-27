@@ -2789,7 +2789,7 @@ function updateMobileTodayCard() {
     visitsEl.innerHTML = '<div class="mtc-empty">Pas de visite programmée</div>';
   } else {
     visitsEl.innerHTML = bks.slice(0, 4).map(bk => {
-      const via = bk.via ? ' · ' + (VIA_DISPLAY?.[bk.via] || bk.via) : (bk.source === 'fareharbor' ? ' · FH' : '');
+      const via = bk.via ? ' · ' + bk.via : (bk.source === 'fareharbor' ? ' · FH' : '');
       return '<div class="mtc-visit-row">'
         + '<span class="mtc-visit-time">' + (bk.time || '—') + '</span>'
         + '<span class="mtc-visit-body">' + (bk.pax ? bk.pax + 'pax ' : '') + esc(bk.clientName || bk.description || bk.activity || '') + via + '</span>'
