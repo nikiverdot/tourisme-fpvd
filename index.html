@@ -832,7 +832,7 @@ const ADMIN_EMAIL       = 'mfverdot@gmail.com';  // admin principal
 // Tous les comptes de Monique (présence invisible + seule à modifier sa colonne)
 const MONIQUE_EMAILS    = ['mfverdot@gmail.com', 'verdotmf@gmail.com', 'monique.verdot@fpvd.fr', 'verdotmonique@gmail.com'];
 // Comptes admin qui court-circuitent l'ACL (verdotmonique passe par l'ACL Firebase)
-const ADMIN_EMAILS      = ['mfverdot@gmail.com', 'verdotmf@gmail.com', 'monique.verdot@fpvd.fr'];
+const ADMIN_EMAILS      = ['mfverdot@gmail.com', 'verdotmf@gmail.com'];
 const isAdmin   = (email) => ADMIN_EMAILS.includes((email||'').toLowerCase());
 const isMonique = (email) => MONIQUE_EMAILS.includes((email||'').toLowerCase());
 // Clé publique VAPID — remplacer par la vraie clé après génération
