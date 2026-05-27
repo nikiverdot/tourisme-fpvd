@@ -2486,7 +2486,7 @@ function buildVisiteBody(bk) {
       if (status === 'a_regler' || p.via === 'RDV') parts.push(regler);
       return parts.join(' ');
     }).join(' <span style="color:#64748b;font-weight:900"> + </span>');
-    return isBulle ? partStr : esc(bk.activity || 'Dégustation') + ' — ' + partStr;
+    return partStr; // activité masquée partout — on affiche pax + nom + langue + via
   } else {
     // Réservation manuelle
     const desc     = esc(bk.description || '');
@@ -2496,25 +2496,13 @@ function buildVisiteBody(bk) {
     const via      = bk.via || '';
     let langPart = [bk.langCode, bk.langFlag].filter(Boolean).join(' ');
     if (bk.langCode === 'GUIDÉE') langPart = '👤 GUIDÉE' + (bk.guide ? ' (' + esc(bk.guide).toUpperCase() + ')' : '') + (bk.guideLanguage ? ' ' + bk.guideLanguage : '');
-    let body;
-    if (bk.activity && !isBulle) {
-      // Delorme : afficher le nom de la prestation
-      body = esc(bk.activity)
-        + (langPart ? ' <span style="color:#64748b">' + langPart + '</span>' : '')
-        + (paxPart  ? ' — ' + paxPart : '')
-        + (desc     ? ' ' + desc : '')
-        + (via      ? ' ' + viaLabel(via) : '')
-        + priceTag
-        + (comm     ? ' <span style="color:#94a3b8;font-size:12px"> · ' + comm + '</span>' : '');
-    } else {
-      // Bulle (ou sans prestation) : format court — pax + langue + description + via
-      body = (paxPart ? paxPart : '')
-        + (langPart ? ' <span style="color:#64748b">' + langPart + '</span>' : '')
-        + (desc     ? (paxPart || langPart ? ' ' : '') + desc : '')
-        + (via      ? ' ' + viaLabel(via) : '')
-        + priceTag
-        + (comm     ? ' <span style="color:#94a3b8;font-size:12px"> · ' + comm + '</span>' : '');
-    }
+    // Format unifié : pax + langue + nom client + via (activité masquée partout)
+    const body = (paxPart ? paxPart : '')
+      + (langPart ? ' <span style="color:#64748b">' + langPart + '</span>' : '')
+      + (desc     ? (paxPart || langPart ? ' ' : '') + desc : '')
+      + (via      ? ' ' + viaLabel(via) : '')
+      + priceTag
+      + (comm     ? ' <span style="color:#94a3b8;font-size:12px"> · ' + comm + '</span>' : '');
     if (bk.status==='option')   body += ' <span class="visite-badge badge-option">(OPTION)</span>';
     if (bk.status==='a_regler') body += ' ' + regler;
     return body;
@@ -2789,10 +2777,31 @@ function updateMobileTodayCard() {
     visitsEl.innerHTML = '<div class="mtc-empty">Pas de visite programmée</div>';
   } else {
     visitsEl.innerHTML = bks.slice(0, 4).map(bk => {
-      const via = bk.via ? ' · ' + bk.via : (bk.source === 'fareharbor' ? ' · FH' : '');
+      let body;
+      if (bk.source === 'fareharbor') {
+        // FH : pax + langue + nom client + via
+        const parts = (bk.participants && bk.participants.length) ? bk.participants : [bk];
+        body = parts.map(p => {
+          const arr = [];
+          if (p.pax)       arr.push(p.pax + 'pax');
+          if (p.langFlag)  arr.push(p.langFlag);
+          if (p.clientName) arr.push(esc(p.clientName));
+          arr.push('(' + (p.via || 'FH') + ')');
+          return arr.join(' ');
+        }).join(' + ');
+      } else {
+        // Manuel : pax + langue + groupe/client + via
+        const arr = [];
+        if (bk.pax) arr.push(bk.pax + 'pax');
+        const lang = [bk.langCode, bk.langFlag].filter(Boolean).join(' ');
+        if (lang) arr.push(lang);
+        if (bk.description) arr.push(esc(bk.description));
+        if (bk.via) arr.push('(' + bk.via + ')');
+        body = arr.join(' ');
+      }
       return '<div class="mtc-visit-row">'
         + '<span class="mtc-visit-time">' + (bk.time || '—') + '</span>'
-        + '<span class="mtc-visit-body">' + (bk.pax ? bk.pax + 'pax ' : '') + esc(bk.clientName || bk.description || bk.activity || '') + via + '</span>'
+        + '<span class="mtc-visit-body">' + body + '</span>'
         + '</div>';
     }).join('') + (bks.length > 4 ? '<div class="mtc-empty">+ ' + (bks.length - 4) + ' autres…</div>' : '');
   }
