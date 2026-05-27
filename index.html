@@ -2464,11 +2464,13 @@ function updateStickyLeftOffsets() {
   r.style.setProperty('--freeze-visite', left + 'px');
 }
 
+// Abréviations des partenaires → noms complets
+const VIA_DISPLAY = { 'GE': 'Grape Escapes' };
+
 // ── Corps d'une réservation sans le préfixe horaire ──
 function buildVisiteBody(bk) {
   const isFH = bk.source === 'fareharbor';
   const isBulle = state.currentBoutique === 'bulle';
-  const VIA_DISPLAY = { 'GE':'Grape Escapes' };
   const viaLabel = v => '<span style="font-size:13px;font-weight:900;color:#0000ff">('+esc(VIA_DISPLAY[v]||v)+')</span>';
   const regler = '<span style="font-size:10px;font-weight:800;color:#b91c1c;background:#fef2f2;padding:1px 5px;border-radius:3px;border:1px solid #fca5a5">(À RÉGLER)</span>';
 
@@ -3661,7 +3663,7 @@ function openStatsModal() {
     const rowTotal = stats[p].reduce((a,v) => a+v, 0);
     const bg = pi % 2 === 1 ? 'background:#fafafa;' : '';
     html += '<tr style="' + bg + '">';
-    html += '<td style="' + tdName + bg + '">' + esc(p) + '</td>';
+    html += '<td style="' + tdName + bg + '">' + esc(VIA_DISPLAY[p] || p) + '</td>';
     stats[p].forEach(v => {
       html += v > 0
         ? '<td style="' + tdStyle + bg + '">' + v + '</td>'
