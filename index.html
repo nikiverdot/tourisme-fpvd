@@ -752,7 +752,8 @@ tr.row-ferme    td.jour-cell,tr.row-ferme    td.date-cell,tr.row-ferme    td.rdv
   <button id="btn-export" class="btn btn-export" onclick="exportData()" style="display:none">⬇ Exporter</button>
   <label  id="btn-import-json" class="btn btn-import" style="display:none">⬆ Importer<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
   <button id="btn-csv-import" class="btn btn-import" onclick="openImportCSVModal()" style="display:none;background:#f0fdf4;color:#15803d;border-color:#86efac">📋 Import CSV 2026</button>
-  <button id="btn-stats" class="btn" onclick="openStatsModal()" style="display:none;background:#f5f3ff;color:#6d28d9;border-color:#c4b5fd">📊 Statistiques</button>
+  <button id="btn-stats"   class="btn" onclick="openStatsModal()"  style="display:none;background:#f5f3ff;color:#6d28d9;border-color:#c4b5fd">📊 Statistiques</button>
+  <button id="btn-search" class="btn" onclick="openSearchModal()" style="display:none;background:#fff7ed;color:#c2410c;border-color:#fed7aa">🔍 Rechercher</button>
   <div class="col-panel-wrap" style="margin-left:auto">
     <button class="btn" style="background:#f8fafc;border-color:#e2e8f0;color:#475569" onclick="toggleColPanel(event)">⊞ Colonnes</button>
     <div id="col-panel" class="col-panel" style="display:none"></div>
@@ -1316,9 +1317,12 @@ function updateUserChip(user) {
     const el = document.getElementById(id);
     if (el) el.style.display = isAdminU ? '' : 'none';
   });
-  // Statistiques : visible pour admins et managers
-  const statsBtn = document.getElementById('btn-stats');
-  if (statsBtn) statsBtn.style.display = (isAdminU || currentUserRole === 'manager') ? '' : 'none';
+  // Statistiques + Recherche : visible pour admins et managers
+  const statsBtn   = document.getElementById('btn-stats');
+  const searchBtn  = document.getElementById('btn-search');
+  const showMgr = isAdminU || currentUserRole === 'manager';
+  if (statsBtn)  statsBtn.style.display  = showMgr ? '' : 'none';
+  if (searchBtn) searchBtn.style.display = showMgr ? '' : 'none';
   // Badge "lecture seule" visible dans le header
   let vb = document.getElementById('viewer-badge');
   if (isViewer) {
@@ -2883,6 +2887,16 @@ function switchBoutique(b) {
 }
 function prevYear() { state.currentYear--; render(); }
 function nextYear() { state.currentYear++; render(); }
+function scrollToDate(k) {
+  const el = document.getElementById('day-' + k);
+  if (!el) return;
+  const wrap = document.querySelector('.table-wrap');
+  if (!wrap) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+  const elTop  = el.getBoundingClientRect().top;
+  const wrapTop = wrap.getBoundingClientRect().top;
+  wrap.scrollBy({ top: elTop - wrapTop - 8, behavior: 'smooth' });
+}
+
 function scrollToToday() {
   const el = document.getElementById('day-' + toKey(new Date()));
   if (!el) return;
@@ -3840,6 +3854,103 @@ function openStatsModal() {
   document.getElementById('modal-body').innerHTML = html;
   document.getElementById('modal-actions').innerHTML = '<button class="btn-mp" onclick="closeModal()">Fermer</button>';
   openModal();
+}
+
+function openSearchModal() {
+  const modalEl = document.querySelector('.modal');
+  if (modalEl) { modalEl.style.width = '900px'; modalEl.style.maxWidth = '96vw'; }
+  modalCtx = { type: 'search' };
+  document.getElementById('modal-title').textContent = '🔍 Rechercher des réservations';
+  document.getElementById('modal-body').innerHTML =
+    '<div style="margin-bottom:12px">'
+    + '<input id="search-input" type="text" placeholder="Nom du client, partenaire, À RÉGLER, activité…"'
+    + ' style="width:100%;padding:10px 14px;font-size:14px;border:2px solid #e2e8f0;border-radius:8px;outline:none;box-sizing:border-box"'
+    + ' oninput="runSearch(this.value)">'
+    + '</div>'
+    + '<div id="search-results" style="color:#94a3b8;font-size:13px;padding:8px 0">Tapez pour rechercher…</div>';
+  document.getElementById('modal-actions').innerHTML = '<button class="btn-mp" onclick="closeModal()">Fermer</button>';
+  openModal();
+  setTimeout(() => { const inp = document.getElementById('search-input'); if (inp) inp.focus(); }, 80);
+}
+
+function runSearch(query) {
+  const resultsEl = document.getElementById('search-results');
+  if (!resultsEl) return;
+  const q = query.trim().toLowerCase();
+  if (!q) { resultsEl.innerHTML = '<p style="color:#94a3b8;font-size:13px">Tapez pour rechercher…</p>'; return; }
+
+  const b    = state.currentBoutique;
+  const year = state.currentYear;
+  const matches = [];
+
+  let d = new Date(year, 0, 1);
+  const endDate = new Date(year + 1, 0, 1);
+  while (d < endDate) {
+    const k = toKey(d);
+    for (const bk of getAllBookings(b, k)) {
+      const isFH   = bk.source === 'fareharbor';
+      const ptcps  = bk.participants || [];
+      const haystack = [
+        bk.time, bk.activity,
+        bk.status === 'a_regler' ? 'à régler regler' : '',
+        bk.via, bk.clientName, bk.description, bk.comment,
+        ...ptcps.map(p => [p.clientName, p.via, p.status === 'a_regler' ? 'à régler' : ''].join(' '))
+      ].filter(Boolean).join(' ').toLowerCase();
+
+      if (!haystack.includes(q)) { d = d; continue; }
+
+      let clientDisplay, viaDisplay;
+      if (isFH) {
+        const pp = ptcps.length ? ptcps : [{ clientName: bk.clientName, via: bk.via }];
+        clientDisplay = pp.map(p => p.clientName).filter(Boolean).join(', ') || '—';
+        viaDisplay    = [...new Set(pp.map(p => VIA_TO_CODE[p.via]||p.via||'FH').filter(Boolean))].join(', ') || 'FH';
+      } else {
+        clientDisplay = bk.clientName || bk.description || '—';
+        viaDisplay    = VIA_TO_CODE[bk.via]||bk.via||'Direct';
+      }
+      matches.push({ k, date: new Date(d), bk, clientDisplay, viaDisplay, isFH });
+    }
+    d = addDays(d, 1);
+  }
+
+  if (!matches.length) {
+    resultsEl.innerHTML = '<p style="color:#94a3b8;font-size:13px">Aucun résultat pour « ' + esc(query) + ' ».</p>';
+    return;
+  }
+
+  const DS = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+  const MS = ['jan','fév','mar','avr','mai','jui','jul','aoû','sep','oct','nov','déc'];
+  const td = 'padding:5px 8px;border:1px solid #e2e8f0;font-size:12px;';
+
+  let html = '<div style="max-height:420px;overflow-y:auto"><table style="border-collapse:collapse;width:100%">';
+  html += '<thead><tr style="background:#f1f5f9">';
+  ['Date','Heure','Pax','Client / Réservation','Partenaire','Activité'].forEach(h =>
+    html += '<th style="' + td + 'font-weight:700;color:#475569;white-space:nowrap;position:sticky;top:0;background:#f1f5f9">' + h + '</th>'
+  );
+  html += '</tr></thead><tbody>';
+
+  matches.forEach((m, i) => {
+    const bg = i % 2 === 0 ? '#fff' : '#fafafa';
+    const ds = DS[m.date.getDay()] + ' ' + m.date.getDate() + ' ' + MS[m.date.getMonth()];
+    const regler = m.bk.status === 'a_regler' ? ' <span style="font-size:10px;color:#b91c1c;font-weight:700">(À RÉGLER)</span>' : '';
+    const src    = m.isFH ? ' <span style="color:#0000ff;font-size:10px;font-weight:800">(FH)</span>' : '';
+    const act    = esc((m.bk.activity||'').slice(0, 40) || '—');
+    html += '<tr style="cursor:pointer;background:' + bg + '"'
+      + ' onmouseover="this.style.background=\'#eff6ff\'"'
+      + ' onmouseout="this.style.background=\'' + bg + '\'"'
+      + ' onclick="closeModal();setTimeout(()=>scrollToDate(\'' + m.k + '\'),80)">';
+    html += '<td style="' + td + 'white-space:nowrap;font-weight:600">' + ds + '</td>';
+    html += '<td style="' + td + 'white-space:nowrap">' + esc(m.bk.time||'—') + '</td>';
+    html += '<td style="' + td + 'text-align:center">' + (m.bk.pax||'—') + '</td>';
+    html += '<td style="' + td + '">' + esc(m.clientDisplay) + src + regler + '</td>';
+    html += '<td style="' + td + 'white-space:nowrap">' + esc(m.viaDisplay) + '</td>';
+    html += '<td style="' + td + '">' + act + '</td>';
+    html += '</tr>';
+  });
+
+  html += '</tbody></table></div>';
+  html += '<p style="color:#94a3b8;font-size:11px;margin-top:6px">' + matches.length + ' résultat' + (matches.length > 1 ? 's' : '') + '</p>';
+  resultsEl.innerHTML = html;
 }
 
 // Remettre la largeur normale à la fermeture
