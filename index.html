@@ -2059,13 +2059,24 @@ function parseICS(raw) {
     if (status==='CANCELLED'||!dtstart) return;
 
     // Date & time
+    // FH ICS stores in UTC (Z suffix) → convert to Paris local date+time
+    // TZID or no suffix → already local, use string directly (no UTC conversion)
     let dateKey, time;
-    const dt = dtstart.replace('Z','');
+    const hasZ = dtstart.endsWith('Z');
+    const dt   = dtstart.replace('Z','');
     if (dt.includes('T')) {
       const [y,mo,d,h,mi]=[dt.slice(0,4),dt.slice(4,6),dt.slice(6,8),dt.slice(9,11),dt.slice(11,13)];
-      dateKey=y+'-'+mo+'-'+d;
-      const u=new Date(Date.UTC(+y,+mo-1,+d,+h,+mi));
-      time=String(u.getHours()).padStart(2,'0')+'h'+(u.getMinutes()?String(u.getMinutes()).padStart(2,'0'):'');
+      if (hasZ) {
+        // UTC timestamp → resolve to local date/time (handles midnight-UTC edge cases)
+        const u  = new Date(Date.UTC(+y,+mo-1,+d,+h,+mi));
+        dateKey  = toKey(u);
+        const lh = u.getHours(), lm = u.getMinutes();
+        time = String(lh).padStart(2,'0')+'h'+(lm ? String(lm).padStart(2,'0') : '');
+      } else {
+        // Local time (TZID or no suffix) — use string directly, no UTC conversion
+        dateKey = y+'-'+mo+'-'+d;
+        time    = h+'h'+(mi && mi!=='00' ? mi : '');
+      }
     } else { dateKey=dt.slice(0,4)+'-'+dt.slice(4,6)+'-'+dt.slice(6,8); time=''; }
 
     // Clean activity name: strip all noise from FareHarbor SUMMARY
