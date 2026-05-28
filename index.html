@@ -1773,30 +1773,43 @@ async function fetchFHChannels(year) {
     'getyourguide':'GYG', 'gyg':'GYG',
     'grapeescapes':'GE', 'grapeescapes':'GE',
   };
-  const apiUrl = 'https://fareharbor.com/api/v1/companies/andre-delorme/bookings/?start-date=' + year + '-01-01&end-date=' + year + '-12-31&per_page=300';
-  const hdrs   = { 'X-FareHarbor-API-App': appKey, 'X-FareHarbor-API-User': userKey, 'Accept': 'application/json' };
+  const baseUrl = 'https://fareharbor.com/api/v1/companies/andre-delorme/bookings/?start-date=' + year + '-01-01&end-date=' + year + '-12-31&per_page=1000';
+  const hdrs    = { 'X-FareHarbor-API-App': appKey, 'X-FareHarbor-API-User': userKey, 'Accept': 'application/json' };
+  const map = {};
 
-  const proxies = [
-    () => fetch(apiUrl, { headers: hdrs }),
-    () => fetch('https://corsproxy.io/?' + encodeURIComponent(apiUrl), { headers: hdrs }),
-  ];
-  for (const src of proxies) {
-    try {
-      const resp = await src();
-      if (!resp.ok) continue;
-      const data = await resp.json();
-      const map = {};
-      for (const bk of (data.bookings || [])) {
-        const aff = bk.affiliate_company;
-        if (!aff) continue;
-        const key = (aff.shortname || aff.name || '').toLowerCase().replace(/[\s-]+/g,'');
-        const via = Object.entries(FH_AFF).find(([k]) => key.includes(k));
-        if (via) map[bk.pk] = via[1];
-      }
-      return map;
-    } catch(e) { /* next */ }
+  // Paginate through all results (API may cap at 1000 per page)
+  async function fetchPage(url) {
+    const proxies = [
+      () => fetch(url, { headers: hdrs }),
+      () => fetch('https://corsproxy.io/?' + encodeURIComponent(url), { headers: hdrs }),
+    ];
+    for (const src of proxies) {
+      try {
+        const resp = await src();
+        if (!resp.ok) continue;
+        return await resp.json();
+      } catch(e) { /* next proxy */ }
+    }
+    return null;
   }
-  return {};
+
+  let nextUrl = baseUrl;
+  let pages = 0;
+  while (nextUrl && pages < 10) {
+    const data = await fetchPage(nextUrl);
+    if (!data) break;
+    for (const bk of (data.bookings || [])) {
+      const aff = bk.affiliate_company;
+      if (!aff) continue;
+      const key = (aff.shortname || aff.name || '').toLowerCase().replace(/[\s-]+/g,'');
+      const via = Object.entries(FH_AFF).find(([k]) => key.includes(k));
+      if (via) map[bk.pk] = via[1];
+    }
+    // FH API returns next page URL in data.next (null when last page)
+    nextUrl = data.next || null;
+    pages++;
+  }
+  return map;
 }
 
 // Open FH API key settings modal
