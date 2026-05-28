@@ -3728,7 +3728,12 @@ function openStatsModal() {
     if (!stats[p]) stats[p] = new Array(12).fill(0);
     stats[p][month] += (pax || 0);
   };
-  const noshowPax = new Array(12).fill(0);
+  const noshowStats = {};
+  const addNoshow = (partner, month, pax) => {
+    const p = partner || '—';
+    if (!noshowStats[p]) noshowStats[p] = new Array(12).fill(0);
+    noshowStats[p][month] += (pax || 0);
+  };
 
   let d = new Date(year, 0, 1);
   const endDate = new Date(year + 1, 0, 1);
@@ -3738,15 +3743,17 @@ function openStatsModal() {
 
     // Réservations FH (données brutes)
     (fhBookings[k] || []).filter(ev => ev.boutique === b).forEach(ev => {
-      addPax(ev.via || 'FH', month, ev.pax);
+      const partner = ev.via || 'FH';
+      addPax(partner, month, ev.pax);
       const ckKey = 'fh' + (ev.bookingPk || safeFirebaseKey((ev.time||'') + '_' + (ev.activity||'fh')));
-      if (getCheckin(b, k, ckKey) === 'noshow') noshowPax[month] += (ev.pax || 0);
+      if (getCheckin(b, k, ckKey) === 'noshow') addNoshow(partner, month, ev.pax);
     });
 
     // Réservations manuelles
     getManualBookings(b, k).forEach((bk, i) => {
-      addPax(bk.via || 'Direct', month, bk.pax);
-      if (getCheckin(b, k, 'm' + i) === 'noshow') noshowPax[month] += (bk.pax || 0);
+      const partner = bk.via || 'Direct';
+      addPax(partner, month, bk.pax);
+      if (getCheckin(b, k, 'm' + i) === 'noshow') addNoshow(partner, month, bk.pax);
     });
 
     d = addDays(d, 1);
@@ -3790,6 +3797,23 @@ function openStatsModal() {
     });
     html += '<td style="' + tdTotal + '">' + rowTotal + '</td>';
     html += '</tr>';
+    // Sous-ligne no-show pour ce partenaire
+    const ns = noshowStats[p];
+    if (ns) {
+      const nsTotal = ns.reduce((a,v) => a+v, 0);
+      if (nsTotal > 0) {
+        const nsCell = 'padding:3px 8px;font-size:11px;text-align:right;color:#dc2626;border:1px solid #fecaca;';
+        html += '<tr style="background:#fff5f5;">';
+        html += '<td style="' + nsCell + 'text-align:left;padding-left:16px;font-style:italic">↳ no-show</td>';
+        ns.forEach(v => {
+          html += v > 0
+            ? '<td style="' + nsCell + '">−' + v + '</td>'
+            : '<td style="' + nsCell + 'color:#fca5a5;">—</td>';
+        });
+        html += '<td style="' + nsCell + 'font-weight:700;">−' + nsTotal + '</td>';
+        html += '</tr>';
+      }
+    }
   });
 
   // Ligne totaux
@@ -3800,21 +3824,6 @@ function openStatsModal() {
   });
   html += '<td style="padding:5px 8px;font-size:13px;text-align:right">' + grandTotal + '</td>';
   html += '</tr>';
-
-  // Ligne no-show
-  const totalNoshow = noshowPax.reduce((a,v) => a+v, 0);
-  if (totalNoshow > 0) {
-    const nsCell = 'padding:5px 8px;font-size:12px;text-align:right;color:#dc2626;font-weight:700;';
-    html += '<tr style="background:#fef2f2;">';
-    html += '<td style="' + nsCell + 'text-align:left;letter-spacing:.04em">NO-SHOW</td>';
-    noshowPax.forEach(v => {
-      html += v > 0
-        ? '<td style="' + nsCell + '">−' + v + '</td>'
-        : '<td style="' + nsCell + 'color:#fca5a5;">—</td>';
-    });
-    html += '<td style="' + nsCell + '">−' + totalNoshow + '</td>';
-    html += '</tr>';
-  }
 
   html += '</tbody></table></div>';
 
