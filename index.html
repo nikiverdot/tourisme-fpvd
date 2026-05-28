@@ -1013,17 +1013,13 @@ function initFirebaseData() {
         }
       });
       patchEmployees();
+      // Check-ins stockés dans le même nœud autorisé
+      if (data.checkins) checkinData = data.checkins;
       render();
       if (firstDataLoad) { firstDataLoad = false; setTimeout(scrollToToday, 150); }
     }
     setSyncBadge('online', '● En ligne');
   }, () => setSyncBadge('error','Erreur sync'));
-
-  // Check-in temps réel
-  db.ref('piffaut-checkin').on('value', snap => {
-    checkinData = snap.val() || {};
-    render();
-  });
 
   // Connexion temps réel Firebase
   db.ref('.info/connected').on('value', snap => {
@@ -1037,7 +1033,7 @@ function initFirebaseData() {
 
 // ═══ SAVE (FIABLE) ════════════════════════════
 function buildPayload() {
-  const payload = { lastUpdated: Date.now(), lastUpdatedBy: currentUser||'Anonyme', boutiques: {} };
+  const payload = { lastUpdated: Date.now(), lastUpdatedBy: currentUser||'Anonyme', boutiques: {}, checkins: checkinData };
   Object.keys(state.boutiques).forEach(b => {
     payload.boutiques[b] = {
       schedule:     state.boutiques[b].schedule     || {},
@@ -2614,12 +2610,9 @@ function toggleCheckin(boutique, dateKey, timeKey) {
   if (!checkinData[boutique][dateKey]) checkinData[boutique][dateKey] = {};
   if (next === null) delete checkinData[boutique][dateKey][timeKey];
   else checkinData[boutique][dateKey][timeKey] = next;
-  const path = 'piffaut-checkin/' + boutique + '/' + dateKey + '/' + timeKey;
+  const path = DB_PATH + '/checkins/' + boutique + '/' + dateKey + '/' + timeKey;
   const op = next === null ? db.ref(path).remove() : db.ref(path).set(next);
-  op.catch(err => {
-    console.error('[checkin] Firebase write error:', err.code, err.message);
-    toast('⚠ Check-in non sauvegardé (' + (err.code || err.message) + ')', '#dc2626');
-  });
+  op.catch(err => toast('⚠ Check-in non sauvegardé (' + (err.code || err.message) + ')', '#dc2626'));
   render();
 }
 
