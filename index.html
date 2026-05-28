@@ -2534,11 +2534,13 @@ const VIA_DISPLAY = { 'GE': 'Grape Escapes', 'RDV': 'Rue des Vignerons' };
 const VIA_TO_CODE = Object.fromEntries(Object.entries(VIA_DISPLAY).map(([code, label]) => [label, code]));
 
 // ── Corps d'une réservation sans le préfixe horaire ──
-function buildVisiteBody(bk) {
+function buildVisiteBody(bk, ckState) {
   const isFH = bk.source === 'fareharbor';
   const isBulle = state.currentBoutique === 'bulle';
   const viaLabel = v => '<span style="font-size:13px;font-weight:900;color:#0000ff">('+esc(VIA_TO_CODE[v]||v)+')</span>';
-  const regler = '<span style="font-size:10px;font-weight:800;color:#b91c1c;background:#fef2f2;padding:1px 5px;border-radius:3px;border:1px solid #fca5a5">(À RÉGLER)</span>';
+  const regler = ckState === 'arrived'
+    ? '<span style="font-size:10px;font-weight:800;color:#15803d;background:#f0fdf4;padding:1px 5px;border-radius:3px;border:1px solid #86efac">RÉGLÉ ✓</span>'
+    : '<span style="font-size:10px;font-weight:800;color:#b91c1c;background:#fef2f2;padding:1px 5px;border-radius:3px;border:1px solid #fca5a5">(À RÉGLER)</span>';
 
   if (isFH) {
     const participants = bk.participants || [{ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, via: bk.via, bookingPk: bk.bookingPk }];
@@ -2594,9 +2596,9 @@ function buildVisiteBody(bk) {
 }
 
 // ── Construit le label complet d'une réservation (avec préfixe horaire) ──
-function buildVisiteLabel(bk, showTime = true) {
+function buildVisiteLabel(bk, showTime = true, ckState) {
   const timePart = bk.time || '—';
-  const body = buildVisiteBody(bk);
+  const body = buildVisiteBody(bk, ckState);
   return showTime ? '<strong>' + timePart + '</strong> : ' + body : body;
 }
 
@@ -2649,7 +2651,7 @@ function buildGroupCellContent(group, b, k, isLast) {
       ? '<span class="ck-btn' + (ckState ? ' ck-' + ckState : '') + '" onclick="event.stopPropagation();toggleCheckin(\'' + b + '\',\'' + k + '\',\'' + ckKey + '\')" title="Arrivé → No-show → Effacer">' + ckIcon + '</span>'
       : (ckState ? '<span class="ck-btn ck-' + ckState + '">' + ckIcon + '</span>' : '');
     return '<div class="visite-line' + ckCls + '"' + (onclick ? ' onclick="event.stopPropagation();' + onclick + '" style="cursor:pointer"' : '') + '>'
-      + buildVisiteLabel(bk) + ckBtn + '</div>'
+      + buildVisiteLabel(bk, true, ckState) + ckBtn + '</div>'
       + addBtn;
   }
   // Plusieurs réservations au même horaire → une seule ligne inline : "time : p1 + p2 + p3"
@@ -2678,7 +2680,7 @@ function buildGroupCellContent(group, b, k, isLast) {
     const itemCls = ckState2 ? ' ck-' + ckState2 : '';
     return '<span class="visite-item' + itemCls + '">'
       + '<span ' + (onclick ? 'onclick="event.stopPropagation();' + onclick + '" style="cursor:pointer"' : '') + '>'
-      + buildVisiteBody(bk)
+      + buildVisiteBody(bk, ckState2)
       + '</span>'
       + ckBtn2
       + '</span>';
