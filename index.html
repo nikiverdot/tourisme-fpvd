@@ -3432,6 +3432,10 @@ function fmtPrice(inp) {
 }
 function onViaChange() {
   const via = (document.getElementById('f-via')?.value || '').trim().toLowerCase();
+  if (via === 'direct') {
+    const st = document.getElementById('f-status');
+    if (st && st.value !== 'a_regler') st.value = 'a_regler';
+  }
   if (via === 'challanges' || via === 'invitation' || via === 'personnel') {
     const st = document.getElementById('f-status');
     const pr = document.getElementById('f-price');
