@@ -2648,6 +2648,7 @@ function buildGroupCellContent(group, b, k, isLast) {
   }
   // Plusieurs réservations au même horaire → une seule ligne inline : "time : p1 + p2 + p3"
   const timePart = group.time || '—';
+  const itemStates = [];
   const partsHtml = group.items.map((bk, i) => {
     const globalIdx = group.startIdx + i;
     const isFH = bk.source === 'fareharbor';
@@ -2667,6 +2668,7 @@ function buildGroupCellContent(group, b, k, isLast) {
       ? '<span class="ck-btn' + (ckState2 ? ' ck-' + ckState2 : '') + '" onclick="event.stopPropagation();toggleCheckin(\'' + b + '\',\'' + k + '\',\'' + ckKey2 + '\')" title="Arrivé → No-show → Effacer">' + ckIcon2 + '</span>'
       : (ckState2 ? '<span class="ck-btn ck-' + ckState2 + '">' + ckIcon2 + '</span>' : '');
     // ck-btn é IRMÃO do span clicável (não filho) → sempre visível independente do conteúdo HTML
+    itemStates.push(ckState2);
     const itemCls = ckState2 ? ' ck-' + ckState2 : '';
     return '<span class="visite-item' + itemCls + '">'
       + '<span ' + (onclick ? 'onclick="event.stopPropagation();' + onclick + '" style="cursor:pointer"' : '') + '>'
@@ -2675,7 +2677,10 @@ function buildGroupCellContent(group, b, k, isLast) {
       + ckBtn2
       + '</span>';
   }).join(' <span style="color:#94a3b8;font-weight:700;padding:0 1px"> + </span> ');
-  return '<div class="visite-line"><strong>' + timePart + '</strong> : ' + partsHtml + '</div>'
+  const allArrived = itemStates.length > 0 && itemStates.every(s => s === 'arrived');
+  const allNoshow  = itemStates.length > 0 && itemStates.every(s => s === 'noshow');
+  const lineCls    = allArrived ? ' ck-arrived' : (allNoshow ? ' ck-noshow' : '');
+  return '<div class="visite-line' + lineCls + '"><strong>' + timePart + '</strong> : ' + partsHtml + '</div>'
     + addBtn;
 }
 
