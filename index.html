@@ -3427,7 +3427,7 @@ function fmtPrice(inp) {
 }
 function onViaChange() {
   const via = (document.getElementById('f-via')?.value || '').trim().toLowerCase();
-  if (via === 'challanges' || via === 'invitation') {
+  if (via === 'challanges' || via === 'invitation' || via === 'personnel') {
     const st = document.getElementById('f-status');
     const pr = document.getElementById('f-price');
     if (st) st.value = 'confirmed';
