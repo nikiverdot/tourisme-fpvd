@@ -2611,7 +2611,10 @@ function buildGroupCellContent(group, b, k, isLast) {
     const onclick = isFH
       ? 'openFHDetail(\'' + k + '\',\'' + fhTime + '\',\'' + fhAct + '\')'
       : (_canAdd ? 'openBookingModal(\'' + b + '\',\'' + k + '\',' + manualIdx + ')' : '');
-    const ckKey   = safeFirebaseKey((bk.time||'') + '_' + (isFH ? (bk.activity||'fh') + '_' + manualIdx : 'm' + manualIdx));
+    // Clé stable : pour FH on utilise bookingPk (ID unique FH), pour manuel _manualIdx
+    const ckKey   = isFH
+      ? 'fh' + (bk.bookingPk || safeFirebaseKey((bk.time||'') + '_' + (bk.activity||'fh')))
+      : 'm' + (bk._manualIdx !== undefined ? bk._manualIdx : manualIdx);
     const ckState = getCheckin(b, k, ckKey);
     const ckCls   = ckState ? ' ck-' + ckState : '';
     const ckIcon  = ckState === 'arrived' ? '✓' : (ckState === 'noshow' ? '✗' : '');
@@ -2633,7 +2636,9 @@ function buildGroupCellContent(group, b, k, isLast) {
     const onclick = isFH
       ? 'openFHDetail(\'' + k + '\',\'' + fhTime2 + '\',\'' + fhAct2 + '\')'
       : (_canAdd ? 'openBookingModal(\'' + b + '\',\'' + k + '\',' + manualIdx + ')' : '');
-    const ckKey2   = safeFirebaseKey((bk.time||'') + '_' + (isFH ? (bk.activity||'fh') + '_' + globalIdx : 'm' + globalIdx));
+    const ckKey2   = isFH
+      ? 'fh' + (bk.bookingPk || safeFirebaseKey((bk.time||'') + '_' + (bk.activity||'fh')))
+      : 'm' + (bk._manualIdx !== undefined ? bk._manualIdx : globalIdx);
     const ckState2 = getCheckin(b, k, ckKey2);
     const ckIcon2  = ckState2 === 'arrived' ? '✓' : (ckState2 === 'noshow' ? '✗' : '');
     const ckBtn2   = currentUserRole !== 'viewer'
@@ -3676,6 +3681,8 @@ function init() {
     subscribeToPush();
     setTimeout(scrollToToday, 200);
     syncFareHarbor();
+    // Auto-sync FH toutes les 10 minutes
+    setInterval(() => { if (authUser) syncFareHarbor(); }, 10 * 60 * 1000);
   });
 }
 init();
