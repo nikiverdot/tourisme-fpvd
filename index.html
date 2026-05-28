@@ -2526,12 +2526,14 @@ function updateStickyLeftOffsets() {
 
 // Abréviations des partenaires → noms complets
 const VIA_DISPLAY = { 'GE': 'Grape Escapes', 'RDV': 'Rue des Vignerons' };
+// Lookup inverso : nom complet → code court (pour les anciens bookings sauvés avec le nom complet)
+const VIA_TO_CODE = Object.fromEntries(Object.entries(VIA_DISPLAY).map(([code, label]) => [label, code]));
 
 // ── Corps d'une réservation sans le préfixe horaire ──
 function buildVisiteBody(bk) {
   const isFH = bk.source === 'fareharbor';
   const isBulle = state.currentBoutique === 'bulle';
-  const viaLabel = v => '<span style="font-size:13px;font-weight:900;color:#0000ff">('+esc(v)+')</span>';
+  const viaLabel = v => '<span style="font-size:13px;font-weight:900;color:#0000ff">('+esc(VIA_TO_CODE[v]||v)+')</span>';
   const regler = '<span style="font-size:10px;font-weight:800;color:#b91c1c;background:#fef2f2;padding:1px 5px;border-radius:3px;border:1px solid #fca5a5">(À RÉGLER)</span>';
 
   if (isFH) {
