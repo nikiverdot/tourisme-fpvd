@@ -3728,6 +3728,7 @@ function openStatsModal() {
     if (!stats[p]) stats[p] = new Array(12).fill(0);
     stats[p][month] += (pax || 0);
   };
+  const noshowPax = new Array(12).fill(0);
 
   let d = new Date(year, 0, 1);
   const endDate = new Date(year + 1, 0, 1);
@@ -3738,11 +3739,14 @@ function openStatsModal() {
     // Réservations FH (données brutes)
     (fhBookings[k] || []).filter(ev => ev.boutique === b).forEach(ev => {
       addPax(ev.via || 'FH', month, ev.pax);
+      const ckKey = 'fh' + (ev.bookingPk || safeFirebaseKey((ev.time||'') + '_' + (ev.activity||'fh')));
+      if (getCheckin(b, k, ckKey) === 'noshow') noshowPax[month] += (ev.pax || 0);
     });
 
     // Réservations manuelles
-    getManualBookings(b, k).forEach(bk => {
+    getManualBookings(b, k).forEach((bk, i) => {
       addPax(bk.via || 'Direct', month, bk.pax);
+      if (getCheckin(b, k, 'm' + i) === 'noshow') noshowPax[month] += (bk.pax || 0);
     });
 
     d = addDays(d, 1);
@@ -3795,7 +3799,24 @@ function openStatsModal() {
     html += '<td style="padding:5px 8px;font-size:12px;text-align:right">' + (v || '—') + '</td>';
   });
   html += '<td style="padding:5px 8px;font-size:13px;text-align:right">' + grandTotal + '</td>';
-  html += '</tr></tbody></table></div>';
+  html += '</tr>';
+
+  // Ligne no-show
+  const totalNoshow = noshowPax.reduce((a,v) => a+v, 0);
+  if (totalNoshow > 0) {
+    const nsCell = 'padding:5px 8px;font-size:12px;text-align:right;color:#dc2626;font-weight:700;';
+    html += '<tr style="background:#fef2f2;">';
+    html += '<td style="' + nsCell + 'text-align:left;letter-spacing:.04em">NO-SHOW</td>';
+    noshowPax.forEach(v => {
+      html += v > 0
+        ? '<td style="' + nsCell + '">−' + v + '</td>'
+        : '<td style="' + nsCell + 'color:#fca5a5;">—</td>';
+    });
+    html += '<td style="' + nsCell + '">−' + totalNoshow + '</td>';
+    html += '</tr>';
+  }
+
+  html += '</tbody></table></div>';
 
   if (!grandTotal) html = '<p style="color:#94a3b8;font-size:13px;padding:12px 0">Aucune donnée pour ' + year + '.</p>';
 
