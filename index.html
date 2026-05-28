@@ -1019,8 +1019,8 @@ function initFirebaseData() {
     setSyncBadge('online', '● En ligne');
   }, () => setSyncBadge('error','Erreur sync'));
 
-  // Check-in temps réel
-  db.ref('piffaut-checkin').on('value', snap => {
+  // Check-in temps réel — stocké sous le chemin principal déjà autorisé
+  db.ref(DB_PATH + '/checkins').on('value', snap => {
     checkinData = snap.val() || {};
     render();
   });
@@ -2590,7 +2590,7 @@ function toggleCheckin(boutique, dateKey, timeKey) {
   if (!checkinData[boutique][dateKey]) checkinData[boutique][dateKey] = {};
   if (next === null) delete checkinData[boutique][dateKey][timeKey];
   else checkinData[boutique][dateKey][timeKey] = next;
-  const path = 'piffaut-checkin/' + boutique + '/' + dateKey + '/' + timeKey;
+  const path = DB_PATH + '/checkins/' + boutique + '/' + dateKey + '/' + timeKey;
   if (next === null) db.ref(path).remove();
   else db.ref(path).set(next);
   render();
