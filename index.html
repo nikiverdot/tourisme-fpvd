@@ -1019,8 +1019,8 @@ function initFirebaseData() {
     setSyncBadge('online', '● En ligne');
   }, () => setSyncBadge('error','Erreur sync'));
 
-  // Check-in temps réel — stocké sous le chemin principal déjà autorisé
-  db.ref(DB_PATH + '/checkins').on('value', snap => {
+  // Check-in temps réel
+  db.ref('piffaut-checkin').on('value', snap => {
     checkinData = snap.val() || {};
     render();
   });
@@ -2601,9 +2601,12 @@ function toggleCheckin(boutique, dateKey, timeKey) {
   if (!checkinData[boutique][dateKey]) checkinData[boutique][dateKey] = {};
   if (next === null) delete checkinData[boutique][dateKey][timeKey];
   else checkinData[boutique][dateKey][timeKey] = next;
-  const path = DB_PATH + '/checkins/' + boutique + '/' + dateKey + '/' + timeKey;
-  if (next === null) db.ref(path).remove();
-  else db.ref(path).set(next);
+  const path = 'piffaut-checkin/' + boutique + '/' + dateKey + '/' + timeKey;
+  const op = next === null ? db.ref(path).remove() : db.ref(path).set(next);
+  op.catch(err => {
+    console.error('[checkin] Firebase write error:', err.code, err.message);
+    toast('⚠ Check-in non sauvegardé (' + (err.code || err.message) + ')', '#dc2626');
+  });
   render();
 }
 
@@ -2622,9 +2625,10 @@ function buildGroupCellContent(group, b, k, isLast) {
     const onclick = isFH
       ? 'openFHDetail(\'' + k + '\',\'' + fhTime + '\',\'' + fhAct + '\')'
       : (_canAdd ? 'openBookingModal(\'' + b + '\',\'' + k + '\',' + manualIdx + ')' : '');
-    // Clé stable : pour FH on utilise bookingPk (ID unique FH), pour manuel _manualIdx
-    const ckKey   = isFH
-      ? 'fh' + (bk.bookingPk || safeFirebaseKey((bk.time||'') + '_' + (bk.activity||'fh')))
+    // Clé stable : bookingPk FH (sur participants[0]) ou time+activity en fallback
+    const fhPk  = isFH ? ((bk.participants && bk.participants[0] && bk.participants[0].bookingPk) || bk.bookingPk || 0) : 0;
+    const ckKey = isFH
+      ? 'fh' + (fhPk || safeFirebaseKey((bk.time||'') + '_' + (bk.activity||'fh')))
       : 'm' + (bk._manualIdx !== undefined ? bk._manualIdx : manualIdx);
     const ckState = getCheckin(b, k, ckKey);
     const ckCls   = ckState ? ' ck-' + ckState : '';
@@ -2647,8 +2651,9 @@ function buildGroupCellContent(group, b, k, isLast) {
     const onclick = isFH
       ? 'openFHDetail(\'' + k + '\',\'' + fhTime2 + '\',\'' + fhAct2 + '\')'
       : (_canAdd ? 'openBookingModal(\'' + b + '\',\'' + k + '\',' + manualIdx + ')' : '');
-    const ckKey2   = isFH
-      ? 'fh' + (bk.bookingPk || safeFirebaseKey((bk.time||'') + '_' + (bk.activity||'fh')))
+    const fhPk2  = isFH ? ((bk.participants && bk.participants[0] && bk.participants[0].bookingPk) || bk.bookingPk || 0) : 0;
+    const ckKey2 = isFH
+      ? 'fh' + (fhPk2 || safeFirebaseKey((bk.time||'') + '_' + (bk.activity||'fh') + '_' + i))
       : 'm' + (bk._manualIdx !== undefined ? bk._manualIdx : globalIdx);
     const ckState2 = getCheckin(b, k, ckKey2);
     const ckIcon2  = ckState2 === 'arrived' ? '✓' : (ckState2 === 'noshow' ? '✗' : '');
