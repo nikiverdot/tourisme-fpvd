@@ -1032,17 +1032,17 @@ function initFirebaseData() {
     }
   });
 
-  // Chargement du cache FH persisté (données depuis la dernière sync — pour stats sans sync en session)
+  // Chargement du cache FH persisté (2025+ uniquement pour ne pas alourdir)
   db.ref('piffaut-fh-cache').once('value').then(snap => {
     const raw = snap.val();
     if (raw && !Object.keys(fhBookings).length) {
-      // Firebase peut avoir converti les tableaux en objets {0:…,1:…} — on reconstruit
       Object.keys(raw).forEach(k => {
+        if (k < '2025') return; // ignorer les années avant 2025
         const v = raw[k];
         fhBookings[k] = Array.isArray(v) ? v
           : Object.keys(v || {}).sort((a, b) => +a - +b).map(i => v[i]);
       });
-      render(); // Rafraîchir avec les données FH chargées
+      render();
     }
   }).catch(() => {});
 }
@@ -1906,17 +1906,21 @@ async function syncFareHarbor() {
   fhBookings = {};
   allEvents.forEach(ev => { if (!fhBookings[ev.dateKey]) fhBookings[ev.dateKey] = []; fhBookings[ev.dateKey].push(ev); });
 
-  // Persist FH cache to Firebase — merge additif (ne pas écraser les années absentes de l'ICS actuel)
+  // Persist FH cache to Firebase — merge additif, 2025+ uniquement
   if (db && authUser) {
     db.ref('piffaut-fh-cache').once('value').then(snap => {
       const existing = snap.val() || {};
-      // Reconstruire les tableaux Firebase-ifiés
+      // Reconstruire les tableaux Firebase-ifiés et supprimer les entrées < 2025
+      const cleaned = {};
       Object.keys(existing).forEach(k => {
+        if (k < '2025') return; // purger les vieilles années
         const v = existing[k];
-        if (!Array.isArray(v)) existing[k] = Object.keys(v||{}).sort((a,b)=>+a-+b).map(i=>v[i]);
+        cleaned[k] = Array.isArray(v) ? v : Object.keys(v||{}).sort((a,b)=>+a-+b).map(i=>v[i]);
       });
-      // Les dates du sync actuel remplacent l'ancien cache ; les autres dates (années passées) restent
-      const merged = Object.assign({}, existing, fhBookings);
+      // Fusionner avec le sync actuel (2025+ aussi)
+      const newEntries = {};
+      Object.keys(fhBookings).forEach(k => { if (k >= '2025') newEntries[k] = fhBookings[k]; });
+      const merged = Object.assign({}, cleaned, newEntries);
       return db.ref('piffaut-fh-cache').set(merged);
     }).catch(e => console.warn('[FH] cache persist:', e));
   }
@@ -3881,7 +3885,7 @@ function openStatsModal(tab) {
     });
 
     // Garder : années avec ≥ 20 pax (données réelles) OU année en cours/future
-    const dispYears = allYears.filter(y => yearData[y].grand >= 20 || y >= year);
+    const dispYears = allYears.filter(y => y >= 2025);
 
     if (dispYears.length < 1) {
       html += '<p style="color:#94a3b8;font-size:13px;padding:12px 0">Aucune donnée disponible.</p>';
