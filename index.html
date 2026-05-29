@@ -1783,7 +1783,7 @@ async function fetchFHChannels(year) {
 
   const FH_AFF = {
     'vignerons':'RDV', 'rdv':'RDV', 'ruedes':'RDV',
-    'viator':'Viator',
+    'viator':'TripAdvisor / Viator',
     'getyourguide':'GYG', 'gyg':'GYG',
     'grapeescapes':'GE', 'grapeescapes':'GE',
   };
@@ -2136,14 +2136,14 @@ function parseICS(raw) {
       if (emailM) {
         const dom = emailM[1].toLowerCase();
         if (dom.includes('grapeescapes')) via='GE';
-        else if (dom.includes('viator')) via='Viator';
+        else if (dom.includes('viator')) via='TripAdvisor / Viator';
         else if (dom.includes('getyourguide')||dom.includes('gyg.')) via='GYG';
         else if (dom.includes('vignerons')||dom.includes('rdv')) via='RDV';
       }
       if (!via) {
         const hl=bk.toLowerCase();
         if (/rue des vignerons/.test(hl)) via='RDV';
-        else if (/\bviator\b/.test(hl)) via='Viator';
+        else if (/\bviator\b/.test(hl)) via='TripAdvisor / Viator';
         else if (/get your guide|gyg/.test(hl)) via='GYG';
         else if (/grape escapes/.test(hl)) via='GE';
       }
@@ -3335,8 +3335,8 @@ function openBookingModal(b, k, idx) {
   }
 
   const viaList = b === 'bulle'
-    ? ['Direct','FH','Challanges','Invitation','GYG','Personnel','RDV','Winalist','TripAdvisor','OT','Viator','Dijon City Pass','Bon Cadeau','Grape Escapes']
-    : ['FH','Direct','RDV','GYG','OT Chalon','Grape Escapes','Invitation','Go Côté Saône','My French Tour','Winalist','Viator','TripAdvisor','Personnel','Bon Cadeau'];
+    ? ['Direct','FH','Challanges','Invitation','GYG','Personnel','RDV','Winalist','TripAdvisor / Viator','OT','Dijon City Pass','Bon Cadeau','Grape Escapes']
+    : ['FH','Direct','RDV','GYG','OT Chalon','Grape Escapes','Invitation','Go Côté Saône','My French Tour','Winalist','TripAdvisor / Viator','Personnel','Bon Cadeau'];
   document.getElementById('modal-body').innerHTML = `
     <datalist id="dl-act">${actListOpts}</datalist>
     <div class="form-group"><label class="form-label">Prestation</label>
@@ -3455,13 +3455,12 @@ function openFHDetail(k, time, activity) {
   const participants = bk.participants || [{ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, via: bk.via, comment: bk.comment, bookingPk: bk.bookingPk, status: bk.status }];
   document.getElementById('modal-title').textContent = 'FareHarbor · ' + DAYS_FR[date.getDay()] + ' ' + date.getDate() + ' ' + MONTHS_FR[date.getMonth()];
 
-  const VIA_OPTIONS = ['', 'RDV', 'GYG', 'Viator', 'TripAdvisor', 'GE', 'FrenchTour', 'Challanges', 'Go Côté Saône', 'Winalist', 'OT', 'BFC'];
+  const VIA_OPTIONS = ['', 'RDV', 'GYG', 'TripAdvisor / Viator', 'GE', 'FrenchTour', 'Challanges', 'Go Côté Saône', 'Winalist', 'OT', 'BFC'];
   const VIA_LABELS  = {
     '':              '— Aucun canal',
     'RDV':           '(RDV) Rue des Vignerons',
     'GYG':           '(GYG) GetYourGuide',
-    'Viator':        '(Viator) Viator',
-    'TripAdvisor':   '(TripAdvisor) TripAdvisor',
+    'TripAdvisor / Viator': '(TripAdvisor / Viator) TripAdvisor / Viator',
     'GE':            '(GE) Grape Escapes',
     'FrenchTour':    '(FrenchTour) MyFrenchTour',
     'Challanges':    '(Challanges) Château de Challanges',
@@ -3710,6 +3709,13 @@ init();
 
 // ═══ STATISTIQUES PAX ══════════════════════════════════════════════════════
 
+// Normalise les labels via pour regrouper TripAdvisor + Viator
+function normVia(v) {
+  if (!v) return v;
+  if (v === 'TripAdvisor' || v === 'Viator' || /tripadvisor|viator/i.test(v)) return 'TripAdvisor / Viator';
+  return v;
+}
+
 function _statsComputeYear(b, year) {
   // Returns { stats: {partner→[12]}, noshowStats: {partner→[12]} }
   const stats = {}, nsStats = {};
@@ -3719,12 +3725,12 @@ function _statsComputeYear(b, year) {
   while (d < end) {
     const k = toKey(d), m = d.getMonth();
     (fhBookings[k]||[]).filter(ev=>ev.boutique===b).forEach(ev=>{
-      const p = ev.via||'FH'; add(stats,p,m,ev.pax);
+      const p = normVia(ev.via||'FH'); add(stats,p,m,ev.pax);
       const ck='fh'+(ev.bookingPk||safeFirebaseKey((ev.time||'')+'_'+(ev.activity||'fh')));
       if(getCheckin(b,k,ck)==='noshow') add(nsStats,p,m,ev.pax);
     });
     getManualBookings(b,k).forEach((bk,i)=>{
-      const p=bk.via||'Direct'; add(stats,p,m,bk.pax);
+      const p=normVia(bk.via||'Direct'); add(stats,p,m,bk.pax);
       if(getCheckin(b,k,'m'+i)==='noshow') add(nsStats,p,m,bk.pax);
     });
     d = addDays(d,1);
@@ -4237,7 +4243,7 @@ function parseCSVVisites(text, defaultActivity) {
     if      (/\bFH\b/.test(rest))                        via = 'FH';
     else if (/\bGYG\b/i.test(rest))                      via = 'GYG';
     else if (/\bWinalist\b/i.test(rest))                  via = 'Winalist';
-    else if (/\btripadvisor\b/i.test(rest))               via = 'TripAdvisor';
+    else if (/\btripadvisor\b/i.test(rest))               via = 'TripAdvisor / Viator';
     else if (/\bChallanges?\b/i.test(rest))               via = 'Challanges';
     else if (/\bOT\b/.test(rest))                         via = 'OT';
     else if (/\binvitation\b/i.test(rest))                via = 'invitation';
