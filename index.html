@@ -3489,7 +3489,7 @@ function openFHDetail(k, time, activity) {
   const participants = bk.participants || [{ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, via: bk.via, comment: bk.comment, bookingPk: bk.bookingPk, status: bk.status }];
   document.getElementById('modal-title').textContent = 'FareHarbor · ' + DAYS_FR[date.getDay()] + ' ' + date.getDate() + ' ' + MONTHS_FR[date.getMonth()];
 
-  const VIA_OPTIONS = ['', 'RDV', 'GYG', 'Viator', 'TripAdvisor', 'GE', 'FrenchTour', 'Challanges', 'Go Côté Saône', 'Winalist', 'OT', 'BFC', 'À REGLER'];
+  const VIA_OPTIONS = ['', 'RDV', 'GYG', 'Viator', 'TripAdvisor', 'GE', 'FrenchTour', 'Challanges', 'Go Côté Saône', 'Winalist', 'OT', 'BFC'];
   const VIA_LABELS  = {
     '':              '— Aucun canal',
     'RDV':           '(RDV) Rue des Vignerons',
