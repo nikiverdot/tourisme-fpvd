@@ -747,7 +747,6 @@ tr.row-ferme    td.jour-cell,tr.row-ferme    td.date-cell,tr.row-ferme    td.rdv
   <button class="btn btn-today"  onclick="scrollToToday()">📍 Aujourd'hui</button>
   <button class="btn btn-ics"    onclick="syncFareHarbor()" id="btn-ics">🔄 Sync FareHarbor</button>
   <button id="btn-fh-settings" class="btn btn-ics" onclick="openFHSettings()" title="Configuration API FareHarbor" style="padding:4px 8px;font-size:14px;min-width:0;display:none">⚙️</button>
-  <label  id="btn-csv-fh" class="btn btn-ics" title="Importer CSV FareHarbor (Rapports → Réservations → Exporter)" style="cursor:pointer;font-size:11px;display:none">📊 CSV FH<input type="file" accept=".csv,.txt" onchange="importFHAffiliatesCSV(event)" style="display:none"></label>
   <span   class="ics-msg"        id="ics-status" style="display:none"></span>
   <button id="btn-export" class="btn btn-export" onclick="exportData()" style="display:none">⬇ Exporter</button>
   <label  id="btn-import-json" class="btn btn-import" style="display:none">⬆ Importer<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
@@ -1327,7 +1326,7 @@ function updateUserChip(user) {
   const isViewer = currentUserRole === 'viewer';
   document.body.classList.toggle('is-admin',  isAdminU);
   document.body.classList.toggle('is-viewer', isViewer);
-  ['btn-admin','btn-export','btn-import-json','btn-csv-import','btn-csv-fh','btn-fh-settings','ics-status'].forEach(id => {
+  ['btn-admin','btn-export','btn-import-json','btn-csv-import','btn-fh-settings','ics-status'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = isAdminU ? '' : 'none';
   });
@@ -2007,69 +2006,6 @@ async function saveFHOverride(bookingPk, fields) {
   } catch(e) { console.error('saveFHOverride:', e); toast('⚠ Erreur Firebase (statut) : ' + e.message, '#dc2626'); }
 }
 
-// ═══ FH CSV AFFILIATE IMPORT ══════════════════
-function mapFHAffiliate(raw) {
-  if (!raw) return '';
-  const n = raw.toLowerCase().replace(/[-\s_]+/g,'');
-  if (n.includes('vignerons')||n.includes('ruedes')||n==='rdv')      return 'RDV';
-  if (n.includes('getyourguide')||n.includes('gyg'))                  return 'GYG';
-  if (n.includes('viator'))                                            return 'Viator';
-  if (n.includes('grapeescapes')||n.includes('grapes'))               return 'GE';
-  if (n.includes('frenchcour')||n.includes('myfrench'))               return 'FrenchTour';
-  if (n.includes('challanges')||n.includes('chalange'))               return 'Challanges';
-  if (n.includes('cotesaone')||n.includes('côtesaône')||n.includes('gosao')) return 'Go Côté Saône';
-  if (n.includes('winalist'))                                                 return 'Winalist';
-  if (n.includes('officetourisme')||n.includes('officedutourisme'))           return 'OT';
-  if (n.includes('bourgogne')||n.includes('bfc')||n.includes('franchecomte')) return 'BFC';
-  return raw.trim().slice(0,30); // keep unknown affiliates as-is
-}
-
-async function importFHAffiliatesCSV(e) {
-  const file = e.target.files[0]; e.target.value=''; if (!file) return;
-  const text = await file.text();
-  // Detect separator (comma or semicolon)
-  const sep = (text.split('\n')[0]||'').includes(';') ? ';' : ',';
-  const rows = text.split('\n').map(r => r.split(sep).map(c => c.replace(/^"|"$/g,'').trim()));
-  if (rows.length < 2) return toast('❌ CSV vide ou invalide', '#dc2626');
-
-  const headers = rows[0].map(h => h.toLowerCase().replace(/[^a-z0-9]/g,''));
-  // Find booking # column
-  const pkCol = headers.findIndex(h =>
-    h.includes('confirmation')||h.includes('booking')||h==='no'||h==='n'||h==='pk'||h==='id'||h.startsWith('#'));
-  // Find affiliate column
-  const affCol = headers.findIndex(h =>
-    h.includes('affili')||h.includes('canal')||h.includes('channel')||h.includes('partenaire')||h.includes('source')||h.includes('bookedby'));
-
-  if (pkCol < 0) return toast('❌ Colonne N° réservation introuvable dans le CSV', '#dc2626');
-  if (affCol < 0) return toast('❌ Colonne affilié introuvable dans le CSV', '#dc2626');
-
-  const newTags = {};
-  let count = 0;
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i]; if (row.length <= Math.max(pkCol, affCol)) continue;
-    const rawPk  = row[pkCol].replace(/\D/g,'');
-    const rawAff = row[affCol];
-    if (!rawPk || !rawAff) continue;
-    const pk  = parseInt(rawPk);
-    const via = mapFHAffiliate(rawAff);
-    if (pk && via) { newTags[pk] = via; count++; }
-  }
-  if (!count) return toast('⚠ Aucun affilié trouvé dans le CSV', '#d97706');
-
-  // Merge into fhTags and Firebase
-  Object.assign(fhTags, newTags);
-  if (db) {
-    const updates = {};
-    Object.entries(newTags).forEach(([pk, via]) => { updates['piffaut-fh-tags/' + pk] = via; });
-    await db.ref().update(updates).catch(()=>{});
-  }
-  // Apply to live fhBookings
-  Object.values(fhBookings).forEach(dayEvs => dayEvs.forEach(ev => {
-    if (fhTags[ev.bookingPk]) ev.via = fhTags[ev.bookingPk];
-  }));
-  render();
-  toast('✅ ' + count + ' affilié' + (count>1?'s':'') + ' importé' + (count>1?'s':'') + ' depuis CSV', '#16a34a');
-}
 
 // Language → { code, flag }
 const LANGS = [
