@@ -1031,6 +1031,20 @@ function initFirebaseData() {
       setSyncBadge('offline', 'Hors ligne');
     }
   });
+
+  // Chargement du cache FH persisté (données depuis la dernière sync — pour stats sans sync en session)
+  db.ref('piffaut-fh-cache').once('value').then(snap => {
+    const raw = snap.val();
+    if (raw && !Object.keys(fhBookings).length) {
+      // Firebase peut avoir converti les tableaux en objets {0:…,1:…} — on reconstruit
+      Object.keys(raw).forEach(k => {
+        const v = raw[k];
+        fhBookings[k] = Array.isArray(v) ? v
+          : Object.keys(v || {}).sort((a, b) => +a - +b).map(i => v[i]);
+      });
+      render(); // Rafraîchir avec les données FH chargées
+    }
+  }).catch(() => {});
 }
 
 // ═══ SAVE (FIABLE) ════════════════════════════
@@ -1891,6 +1905,11 @@ async function syncFareHarbor() {
   // Store merged result
   fhBookings = {};
   allEvents.forEach(ev => { if (!fhBookings[ev.dateKey]) fhBookings[ev.dateKey] = []; fhBookings[ev.dateKey].push(ev); });
+
+  // Persist FH cache to Firebase (pour stats + rechargement sans sync)
+  if (db && authUser) {
+    db.ref('piffaut-fh-cache').set(fhBookings).catch(e => console.warn('[FH] cache persist:', e));
+  }
 
   // Status message
   const cntD  = eventsDelorme.length,   cntB  = eventsBulle.length;
