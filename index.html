@@ -1906,9 +1906,19 @@ async function syncFareHarbor() {
   fhBookings = {};
   allEvents.forEach(ev => { if (!fhBookings[ev.dateKey]) fhBookings[ev.dateKey] = []; fhBookings[ev.dateKey].push(ev); });
 
-  // Persist FH cache to Firebase (pour stats + rechargement sans sync)
+  // Persist FH cache to Firebase — merge additif (ne pas écraser les années absentes de l'ICS actuel)
   if (db && authUser) {
-    db.ref('piffaut-fh-cache').set(fhBookings).catch(e => console.warn('[FH] cache persist:', e));
+    db.ref('piffaut-fh-cache').once('value').then(snap => {
+      const existing = snap.val() || {};
+      // Reconstruire les tableaux Firebase-ifiés
+      Object.keys(existing).forEach(k => {
+        const v = existing[k];
+        if (!Array.isArray(v)) existing[k] = Object.keys(v||{}).sort((a,b)=>+a-+b).map(i=>v[i]);
+      });
+      // Les dates du sync actuel remplacent l'ancien cache ; les autres dates (années passées) restent
+      const merged = Object.assign({}, existing, fhBookings);
+      return db.ref('piffaut-fh-cache').set(merged);
+    }).catch(e => console.warn('[FH] cache persist:', e));
   }
 
   // Status message
@@ -3854,28 +3864,36 @@ function openStatsModal(tab) {
     }
 
   } else {
-    // ── Vue comparatif annuel (2026+, avec partenaires) ──
-    const allYears  = _statsAvailableYears(b);
-    const dispYears = allYears.filter(y => y >= 2026); // afficher seulement 2026+
+    // ── Vue comparatif annuel (années avec données, avec partenaires) ──
+    const allYears = _statsAvailableYears(b);
+
+    // Calculer tous les totaux d'abord pour filtrer intelligemment
+    const yearData = {};
+    allYears.forEach(y => {
+      const { stats } = _statsComputeYear(b, y);
+      const totals = new Array(12).fill(0);
+      Object.values(stats).forEach(arr => arr.forEach((v,m) => { totals[m] += v; }));
+      const grand = totals.reduce((a,v) => a+v, 0);
+      const partners = Object.keys(stats)
+        .filter(p => stats[p].reduce((a,v)=>a+v,0) > 0)
+        .sort((a,z) => stats[z].reduce((s,v)=>s+v,0) - stats[a].reduce((s,v)=>s+v,0));
+      yearData[y] = { stats, totals, grand, partners };
+    });
+
+    // Garder : années avec ≥ 20 pax (données réelles) OU année en cours/future
+    const dispYears = allYears.filter(y => yearData[y].grand >= 20 || y >= year);
+
     if (dispYears.length < 1) {
       html += '<p style="color:#94a3b8;font-size:13px;padding:12px 0">Aucune donnée disponible.</p>';
     } else {
-      // Pré-calcul : inclure l'année N-1 du premier millésime affiché pour la variation
-      const yearsToCompute = [...dispYears];
+      // Assurer que l'année N-1 du premier millésime affiché est calculée pour la variation
       const minDisp = Math.min(...dispYears);
-      if (!yearsToCompute.includes(minDisp - 1)) yearsToCompute.push(minDisp - 1);
-
-      const yearData = {};
-      yearsToCompute.forEach(y => {
-        const { stats } = _statsComputeYear(b, y);
+      if (!yearData[minDisp - 1]) {
+        const { stats: sy } = _statsComputeYear(b, minDisp - 1);
         const totals = new Array(12).fill(0);
-        Object.values(stats).forEach(arr => arr.forEach((v,m) => { totals[m] += v; }));
-        const grand = totals.reduce((a,v) => a+v, 0);
-        const partners = Object.keys(stats)
-          .filter(p => stats[p].reduce((a,v)=>a+v,0) > 0)
-          .sort((a,z) => stats[z].reduce((s,v)=>s+v,0) - stats[a].reduce((s,v)=>s+v,0));
-        yearData[y] = { stats, totals, grand, partners };
-      });
+        Object.values(sy).forEach(arr => arr.forEach((v,m) => { totals[m] += v; }));
+        yearData[minDisp - 1] = { stats: sy, totals, grand: totals.reduce((a,v)=>a+v,0), partners: [] };
+      }
 
       const COL = 16; // Année + Partenaire + 12 mois + Total + Var
       html += '<div style="overflow-x:auto;margin:-4px -2px"><table style="border-collapse:collapse;width:100%;min-width:700px">';
@@ -3964,13 +3982,9 @@ function downloadStatsCSV() {
     });
     rows.push(['TOTAL PAX',...monthTotals,monthTotals.reduce((a,v)=>a+v,0)]);
   } else {
-    const allYears  = _statsAvailableYears(b);
-    const dispYears = allYears.filter(y => y >= 2026);
-    const yearsComp = [...dispYears];
-    const minDisp   = Math.min(...dispYears);
-    if (!yearsComp.includes(minDisp-1)) yearsComp.push(minDisp-1);
+    const allYears = _statsAvailableYears(b);
     const yData = {};
-    yearsComp.forEach(y=>{
+    allYears.forEach(y=>{
       const {stats}=_statsComputeYear(b,y);
       const totals=new Array(12).fill(0);
       Object.values(stats).forEach(arr=>arr.forEach((v,m)=>{ totals[m]+=v; }));
@@ -3979,6 +3993,10 @@ function downloadStatsCSV() {
         .sort((a,z)=>stats[z].reduce((s,v)=>s+v,0)-stats[a].reduce((s,v)=>s+v,0));
       yData[y]={stats,totals,grand,partners};
     });
+    const dispYears = allYears.filter(y => yData[y].grand >= 20 || y >= year);
+    // Assurer l'année N-1 pour variation
+    const minD = Math.min(...dispYears);
+    if (!yData[minD-1]) { const {stats:s}=_statsComputeYear(b,minD-1); const t=new Array(12).fill(0); Object.values(s).forEach(a=>a.forEach((v,m)=>t[m]+=v)); yData[minD-1]={stats:s,totals:t,grand:t.reduce((a,v)=>a+v,0),partners:[]}; }
     rows.push(['Année','Partenaire',...MOIS,'Total','Variation']);
     dispYears.forEach(y=>{
       const {stats,totals,grand,partners}=yData[y];
