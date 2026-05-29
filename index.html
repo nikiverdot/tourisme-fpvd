@@ -754,7 +754,6 @@ tr.row-ferme    td.jour-cell,tr.row-ferme    td.date-cell,tr.row-ferme    td.rdv
   <button id="btn-csv-import" class="btn btn-import" onclick="openImportCSVModal()" style="display:none;background:#f0fdf4;color:#15803d;border-color:#86efac">📋 Import CSV 2026</button>
   <button id="btn-stats"   class="btn" onclick="openStatsModal()"  style="display:none;background:#f5f3ff;color:#6d28d9;border-color:#c4b5fd">📊 Statistiques</button>
   <button id="btn-search" class="btn" onclick="openSearchModal()" style="display:none;background:#fff7ed;color:#c2410c;border-color:#fed7aa">🔍 Rechercher</button>
-  <button id="btn-bulk-arrived" class="btn" onclick="bulkMarkArrived()" style="display:none;background:#f0fdf4;color:#15803d;border-color:#86efac">✅ Marquer arrivés</button>
   <div class="col-panel-wrap" style="margin-left:auto">
     <button class="btn" style="background:#f8fafc;border-color:#e2e8f0;color:#475569" onclick="toggleColPanel(event)">⊞ Colonnes</button>
     <div id="col-panel" class="col-panel" style="display:none"></div>
@@ -1338,8 +1337,6 @@ function updateUserChip(user) {
   const showMgr = isAdminU || currentUserRole === 'manager';
   if (statsBtn)  statsBtn.style.display  = showMgr ? '' : 'none';
   if (searchBtn) searchBtn.style.display = showMgr ? '' : 'none';
-  const bulkBtn = document.getElementById('btn-bulk-arrived');
-  if (bulkBtn) bulkBtn.style.display = isAdminU ? '' : 'none';
   // Badge "lecture seule" visible dans le header
   let vb = document.getElementById('viewer-badge');
   if (isViewer) {
@@ -4039,54 +4036,6 @@ function downloadStatsCSV() {
   URL.revokeObjectURL(url);
 }
 
-async function bulkMarkArrived() {
-  const btn = document.getElementById('btn-bulk-arrived');
-  if (!confirm('Marcar como ARRIVÉ toutes les réservations non-noshow\ndu 1 jan 2026 à aujourd\'hui (AD + Bulle) ?')) return;
-  if (btn) { btn.textContent = '⏳ En cours…'; btn.disabled = true; }
-
-  const START = new Date(2026, 0, 1);
-  const END   = new Date();
-  const BOUTIQUES = ['delorme', 'bulle'];
-  const updates = {};
-  let count = 0;
-
-  for (const b of BOUTIQUES) {
-    let d = new Date(START);
-    while (d <= END) {
-      const k = toKey(d);
-      for (const ev of (fhBookings[k] || []).filter(ev => ev.boutique === b)) {
-        if (!ev.bookingPk) continue;
-        const ck = 'fh' + ev.bookingPk;
-        if (getCheckin(b, k, ck) === 'noshow' || getCheckin(b, k, ck) === 'arrived') continue;
-        if (!checkinData[b]) checkinData[b] = {};
-        if (!checkinData[b][k]) checkinData[b][k] = {};
-        checkinData[b][k][ck] = 'arrived';
-        updates['checkins/' + b + '/' + k + '/' + ck] = 'arrived';
-        count++;
-      }
-      getManualBookings(b, k).forEach((bk, i) => {
-        const ck = 'm' + i;
-        if (getCheckin(b, k, ck) === 'noshow' || getCheckin(b, k, ck) === 'arrived') return;
-        if (!checkinData[b]) checkinData[b] = {};
-        if (!checkinData[b][k]) checkinData[b][k] = {};
-        checkinData[b][k][ck] = 'arrived';
-        updates['checkins/' + b + '/' + k + '/' + ck] = 'arrived';
-        count++;
-      });
-      d = addDays(d, 1);
-    }
-  }
-
-  if (!count) {
-    toast('Rien à marquer.', '#64748b');
-    if (btn) { btn.textContent = '✅ Déjà fait'; btn.disabled = true; }
-    return;
-  }
-  await db.ref(DB_PATH).update(updates);
-  render();
-  toast('✅ ' + count + ' réservations marquées arrivé', '#15803d');
-  if (btn) { btn.textContent = '✅ Fait (' + count + ')'; btn.disabled = true; }
-}
 
 function openSearchModal() {
   const modalEl = document.querySelector('.modal');
