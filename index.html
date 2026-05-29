@@ -1035,7 +1035,7 @@ function initFirebaseData() {
 
 // ═══ SAVE (FIABLE) ════════════════════════════
 function buildPayload() {
-  const payload = { lastUpdated: Date.now(), lastUpdatedBy: currentUser||'Anonyme', boutiques: {}, checkins: checkinData };
+  const payload = { lastUpdated: Date.now(), lastUpdatedBy: currentUser||'Anonyme', boutiques: {} };
   Object.keys(state.boutiques).forEach(b => {
     payload.boutiques[b] = {
       schedule:     state.boutiques[b].schedule     || {},
@@ -1059,13 +1059,13 @@ function doSaveNow() {
   if (!db || !authUser) return; // never write without auth
   pendingSave = true;
   setSyncBadge('saving','Sauvegarde…');
-  db.ref(DB_PATH).set(buildPayload())
+  db.ref(DB_PATH).update(buildPayload())
     .then(() => { pendingSave = false; setSyncBadge('online','✓ Sauvegardé · ' + new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})); })
     .catch(err => {
       pendingSave = false;
       setSyncBadge('error','Erreur save');
       // Retry once after 2s
-      setTimeout(() => { if (isFirebase && db) db.ref(DB_PATH).set(buildPayload()).catch(()=>{}); }, 2000);
+      setTimeout(() => { if (isFirebase && db) db.ref(DB_PATH).update(buildPayload()).catch(()=>{}); }, 2000);
     });
 }
 
