@@ -3802,7 +3802,12 @@ function _statsComputeYear(b, year) {
 function _statsAvailableYears(b) {
   const yrs = new Set();
   Object.keys(state.boutiques[b]?.bookings||{}).forEach(k=>{ const y=parseInt(k.slice(0,4)); if(y>=2020&&y<=2099) yrs.add(y); });
-  Object.keys(fhBookings).forEach(k=>{ const y=parseInt(k.slice(0,4)); if(y>=2020&&y<=2099) yrs.add(y); });
+  // Filtrer par boutique — ne pas inclure les années qui n'ont des FH que de l'autre boutique
+  Object.entries(fhBookings).forEach(([k, evs]) => {
+    if (evs.some(ev => ev.boutique === b)) {
+      const y = parseInt(k.slice(0,4)); if(y>=2020&&y<=2099) yrs.add(y);
+    }
+  });
   return [...yrs].sort((a,b)=>b-a); // desc
 }
 
@@ -3885,7 +3890,7 @@ function openStatsModal(tab) {
     });
 
     // Garder : années avec ≥ 20 pax (données réelles) OU année en cours/future
-    const dispYears = allYears.filter(y => y >= 2025);
+    const dispYears = allYears.filter(y => y >= 2025 && (yearData[y].grand > 0 || y >= year));
 
     if (dispYears.length < 1) {
       html += '<p style="color:#94a3b8;font-size:13px;padding:12px 0">Aucune donnée disponible.</p>';
@@ -4001,7 +4006,7 @@ function downloadStatsCSV() {
         .sort((a,z)=>stats[z].reduce((s,v)=>s+v,0)-stats[a].reduce((s,v)=>s+v,0));
       yData[y]={stats,totals,grand,partners};
     });
-    const dispYears = allYears.filter(y => yData[y].grand >= 20 || y >= year);
+    const dispYears = allYears.filter(y => y >= 2025 && (yData[y].grand > 0 || y >= year));
     const ordY = [...dispYears].sort((a,b)=>a-b);
     // Assurer l'année N-1 pour variation
     const minD = Math.min(...ordY);
