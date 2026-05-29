@@ -3895,53 +3895,57 @@ function openStatsModal(tab) {
         yearData[minDisp - 1] = { stats: sy, totals, grand: totals.reduce((a,v)=>a+v,0), partners: [] };
       }
 
-      const COL = 16; // Année + Partenaire + 12 mois + Total + Var
-      html += '<div style="overflow-x:auto;margin:-4px -2px"><table style="border-collapse:collapse;width:100%;min-width:700px">';
-      html += '<thead><tr>';
-      html += '<th style="'+thL+';min-width:52px">Année</th>';
-      html += '<th style="'+thL+';min-width:110px">Partenaire</th>';
-      MOIS.forEach(m => html += '<th style="'+thS+'">'+m+'</th>');
-      html += '<th style="'+thS+';background:#f0f8f7;color:#0e5c5c">Total</th>';
-      html += '<th style="'+thS+'">Var.</th>';
+      // ── Partenaires en lignes, années en colonnes ──
+      const orderedYears = [...dispYears].sort((a,b) => a - b); // chronologique gauche→droite
+
+      // Union de tous les partenaires sur toutes les années affichées
+      const allPartners = [], partnerSet = new Set();
+      orderedYears.forEach(y => yearData[y].partners.forEach(p => { if (!partnerSet.has(p)) { partnerSet.add(p); allPartners.push(p); } }));
+      // Trier par total sur l'année la plus récente, puis par total global
+      const lastY = orderedYears[orderedYears.length - 1];
+      allPartners.sort((a, z) => {
+        const av = (yearData[lastY]?.stats[a]||[]).reduce((s,v)=>s+v,0);
+        const zv = (yearData[lastY]?.stats[z]||[]).reduce((s,v)=>s+v,0);
+        if (av !== zv) return zv - av;
+        return orderedYears.reduce((s,y)=>s+(yearData[y]?.stats[z]||[]).reduce((ss,v)=>ss+v,0),0)
+             - orderedYears.reduce((s,y)=>s+(yearData[y]?.stats[a]||[]).reduce((ss,v)=>ss+v,0),0);
+      });
+
+      html += '<div style="overflow-x:auto;margin:-4px -2px"><table style="border-collapse:collapse;width:100%;min-width:360px">';
+      html += '<thead>';
+      // Ligne 1 : années
+      html += '<tr><th style="'+thL+';min-width:130px">Partenaire</th>';
+      orderedYears.forEach(y => {
+        const isCY = y === year;
+        html += '<th style="'+thS+(isCY?';background:#0e5c5c;color:#fff;':'')+';min-width:62px">'+y+'</th>';
+      });
+      html += '</tr>';
+      // Ligne 2 : variations sous les années
+      html += '<tr><th style="'+thL+';font-size:10px;color:#94a3b8;font-weight:400;padding:2px 8px">vs année préc.</th>';
+      orderedYears.forEach(y => {
+        const g = yearData[y].grand, prev = yearData[y-1];
+        if (prev && prev.grand > 0) {
+          const pct = Math.round((g - prev.grand) / prev.grand * 100);
+          const col = pct >= 0 ? '#15803d' : '#dc2626';
+          html += '<th style="'+thS+';font-weight:700;font-size:11px;color:'+col+'">'+(pct>=0?'+':'')+pct+'%</th>';
+        } else { html += '<th style="'+thS+';color:#cbd5e1;font-size:10px">—</th>'; }
+      });
       html += '</tr></thead><tbody>';
 
-      dispYears.forEach((y, yi) => {
-        const { stats, totals, grand, partners } = yearData[y];
-        const isCurrentYear = y === year;
-        const bg = yi % 2 === 1 ? 'background:#f8fafc;' : '';
+      // Ligne TOTAL PAX
+      html += '<tr style="'+trTt+'"><td style="padding:5px 8px;font-size:12px;letter-spacing:.04em">TOTAL PAX</td>';
+      orderedYears.forEach(y => { const g=yearData[y].grand; html+='<td style="padding:5px 8px;font-size:12px;text-align:right">'+(g||'—')+'</td>'; });
+      html += '</tr>';
 
-        // Variation vs année précédente (affichée ou non)
-        let varHtml = '<td style="border:1px solid #e2e8f0"></td>';
-        const prev = yearData[y - 1];
-        if (prev && prev.grand > 0) {
-          const pct = Math.round((grand - prev.grand) / prev.grand * 100);
-          const col = pct >= 0 ? '#15803d' : '#dc2626';
-          varHtml = '<td style="padding:4px 8px;font-size:11px;color:'+col+';font-weight:700;border:1px solid #e2e8f0">'+(pct>=0?'+':'')+pct+'%</td>';
-        }
-
-        // ── Ligne TOTAL de l'année ──
-        if (yi > 0) html += '<tr><td colspan="'+COL+'" style="height:5px;background:#e2e8f0;border:none;padding:0"></td></tr>';
-        html += '<tr style="'+bg+(isCurrentYear?'font-weight:800;':'font-weight:700;')+'">';
-        html += '<td style="'+tdN+bg+(isCurrentYear?'color:#0e5c5c;':'')+';font-size:13px">'+y+'</td>';
-        html += '<td style="'+tdN+bg+';color:#475569;font-size:11px;font-weight:600;letter-spacing:.05em">TOTAL</td>';
-        totals.forEach(v => { html += v>0?'<td style="'+tdS+bg+'">'+v+'</td>':'<td style="'+tdZ+bg+'">—</td>'; });
-        html += '<td style="'+tdT+'">'+grand+'</td>';
-        html += varHtml;
-        html += '</tr>';
-
-        // ── Sous-lignes par partenaire ──
-        partners.forEach(p => {
-          const arr   = stats[p];
-          const ptot  = arr.reduce((a,v)=>a+v,0);
-          const subC  = 'padding:3px 8px;font-size:11px;text-align:right;border:1px solid #e2e8f0;'+bg;
-          html += '<tr style="'+bg+'">';
-          html += '<td style="'+subC+'text-align:left;color:#94a3b8"></td>';
-          html += '<td style="'+subC+'text-align:left;padding-left:18px;color:#64748b;font-style:italic">↳ '+(VIA_DISPLAY[p]||p)+'</td>';
-          arr.forEach(v => { html += v>0?'<td style="'+subC+'color:#334155">'+v+'</td>':'<td style="'+subC+'color:#e2e8f0">—</td>'; });
-          html += '<td style="'+subC+'font-weight:700;color:#0e5c5c;background:#f0f8f7">'+ptot+'</td>';
-          html += '<td style="border:1px solid #e2e8f0;'+bg+'"></td>';
-          html += '</tr>';
+      // Lignes par partenaire
+      allPartners.forEach((p, pi) => {
+        const bg = pi % 2 === 1 ? 'background:#fafafa;' : '';
+        html += '<tr style="'+bg+'"><td style="'+tdN+bg+'">'+esc(VIA_DISPLAY[p]||p)+'</td>';
+        orderedYears.forEach(y => {
+          const v = (yearData[y]?.stats[p]||[]).reduce((s,x)=>s+x,0);
+          html += v > 0 ? '<td style="'+tdS+bg+'">'+v+'</td>' : '<td style="'+tdZ+bg+'">—</td>';
         });
+        html += '</tr>';
       });
 
       html += '</tbody></table></div>';
@@ -3994,21 +3998,26 @@ function downloadStatsCSV() {
       yData[y]={stats,totals,grand,partners};
     });
     const dispYears = allYears.filter(y => yData[y].grand >= 20 || y >= year);
+    const ordY = [...dispYears].sort((a,b)=>a-b);
     // Assurer l'année N-1 pour variation
-    const minD = Math.min(...dispYears);
+    const minD = Math.min(...ordY);
     if (!yData[minD-1]) { const {stats:s}=_statsComputeYear(b,minD-1); const t=new Array(12).fill(0); Object.values(s).forEach(a=>a.forEach((v,m)=>t[m]+=v)); yData[minD-1]={stats:s,totals:t,grand:t.reduce((a,v)=>a+v,0),partners:[]}; }
-    rows.push(['Année','Partenaire',...MOIS,'Total','Variation']);
-    dispYears.forEach(y=>{
-      const {stats,totals,grand,partners}=yData[y];
-      let pct='';
-      const prev=yData[y-1];
-      if(prev&&prev.grand>0) pct=(grand>=prev.grand?'+':'')+Math.round((grand-prev.grand)/prev.grand*100)+'%';
-      rows.push([y,'TOTAL',...totals,grand,pct]);
-      partners.forEach(p=>{
-        const arr=stats[p]; const pt=arr.reduce((a,v)=>a+v,0);
-        rows.push(['','↳ '+(VIA_DISPLAY[p]||p),...arr,pt,'']);
-      });
-      rows.push([]); // ligne vide entre années
+    // Union des partenaires, triés par total sur dernière année
+    const pSet=new Set(), pAll=[];
+    ordY.forEach(y=>yData[y].partners.forEach(p=>{if(!pSet.has(p)){pSet.add(p);pAll.push(p);}}));
+    const lastY2=ordY[ordY.length-1];
+    pAll.sort((a,z)=>(yData[lastY2]?.stats[z]||[]).reduce((s,v)=>s+v,0)-(yData[lastY2]?.stats[a]||[]).reduce((s,v)=>s+v,0));
+    // Header : Partenaire | yr1 | yr2 | ...
+    rows.push(['Partenaire',...ordY]);
+    // Variation row
+    const varRow=['vs année préc.'];
+    ordY.forEach(y=>{ const g=yData[y].grand,p=yData[y-1]; varRow.push(p&&p.grand>0?(g>=p.grand?'+':'')+Math.round((g-p.grand)/p.grand*100)+'%':''); });
+    rows.push(varRow);
+    // TOTAL row
+    rows.push(['TOTAL PAX',...ordY.map(y=>yData[y].grand)]);
+    // Partner rows
+    pAll.forEach(p=>{
+      rows.push([VIA_DISPLAY[p]||p,...ordY.map(y=>(yData[y]?.stats[p]||[]).reduce((s,v)=>s+v,0)||'')]);
     });
   }
 
