@@ -506,24 +506,11 @@ tr.row-ferme    td.jour-cell,tr.row-ferme    td.date-cell,tr.row-ferme    td.rdv
 .admin-user-row:last-child { border-bottom: none; }
 
 /* ── BARRE ADMIN (visible uniquement pour l'admin, au-dessus de la toolbar) ── */
-#admin-bar {
-  display: none;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 14px;
-  background: #f0f8f7;
-  border-top: 1px solid #e2e8f0;
-  border-bottom: 2px solid #0e5c5c;
-  flex-wrap: wrap;
-}
-body.is-admin #admin-bar { display: flex; }
-#admin-bar .admin-bar-label {
-  font-size: 10px; font-weight: 800; color: #0e5c5c;
-  letter-spacing: .08em; text-transform: uppercase;
-  margin-right: 4px; white-space: nowrap;
-}
-#admin-bar .btn { font-size: 11px; padding: 4px 9px; }
-#admin-bar .ics-msg { font-size: 11px; color: #64748b; }
+/* ── Bouton admin (⚙️) — visible uniquement pour l'admin ── */
+#btn-admin-tools { display: none; }
+body.is-admin #btn-admin-tools { display: inline-flex; }
+#ics-status { font-size: 11px; color: #64748b; }
+#ics-status:empty { display: none; }
 
 /* ── CONSECUTIVE WORK DAYS ── */
 .cell-warn-6 { outline: 2px solid #f97316 !important; outline-offset: 1px; border-radius: 5px; }
@@ -543,7 +530,6 @@ body.is-admin #admin-bar { display: flex; }
   .app-logo    { font-size: 13px; }
   .tab-btn     { padding: 5px 11px; font-size: 12px; }
   .col-panel-wrap { display: none !important; }
-  #admin-bar   { display: none !important; }
   col.col-rdv    { width: 120px; }
   col.col-visite { width: 200px; }
   col.col-emp    { width: 60px; }
@@ -762,23 +748,14 @@ body.is-admin #admin-bar { display: flex; }
   </div>
 </div>
 
-<!-- Barre admin (visible uniquement pour l'admin) -->
-<div id="admin-bar">
-  <span class="admin-bar-label">🔧 Admin</span>
-  <button id="btn-admin" class="btn btn-admin" onclick="openAdminPanel()">⚙ Accès</button>
-  <button id="btn-export" class="btn btn-export" onclick="exportData()">⬇ Exporter</button>
-  <label  id="btn-import-json" class="btn btn-import">⬆ Importer JSON<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
-  <button id="btn-csv-import" class="btn btn-import" onclick="openImportCSVModal()" style="background:#f0fdf4;color:#15803d;border-color:#86efac">📋 Import CSV 2026</button>
-  <button id="btn-fh-settings" class="btn btn-ics" onclick="openFHSettings()" title="Configuration API FareHarbor" style="padding:4px 9px">⚙️ API FH</button>
-  <span class="ics-msg" id="ics-status"></span>
-</div>
-
 <!-- Toolbar principale -->
 <div class="toolbar">
+  <button id="btn-admin-tools" class="btn btn-admin" onclick="openAdminTools()" title="Outils admin">⚙️</button>
   <button id="btn-search" class="btn" onclick="openSearchModal()" style="display:none;background:#fff7ed;color:#c2410c;border-color:#fed7aa">🔍 Rechercher</button>
   <button class="btn btn-today" onclick="scrollToToday()">📍 Aujourd'hui</button>
   <button id="btn-stats"  class="btn" onclick="openStatsModal()"  style="display:none;background:#f5f3ff;color:#6d28d9;border-color:#c4b5fd">📊 Statistiques</button>
   <button class="btn btn-ics" onclick="syncFareHarbor()" id="btn-ics">🔄 Sync FH</button>
+  <span class="ics-msg" id="ics-status"></span>
   <div class="col-panel-wrap" style="margin-left:auto">
     <button class="btn" style="background:#f8fafc;border-color:#e2e8f0;color:#475569" onclick="toggleColPanel(event)">⊞ Colonnes</button>
     <div id="col-panel" class="col-panel" style="display:none"></div>
@@ -1061,7 +1038,7 @@ function initFirebaseData() {
     const raw = snap.val();
     if (raw && !Object.keys(fhBookings).length) {
       Object.keys(raw).forEach(k => {
-        if (k < '2025') return; // ignorer les années avant 2025
+        if (k < '2026') return; // ignorer les années avant 2026
         const v = raw[k];
         fhBookings[k] = Array.isArray(v) ? v
           : Object.keys(v || {}).sort((a, b) => +a - +b).map(i => v[i]);
@@ -1932,13 +1909,13 @@ async function syncFareHarbor() {
       // Reconstruire les tableaux Firebase-ifiés et supprimer les entrées < 2025
       const cleaned = {};
       Object.keys(existing).forEach(k => {
-        if (k < '2025') return; // purger les vieilles années
+        if (k < '2026') return; // purger les vieilles années
         const v = existing[k];
         cleaned[k] = Array.isArray(v) ? v : Object.keys(v||{}).sort((a,b)=>+a-+b).map(i=>v[i]);
       });
       // Fusionner avec le sync actuel (2025+ aussi)
       const newEntries = {};
-      Object.keys(fhBookings).forEach(k => { if (k >= '2025') newEntries[k] = fhBookings[k]; });
+      Object.keys(fhBookings).forEach(k => { if (k >= '2026') newEntries[k] = fhBookings[k]; });
       const merged = Object.assign({}, cleaned, newEntries);
       return db.ref('piffaut-fh-cache').set(merged);
     }).catch(e => console.warn('[FH] cache persist:', e));
@@ -3846,7 +3823,7 @@ function openStatsModal(tab) {
     });
 
     // Garder : années avec ≥ 20 pax (données réelles) OU année en cours/future
-    const dispYears = allYears.filter(y => y >= 2025 && (yearData[y].grand > 0 || y >= year));
+    const dispYears = allYears.filter(y => y >= 2026 && (yearData[y].grand > 0 || y >= year));
 
     if (dispYears.length < 1) {
       html += '<p style="color:#94a3b8;font-size:13px;padding:12px 0">Aucune donnée disponible.</p>';
@@ -3962,7 +3939,7 @@ function downloadStatsCSV() {
         .sort((a,z)=>stats[z].reduce((s,v)=>s+v,0)-stats[a].reduce((s,v)=>s+v,0));
       yData[y]={stats,totals,grand,partners};
     });
-    const dispYears = allYears.filter(y => y >= 2025 && (yData[y].grand > 0 || y >= year));
+    const dispYears = allYears.filter(y => y >= 2026 && (yData[y].grand > 0 || y >= year));
     const ordY = [...dispYears].sort((a,b)=>a-b);
     // Assurer l'année N-1 pour variation
     const minD = Math.min(...ordY);
@@ -3995,6 +3972,28 @@ function downloadStatsCSV() {
   URL.revokeObjectURL(url);
 }
 
+
+function openAdminTools() {
+  const R = (icon, label, action) =>
+    `<button onclick="${action}" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;font-size:13px;text-align:left;background:#fff;border:1px solid #e2e8f0;border-radius:7px;cursor:pointer;color:#1e293b;font-weight:600" onmouseover="this.style.background='#f0f8f7'" onmouseout="this.style.background='#fff'">${icon} <span>${label}</span></button>`;
+
+  const syncStatus = document.getElementById('ics-status')?.textContent || '';
+  const html = `<div style="display:flex;flex-direction:column;gap:7px;padding:4px 0">
+    ${R('⚙','Accès utilisateurs','closeModal();openAdminPanel()')}
+    ${R('⬇','Exporter JSON','closeModal();exportData()')}
+    <label style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;font-size:13px;text-align:left;background:#fff;border:1px solid #e2e8f0;border-radius:7px;cursor:pointer;color:#1e293b;font-weight:600" onmouseover="this.style.background='#f0f8f7'" onmouseout="this.style.background='#fff'">
+      ⬆ <span>Importer JSON</span><input type="file" accept=".json" onchange="closeModal();importData(event)" style="display:none">
+    </label>
+    ${R('📋','Import CSV 2026','closeModal();openImportCSVModal()')}
+    ${R('⚙️','Configuration API FareHarbor','closeModal();openFHSettings()')}
+    ${syncStatus ? `<div style="margin-top:4px;padding:8px 12px;background:#f0f8f7;border-radius:6px;font-size:11px;color:#64748b">${syncStatus}</div>` : ''}
+  </div>`;
+
+  document.getElementById('modal-title').textContent = '⚙️ Outils Admin';
+  document.getElementById('modal-body').innerHTML = html;
+  document.getElementById('modal-actions').innerHTML = '<button class="btn-mp" onclick="closeModal()">Fermer</button>';
+  openModal();
+}
 
 function openSearchModal() {
   const modalEl = document.querySelector('.modal');
