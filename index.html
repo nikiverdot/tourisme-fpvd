@@ -3742,130 +3742,200 @@ function init() {
 }
 init();
 
-// ═══ STATISTIQUES PAX PAR PARTENAIRE ══════════════════════════════════════
-function openStatsModal() {
+// ═══ STATISTIQUES PAX ══════════════════════════════════════════════════════
+
+function _statsComputeYear(b, year) {
+  // Returns { stats: {partner→[12]}, noshowStats: {partner→[12]} }
+  const stats = {}, nsStats = {};
+  const add = (obj, p, m, v) => { const k = p||'—'; if (!obj[k]) obj[k]=new Array(12).fill(0); obj[k][m]+=(v||0); };
+  let d = new Date(year, 0, 1);
+  const end = new Date(year + 1, 0, 1);
+  while (d < end) {
+    const k = toKey(d), m = d.getMonth();
+    (fhBookings[k]||[]).filter(ev=>ev.boutique===b).forEach(ev=>{
+      const p = ev.via||'FH'; add(stats,p,m,ev.pax);
+      const ck='fh'+(ev.bookingPk||safeFirebaseKey((ev.time||'')+'_'+(ev.activity||'fh')));
+      if(getCheckin(b,k,ck)==='noshow') add(nsStats,p,m,ev.pax);
+    });
+    getManualBookings(b,k).forEach((bk,i)=>{
+      const p=bk.via||'Direct'; add(stats,p,m,bk.pax);
+      if(getCheckin(b,k,'m'+i)==='noshow') add(nsStats,p,m,bk.pax);
+    });
+    d = addDays(d,1);
+  }
+  return { stats, nsStats };
+}
+
+function _statsAvailableYears(b) {
+  const yrs = new Set();
+  Object.keys(state.boutiques[b]?.bookings||{}).forEach(k=>{ const y=parseInt(k.slice(0,4)); if(y>=2020&&y<=2099) yrs.add(y); });
+  Object.keys(fhBookings).forEach(k=>{ const y=parseInt(k.slice(0,4)); if(y>=2020&&y<=2099) yrs.add(y); });
+  return [...yrs].sort((a,b)=>b-a); // desc
+}
+
+function openStatsModal(tab) {
   if (!authUser || (currentUserRole !== 'admin' && currentUserRole !== 'manager')) return;
+  tab = tab || 'year';
   const b    = state.currentBoutique;
   const year = state.currentYear;
   const boutName = b === 'bulle' ? '🫧 Atelier de la Bulle' : '🍾 André Delorme';
 
-  // Agrégation : partenaire → [pax jan..déc]
-  const stats = {};
-  const addPax = (partner, month, pax) => {
-    const p = partner || '—';
-    if (!stats[p]) stats[p] = new Array(12).fill(0);
-    stats[p][month] += (pax || 0);
-  };
-  const noshowStats = {};
-  const addNoshow = (partner, month, pax) => {
-    const p = partner || '—';
-    if (!noshowStats[p]) noshowStats[p] = new Array(12).fill(0);
-    noshowStats[p][month] += (pax || 0);
-  };
+  const MOIS = ['Jan','Fév','Mar','Avr','Mai','Jui','Jul','Aoû','Sep','Oct','Nov','Déc'];
+  const thS  = 'padding:5px 8px;background:#f1f5f9;font-size:11px;font-weight:700;text-align:center;white-space:nowrap;border:1px solid #e2e8f0;color:#475569;letter-spacing:.04em';
+  const thL  = thS+';text-align:left';
+  const tdS  = 'padding:4px 8px;font-size:12px;text-align:right;border:1px solid #e2e8f0;';
+  const tdN  = tdS+'text-align:left;font-weight:600;white-space:nowrap;';
+  const tdT  = tdS+'font-weight:800;color:#0e5c5c;background:#f0f8f7;';
+  const tdZ  = tdS+'color:#cbd5e1;';
+  const trTt = 'background:#0e5c5c;color:#fff;font-weight:800;';
 
-  let d = new Date(year, 0, 1);
-  const endDate = new Date(year + 1, 0, 1);
-  while (d < endDate) {
-    const k = toKey(d);
-    const month = d.getMonth();
+  // ── Tabs ──
+  const tabStyle = (active) => 'padding:6px 14px;font-size:12px;font-weight:700;border-radius:6px;cursor:pointer;border:none;'
+    + (active ? 'background:#0e5c5c;color:#fff;' : 'background:#f1f5f9;color:#475569;');
+  let tabs = '<div style="display:flex;gap:6px;margin-bottom:14px">'
+    + '<button style="'+tabStyle(tab==='year')+'" onclick="openStatsModal(\'year\')">📊 ' + year + '</button>'
+    + '<button style="'+tabStyle(tab==='compare')+'" onclick="openStatsModal(\'compare\')">📈 Comparatif annuel</button>'
+    + '</div>';
 
-    // Réservations FH (données brutes)
-    (fhBookings[k] || []).filter(ev => ev.boutique === b).forEach(ev => {
-      const partner = ev.via || 'FH';
-      addPax(partner, month, ev.pax);
-      const ckKey = 'fh' + (ev.bookingPk || safeFirebaseKey((ev.time||'') + '_' + (ev.activity||'fh')));
-      if (getCheckin(b, k, ckKey) === 'noshow') addNoshow(partner, month, ev.pax);
-    });
+  let html = tabs;
 
-    // Réservations manuelles
-    getManualBookings(b, k).forEach((bk, i) => {
-      const partner = bk.via || 'Direct';
-      addPax(partner, month, bk.pax);
-      if (getCheckin(b, k, 'm' + i) === 'noshow') addNoshow(partner, month, bk.pax);
-    });
+  if (tab === 'year') {
+    // ── Vue année courante par partenaire ──
+    const { stats, nsStats } = _statsComputeYear(b, year);
+    const partners = Object.keys(stats).filter(p=>stats[p].reduce((a,v)=>a+v,0)>0)
+      .sort((a,z)=>stats[z].reduce((s,v)=>s+v,0)-stats[a].reduce((s,v)=>s+v,0));
+    const monthTotals = new Array(12).fill(0);
+    partners.forEach(p=>stats[p].forEach((v,m)=>{ monthTotals[m]+=v; }));
+    const grandTotal = monthTotals.reduce((a,v)=>a+v,0);
 
-    d = addDays(d, 1);
+    if (!grandTotal) {
+      html += '<p style="color:#94a3b8;font-size:13px;padding:12px 0">Aucune donnée pour ' + year + '.</p>';
+    } else {
+      html += '<div style="overflow-x:auto;margin:-4px -2px"><table style="border-collapse:collapse;width:100%;min-width:560px">';
+      html += '<thead><tr><th style="'+thL+';min-width:90px">Partenaire</th>';
+      MOIS.forEach(m=>html+='<th style="'+thS+'">'+m+'</th>');
+      html += '<th style="'+thS+';background:#f0f8f7;color:#0e5c5c">Total</th></tr></thead><tbody>';
+      partners.forEach((p,pi)=>{
+        const rowTotal=stats[p].reduce((a,v)=>a+v,0);
+        const bg=pi%2===1?'background:#fafafa;':'';
+        html+='<tr style="'+bg+'"><td style="'+tdN+bg+'">'+esc(VIA_DISPLAY[p]||p)+'</td>';
+        stats[p].forEach(v=>{ html+=v>0?'<td style="'+tdS+bg+'">'+v+'</td>':'<td style="'+tdZ+bg+'">—</td>'; });
+        html+='<td style="'+tdT+'">'+rowTotal+'</td></tr>';
+        const ns=nsStats[p]; if(ns){ const nsT=ns.reduce((a,v)=>a+v,0); if(nsT>0){
+          const nsC='padding:3px 8px;font-size:11px;text-align:right;color:#dc2626;border:1px solid #fecaca;';
+          html+='<tr style="background:#fff5f5;"><td style="'+nsC+'text-align:left;padding-left:16px;font-style:italic">↳ no-show</td>';
+          ns.forEach(v=>{ html+=v>0?'<td style="'+nsC+'">−'+v+'</td>':'<td style="'+nsC+'color:#fca5a5;">—</td>'; });
+          html+='<td style="'+nsC+'font-weight:700;">−'+nsT+'</td></tr>';
+        }}
+      });
+      html+='<tr style="'+trTt+'"><td style="padding:5px 8px;font-size:12px;letter-spacing:.04em">TOTAL PAX</td>';
+      monthTotals.forEach(v=>{ html+='<td style="padding:5px 8px;font-size:12px;text-align:right">'+(v||'—')+'</td>'; });
+      html+='<td style="padding:5px 8px;font-size:13px;text-align:right">'+grandTotal+'</td></tr>';
+      html+='</tbody></table></div>';
+    }
+
+  } else {
+    // ── Vue comparatif annuel ──
+    const years = _statsAvailableYears(b);
+    if (years.length < 1) {
+      html += '<p style="color:#94a3b8;font-size:13px;padding:12px 0">Aucune donnée disponible.</p>';
+    } else {
+      // Totaux par année
+      const yearData = {}; // year → [12 months]
+      years.forEach(y=>{
+        const { stats } = _statsComputeYear(b, y);
+        const totals = new Array(12).fill(0);
+        Object.values(stats).forEach(arr=>arr.forEach((v,m)=>{ totals[m]+=v; }));
+        yearData[y] = totals;
+      });
+
+      html += '<div style="overflow-x:auto;margin:-4px -2px"><table style="border-collapse:collapse;width:100%;min-width:560px">';
+      html += '<thead><tr><th style="'+thL+';min-width:60px">Année</th>';
+      MOIS.forEach(m=>html+='<th style="'+thS+'">'+m+'</th>');
+      html += '<th style="'+thS+';background:#f0f8f7;color:#0e5c5c">Total</th></tr></thead><tbody>';
+
+      years.forEach((y, yi) => {
+        const totals = yearData[y];
+        const grand  = totals.reduce((a,v)=>a+v,0);
+        const bg     = yi%2===1?'background:#fafafa;':'';
+        const isCurrentYear = y === year;
+        const yrStyle = tdN + bg + (isCurrentYear ? 'color:#0e5c5c;' : '');
+        html += '<tr style="'+bg+(isCurrentYear?'font-weight:800;':'')+'"><td style="'+yrStyle+'">'+y+'</td>';
+        totals.forEach(v=>{ html+=v>0?'<td style="'+tdS+bg+'">'+v+'</td>':'<td style="'+tdZ+bg+'">—</td>'; });
+        html += '<td style="'+tdT+'">'+grand+'</td>';
+        // Variation vs année précédente
+        if (yi < years.length-1) {
+          const prevGrand = yearData[years[yi+1]].reduce((a,v)=>a+v,0);
+          if (prevGrand > 0) {
+            const pct = Math.round((grand-prevGrand)/prevGrand*100);
+            const color = pct>=0?'#15803d':'#dc2626';
+            html += '<td style="padding:4px 8px;font-size:11px;color:'+color+';font-weight:700;border:1px solid #e2e8f0">'+(pct>=0?'+':'')+pct+'%</td>';
+          } else { html += '<td style="border:1px solid #e2e8f0"></td>'; }
+        } else { html += '<td style="border:1px solid #e2e8f0"></td>'; }
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+      html += '<p style="color:#94a3b8;font-size:11px;margin-top:8px">* FH inclus uniquement si synchronisé pour l\'année concernée</p>';
+    }
   }
 
-  const partners = Object.keys(stats).filter(p => stats[p].reduce((a,v)=>a+v,0) > 0)
-    .sort((a,z) => stats[z].reduce((s,v)=>s+v,0) - stats[a].reduce((s,v)=>s+v,0)); // tri par total desc
-
-  const MOIS = ['Jan','Fév','Mar','Avr','Mai','Jui','Jul','Aoû','Sep','Oct','Nov','Déc'];
-  const monthTotals = new Array(12).fill(0);
-  partners.forEach(p => stats[p].forEach((v,m) => { monthTotals[m] += v; }));
-  const grandTotal = monthTotals.reduce((a,v) => a+v, 0);
-
-  const thStyle  = 'padding:5px 8px;background:#f1f5f9;font-size:11px;font-weight:700;text-align:center;white-space:nowrap;border:1px solid #e2e8f0;color:#475569;letter-spacing:.04em';
-  const thLeft   = thStyle + ';text-align:left';
-  const tdStyle  = 'padding:4px 8px;font-size:12px;text-align:right;border:1px solid #e2e8f0;';
-  const tdName   = tdStyle + 'text-align:left;font-weight:600;white-space:nowrap;';
-  const tdTotal  = tdStyle + 'font-weight:800;color:#0e5c5c;background:#f0f8f7;';
-  const tdZero   = tdStyle + 'color:#cbd5e1;';
-  const trTot    = 'background:#0e5c5c;color:#fff;font-weight:800;';
-
-  let html = '<div style="overflow-x:auto;margin:-4px -2px"><table style="border-collapse:collapse;width:100%;min-width:560px">';
-
-  // En-tête
-  html += '<thead><tr>';
-  html += '<th style="' + thLeft + ';min-width:90px">Partenaire</th>';
-  MOIS.forEach(m => html += '<th style="' + thStyle + '">' + m + '</th>');
-  html += '<th style="' + thStyle + ';background:#f0f8f7;color:#0e5c5c">Total</th>';
-  html += '</tr></thead><tbody>';
-
-  // Lignes par partenaire
-  partners.forEach((p, pi) => {
-    const rowTotal = stats[p].reduce((a,v) => a+v, 0);
-    const bg = pi % 2 === 1 ? 'background:#fafafa;' : '';
-    html += '<tr style="' + bg + '">';
-    html += '<td style="' + tdName + bg + '">' + esc(VIA_DISPLAY[p] || p) + '</td>';
-    stats[p].forEach(v => {
-      html += v > 0
-        ? '<td style="' + tdStyle + bg + '">' + v + '</td>'
-        : '<td style="' + tdZero + bg + '">—</td>';
-    });
-    html += '<td style="' + tdTotal + '">' + rowTotal + '</td>';
-    html += '</tr>';
-    // Sous-ligne no-show pour ce partenaire
-    const ns = noshowStats[p];
-    if (ns) {
-      const nsTotal = ns.reduce((a,v) => a+v, 0);
-      if (nsTotal > 0) {
-        const nsCell = 'padding:3px 8px;font-size:11px;text-align:right;color:#dc2626;border:1px solid #fecaca;';
-        html += '<tr style="background:#fff5f5;">';
-        html += '<td style="' + nsCell + 'text-align:left;padding-left:16px;font-style:italic">↳ no-show</td>';
-        ns.forEach(v => {
-          html += v > 0
-            ? '<td style="' + nsCell + '">−' + v + '</td>'
-            : '<td style="' + nsCell + 'color:#fca5a5;">—</td>';
-        });
-        html += '<td style="' + nsCell + 'font-weight:700;">−' + nsTotal + '</td>';
-        html += '</tr>';
-      }
-    }
-  });
-
-  // Ligne totaux
-  html += '<tr style="' + trTot + '">';
-  html += '<td style="padding:5px 8px;font-size:12px;letter-spacing:.04em">TOTAL PAX</td>';
-  monthTotals.forEach(v => {
-    html += '<td style="padding:5px 8px;font-size:12px;text-align:right">' + (v || '—') + '</td>';
-  });
-  html += '<td style="padding:5px 8px;font-size:13px;text-align:right">' + grandTotal + '</td>';
-  html += '</tr>';
-
-  html += '</tbody></table></div>';
-
-  if (!grandTotal) html = '<p style="color:#94a3b8;font-size:13px;padding:12px 0">Aucune donnée pour ' + year + '.</p>';
-
-  // Modal plus large
   const modalEl = document.querySelector('.modal');
-  if (modalEl) { modalEl.style.width = '860px'; modalEl.style.maxWidth = '96vw'; }
-
-  modalCtx = { type: 'stats' };
-  document.getElementById('modal-title').textContent = '📊 Statistiques PAX — ' + boutName + ' — ' + year;
+  if (modalEl) { modalEl.style.width = '900px'; modalEl.style.maxWidth = '96vw'; }
+  modalCtx = { type: 'stats', tab, b, year };
+  document.getElementById('modal-title').textContent = '📊 Statistiques PAX — ' + boutName;
   document.getElementById('modal-body').innerHTML = html;
-  document.getElementById('modal-actions').innerHTML = '<button class="btn-mp" onclick="closeModal()">Fermer</button>';
+  document.getElementById('modal-actions').innerHTML =
+    '<button class="btn-mp" style="background:#f0fdf4;color:#15803d;border:1px solid #86efac" onclick="downloadStatsCSV()">⬇ CSV</button>' +
+    '<button class="btn-mp" onclick="closeModal()">Fermer</button>';
   openModal();
+}
+
+function downloadStatsCSV() {
+  const ctx = modalCtx || {};
+  const b    = ctx.b    || state.currentBoutique;
+  const year = ctx.year || state.currentYear;
+  const tab  = ctx.tab  || 'year';
+  const MOIS = ['Jan','Fév','Mar','Avr','Mai','Jui','Jul','Aoû','Sep','Oct','Nov','Déc'];
+  const rows = [];
+
+  if (tab === 'year') {
+    const { stats, nsStats } = _statsComputeYear(b, year);
+    const partners = Object.keys(stats).filter(p=>stats[p].reduce((a,v)=>a+v,0)>0)
+      .sort((a,z)=>stats[z].reduce((s,v)=>s+v,0)-stats[a].reduce((s,v)=>s+v,0));
+    const monthTotals = new Array(12).fill(0);
+    partners.forEach(p=>stats[p].forEach((v,m)=>{ monthTotals[m]+=v; }));
+    rows.push(['Partenaire',...MOIS,'Total']);
+    partners.forEach(p=>{
+      rows.push([VIA_DISPLAY[p]||p,...stats[p],stats[p].reduce((a,v)=>a+v,0)]);
+      const ns=nsStats[p]; if(ns&&ns.reduce((a,v)=>a+v,0)>0)
+        rows.push(['  ↳ no-show',...ns.map(v=>v>0?'-'+v:''),'−'+ns.reduce((a,v)=>a+v,0)]);
+    });
+    rows.push(['TOTAL PAX',...monthTotals,monthTotals.reduce((a,v)=>a+v,0)]);
+  } else {
+    const years = _statsAvailableYears(b);
+    rows.push(['Année',...MOIS,'Total','Variation']);
+    years.forEach((y,yi)=>{
+      const {stats} = _statsComputeYear(b,y);
+      const totals=new Array(12).fill(0);
+      Object.values(stats).forEach(arr=>arr.forEach((v,m)=>{ totals[m]+=v; }));
+      const grand=totals.reduce((a,v)=>a+v,0);
+      let pct='';
+      if(yi<years.length-1){
+        const {stats:ps}=_statsComputeYear(b,years[yi+1]);
+        const pg=Object.values(ps).flat().reduce((a,v)=>a+v,0);
+        if(pg>0) pct=(grand>=pg?'+':'')+Math.round((grand-pg)/pg*100)+'%';
+      }
+      rows.push([y,...totals,grand,pct]);
+    });
+  }
+
+  const boutSlug = b === 'bulle' ? 'bulle' : 'ad';
+  const fname    = 'stats-' + boutSlug + (tab==='year'?'-'+year:'-comparatif') + '.csv';
+  const csv      = rows.map(r=>r.map(c=>'"'+String(c===0?'':c).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+  const blob     = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8;'});
+  const url      = URL.createObjectURL(blob);
+  const a        = document.createElement('a'); a.href=url; a.download=fname; a.click();
+  URL.revokeObjectURL(url);
 }
 
 async function bulkMarkArrived() {
