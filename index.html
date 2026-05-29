@@ -3405,7 +3405,7 @@ function openBookingModal(b, k, idx) {
       </div>
     </div>
     <div class="form-group"><label class="form-label">Via <span style="font-size:10px;color:#94a3b8;font-weight:400">— affiche (texte)</span></label>
-      <input id="f-via" class="form-input" list="dl-via" maxlength="30" placeholder="RDV, GYG, Winalist…" value="${esc(bk.via||'')}" oninput="onViaChange()">
+      <input id="f-via" class="form-input" list="dl-via" maxlength="30" placeholder="${b==='bulle' ? 'Direct, GYG, Winalist…' : 'RDV, GYG, Winalist…'}" value="${esc(bk.via||'')}" oninput="onViaChange()">
       <datalist id="dl-via">${viaList.map(v=>`<option value="${v}">`).join('')}</datalist>
     </div>
     <div class="form-group"><label class="form-label">Groupe / Client</label><input id="f-desc" class="form-input" type="text" placeholder="Famille Martin…" value="${esc(bk.description||'')}" oninput="onDescChange()"></div>
