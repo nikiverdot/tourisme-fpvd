@@ -2502,12 +2502,14 @@ function updateStickyLeftOffsets() {
 const VIA_DISPLAY = { 'GE': 'Grape Escapes', 'RDV': 'Rue des Vignerons' };
 // Lookup inverso : nom complet → code court (pour les anciens bookings sauvés avec le nom complet)
 const VIA_TO_CODE = Object.fromEntries(Object.entries(VIA_DISPLAY).map(([code, label]) => [label, code]));
+// Abréviations d'affichage dans les cellules du planning (sans changer le nom dans les stats/modal)
+const VIA_SHORT = { 'TripAdvisor / Viator': 'TripAdvisor' };
 
 // ── Corps d'une réservation sans le préfixe horaire ──
 function buildVisiteBody(bk, ckState) {
   const isFH = bk.source === 'fareharbor';
   const isBulle = state.currentBoutique === 'bulle';
-  const viaLabel = v => '<span style="font-size:13px;font-weight:900;color:#0000ff">('+esc(VIA_TO_CODE[v]||v)+')</span>';
+  const viaLabel = v => '<span style="font-size:13px;font-weight:900;color:#0000ff">('+esc(VIA_SHORT[v]||VIA_TO_CODE[v]||v)+')</span>';
   const regler = ckState === 'arrived'
     ? '<span style="font-size:10px;font-weight:800;color:#15803d;background:#f0fdf4;padding:1px 5px;border-radius:3px;border:1px solid #86efac">RÉGLÉ ✓</span>'
     : '<span style="font-size:10px;font-weight:800;color:#b91c1c;background:#fef2f2;padding:1px 5px;border-radius:3px;border:1px solid #fca5a5">(À RÉGLER)</span>';
