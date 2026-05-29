@@ -3368,7 +3368,9 @@ function openBookingModal(b, k, idx) {
     langOpts  = langList.map(([v,l]) => `<option value="${v}" ${curLang===v?'selected':''}>${l}</option>`).join('');
   }
 
-  const viaList = ['RDV','GYG','Viator','TripAdvisor','Grape Escapes','FrenchTour','Challanges','Invitation','Go Côté Saône','Winalist','OT','BFC','À REGLER'];
+  const viaList = b === 'bulle'
+    ? ['Direct','FH','Challanges','Invitation','GYG','Personnel','RDV','Winalist','TripAdvisor','OT','Viator','Dijon City Pass','Bon Cadeau','Grape Escapes']
+    : ['RDV','GYG','Viator','TripAdvisor','Grape Escapes','FrenchTour','Challanges','Invitation','Go Côté Saône','Winalist','OT','BFC','À REGLER'];
   document.getElementById('modal-body').innerHTML = `
     <datalist id="dl-act">${actListOpts}</datalist>
     <div class="form-group"><label class="form-label">Prestation</label>
