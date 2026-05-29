@@ -505,6 +505,26 @@ tr.row-ferme    td.jour-cell,tr.row-ferme    td.date-cell,tr.row-ferme    td.rdv
   padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: 12px; gap: 8px; }
 .admin-user-row:last-child { border-bottom: none; }
 
+/* ── BARRE ADMIN (visible uniquement pour l'admin, au-dessus de la toolbar) ── */
+#admin-bar {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  background: #f0f8f7;
+  border-top: 1px solid #e2e8f0;
+  border-bottom: 2px solid #0e5c5c;
+  flex-wrap: wrap;
+}
+body.is-admin #admin-bar { display: flex; }
+#admin-bar .admin-bar-label {
+  font-size: 10px; font-weight: 800; color: #0e5c5c;
+  letter-spacing: .08em; text-transform: uppercase;
+  margin-right: 4px; white-space: nowrap;
+}
+#admin-bar .btn { font-size: 11px; padding: 4px 9px; }
+#admin-bar .ics-msg { font-size: 11px; color: #64748b; }
+
 /* ── CONSECUTIVE WORK DAYS ── */
 .cell-warn-6 { outline: 2px solid #f97316 !important; outline-offset: 1px; border-radius: 5px; }
 .cell-warn-7 { outline: 2px solid #dc2626 !important; outline-offset: 1px; border-radius: 5px;
@@ -523,7 +543,7 @@ tr.row-ferme    td.jour-cell,tr.row-ferme    td.date-cell,tr.row-ferme    td.rdv
   .app-logo    { font-size: 13px; }
   .tab-btn     { padding: 5px 11px; font-size: 12px; }
   .col-panel-wrap { display: none !important; }
-  #btn-export, #btn-import-json { display: none !important; }
+  #admin-bar   { display: none !important; }
   col.col-rdv    { width: 120px; }
   col.col-visite { width: 200px; }
   col.col-emp    { width: 60px; }
@@ -544,7 +564,7 @@ tr.row-ferme    td.jour-cell,tr.row-ferme    td.date-cell,tr.row-ferme    td.rdv
 
   /* Masqués sur mobile */
   #presence-bar  { display: none !important; }
-  #btn-export, #btn-import-json { display: none !important; }
+  #admin-bar     { display: none !important; }
   #sync-label  { display: none; }
 
   /* Colonnes : bouton visible sur mobile (ouvre une modale) */
@@ -734,7 +754,6 @@ tr.row-ferme    td.jour-cell,tr.row-ferme    td.date-cell,tr.row-ferme    td.rdv
     <span id="user-name-label">…</span>
     <span style="font-size:9px;opacity:0.5">✎</span>
   </div>
-  <button id="btn-admin" class="btn btn-admin" onclick="openAdminPanel()" style="display:none">⚙ Accès</button>
   <button class="btn" style="background:#fef2f2;color:#dc2626;border-color:#fca5a5;font-size:10px" onclick="logoutUser()">Déconnexion</button>
   <div class="year-nav">
     <button class="nav-btn" onclick="prevYear()">‹</button>
@@ -743,16 +762,23 @@ tr.row-ferme    td.jour-cell,tr.row-ferme    td.date-cell,tr.row-ferme    td.rdv
   </div>
 </div>
 
+<!-- Barre admin (visible uniquement pour l'admin) -->
+<div id="admin-bar">
+  <span class="admin-bar-label">🔧 Admin</span>
+  <button id="btn-admin" class="btn btn-admin" onclick="openAdminPanel()">⚙ Accès</button>
+  <button id="btn-export" class="btn btn-export" onclick="exportData()">⬇ Exporter</button>
+  <label  id="btn-import-json" class="btn btn-import">⬆ Importer JSON<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
+  <button id="btn-csv-import" class="btn btn-import" onclick="openImportCSVModal()" style="background:#f0fdf4;color:#15803d;border-color:#86efac">📋 Import CSV 2026</button>
+  <button id="btn-fh-settings" class="btn btn-ics" onclick="openFHSettings()" title="Configuration API FareHarbor" style="padding:4px 9px">⚙️ API FH</button>
+  <span class="ics-msg" id="ics-status"></span>
+</div>
+
+<!-- Toolbar principale -->
 <div class="toolbar">
-  <button class="btn btn-today"  onclick="scrollToToday()">📍 Aujourd'hui</button>
-  <button class="btn btn-ics"    onclick="syncFareHarbor()" id="btn-ics">🔄 Sync FareHarbor</button>
-  <button id="btn-fh-settings" class="btn btn-ics" onclick="openFHSettings()" title="Configuration API FareHarbor" style="padding:4px 8px;font-size:14px;min-width:0;display:none">⚙️</button>
-  <span   class="ics-msg"        id="ics-status" style="display:none"></span>
-  <button id="btn-export" class="btn btn-export" onclick="exportData()" style="display:none">⬇ Exporter</button>
-  <label  id="btn-import-json" class="btn btn-import" style="display:none">⬆ Importer<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
-  <button id="btn-csv-import" class="btn btn-import" onclick="openImportCSVModal()" style="display:none;background:#f0fdf4;color:#15803d;border-color:#86efac">📋 Import CSV 2026</button>
-  <button id="btn-stats"   class="btn" onclick="openStatsModal()"  style="display:none;background:#f5f3ff;color:#6d28d9;border-color:#c4b5fd">📊 Statistiques</button>
   <button id="btn-search" class="btn" onclick="openSearchModal()" style="display:none;background:#fff7ed;color:#c2410c;border-color:#fed7aa">🔍 Rechercher</button>
+  <button class="btn btn-today" onclick="scrollToToday()">📍 Aujourd'hui</button>
+  <button id="btn-stats"  class="btn" onclick="openStatsModal()"  style="display:none;background:#f5f3ff;color:#6d28d9;border-color:#c4b5fd">📊 Statistiques</button>
+  <button class="btn btn-ics" onclick="syncFareHarbor()" id="btn-ics">🔄 Sync FH</button>
   <div class="col-panel-wrap" style="margin-left:auto">
     <button class="btn" style="background:#f8fafc;border-color:#e2e8f0;color:#475569" onclick="toggleColPanel(event)">⊞ Colonnes</button>
     <div id="col-panel" class="col-panel" style="display:none"></div>
@@ -1326,13 +1352,10 @@ function updateUserChip(user) {
   const isViewer = currentUserRole === 'viewer';
   document.body.classList.toggle('is-admin',  isAdminU);
   document.body.classList.toggle('is-viewer', isViewer);
-  ['btn-admin','btn-export','btn-import-json','btn-csv-import','btn-fh-settings','ics-status'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = isAdminU ? '' : 'none';
-  });
+  // Barre admin : gérée par CSS (body.is-admin) — pas besoin de toggle JS
   // Statistiques + Recherche : visible pour admins et managers
-  const statsBtn   = document.getElementById('btn-stats');
-  const searchBtn  = document.getElementById('btn-search');
+  const statsBtn  = document.getElementById('btn-stats');
+  const searchBtn = document.getElementById('btn-search');
   const showMgr = isAdminU || currentUserRole === 'manager';
   if (statsBtn)  statsBtn.style.display  = showMgr ? '' : 'none';
   if (searchBtn) searchBtn.style.display = showMgr ? '' : 'none';
