@@ -1783,7 +1783,7 @@ async function fetchFHChannels(year) {
 
   const FH_AFF = {
     'vignerons':'RDV', 'rdv':'RDV', 'ruedes':'RDV',
-    'viator':'TripAdvisor / Viator',
+    'viator':'TripAdvisor',
     'getyourguide':'GYG', 'gyg':'GYG',
     'grapeescapes':'GE', 'grapeescapes':'GE',
   };
@@ -2136,14 +2136,14 @@ function parseICS(raw) {
       if (emailM) {
         const dom = emailM[1].toLowerCase();
         if (dom.includes('grapeescapes')) via='GE';
-        else if (dom.includes('viator')) via='TripAdvisor / Viator';
+        else if (dom.includes('viator')) via='TripAdvisor';
         else if (dom.includes('getyourguide')||dom.includes('gyg.')) via='GYG';
         else if (dom.includes('vignerons')||dom.includes('rdv')) via='RDV';
       }
       if (!via) {
         const hl=bk.toLowerCase();
         if (/rue des vignerons/.test(hl)) via='RDV';
-        else if (/\bviator\b/.test(hl)) via='TripAdvisor / Viator';
+        else if (/\bviator\b/.test(hl)) via='TripAdvisor';
         else if (/get your guide|gyg/.test(hl)) via='GYG';
         else if (/grape escapes/.test(hl)) via='GE';
       }
@@ -2503,13 +2503,11 @@ const VIA_DISPLAY = { 'GE': 'Grape Escapes', 'RDV': 'Rue des Vignerons' };
 // Lookup inverso : nom complet → code court (pour les anciens bookings sauvés avec le nom complet)
 const VIA_TO_CODE = Object.fromEntries(Object.entries(VIA_DISPLAY).map(([code, label]) => [label, code]));
 // Abréviations d'affichage dans les cellules du planning (sans changer le nom dans les stats/modal)
-const VIA_SHORT = { 'TripAdvisor / Viator': 'TripAdvisor' };
-
 // ── Corps d'une réservation sans le préfixe horaire ──
 function buildVisiteBody(bk, ckState) {
   const isFH = bk.source === 'fareharbor';
   const isBulle = state.currentBoutique === 'bulle';
-  const viaLabel = v => '<span style="font-size:13px;font-weight:900;color:#0000ff">('+esc(VIA_SHORT[v]||VIA_TO_CODE[v]||v)+')</span>';
+  const viaLabel = v => '<span style="font-size:13px;font-weight:900;color:#0000ff">('+esc(VIA_TO_CODE[v]||v)+')</span>';
   const regler = ckState === 'arrived'
     ? '<span style="font-size:10px;font-weight:800;color:#15803d;background:#f0fdf4;padding:1px 5px;border-radius:3px;border:1px solid #86efac">RÉGLÉ ✓</span>'
     : '<span style="font-size:10px;font-weight:800;color:#b91c1c;background:#fef2f2;padding:1px 5px;border-radius:3px;border:1px solid #fca5a5">(À RÉGLER)</span>';
@@ -3337,8 +3335,8 @@ function openBookingModal(b, k, idx) {
   }
 
   const viaList = b === 'bulle'
-    ? ['Direct','FH','Challanges','Invitation','GYG','Personnel','RDV','Winalist','TripAdvisor / Viator','OT','Dijon City Pass','Bon Cadeau','Grape Escapes']
-    : ['FH','Direct','RDV','GYG','OT Chalon','Grape Escapes','Invitation','Go Côté Saône','My French Tour','Winalist','TripAdvisor / Viator','Personnel','Bon Cadeau'];
+    ? ['Direct','FH','Challanges','Invitation','GYG','Personnel','RDV','Winalist','TripAdvisor','OT','Dijon City Pass','Bon Cadeau','Grape Escapes']
+    : ['FH','Direct','RDV','GYG','OT Chalon','Grape Escapes','Invitation','Go Côté Saône','My French Tour','Winalist','TripAdvisor','Personnel','Bon Cadeau'];
   document.getElementById('modal-body').innerHTML = `
     <datalist id="dl-act">${actListOpts}</datalist>
     <div class="form-group"><label class="form-label">Prestation</label>
@@ -3457,12 +3455,12 @@ function openFHDetail(k, time, activity) {
   const participants = bk.participants || [{ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, via: bk.via, comment: bk.comment, bookingPk: bk.bookingPk, status: bk.status }];
   document.getElementById('modal-title').textContent = 'FareHarbor · ' + DAYS_FR[date.getDay()] + ' ' + date.getDate() + ' ' + MONTHS_FR[date.getMonth()];
 
-  const VIA_OPTIONS = ['', 'RDV', 'GYG', 'TripAdvisor / Viator', 'GE', 'FrenchTour', 'Challanges', 'Go Côté Saône', 'Winalist', 'OT', 'BFC'];
+  const VIA_OPTIONS = ['', 'RDV', 'GYG', 'TripAdvisor', 'GE', 'FrenchTour', 'Challanges', 'Go Côté Saône', 'Winalist', 'OT', 'BFC'];
   const VIA_LABELS  = {
     '':              '— Aucun canal',
     'RDV':           '(RDV) Rue des Vignerons',
     'GYG':           '(GYG) GetYourGuide',
-    'TripAdvisor / Viator': '(TripAdvisor / Viator) TripAdvisor / Viator',
+    'TripAdvisor': '(TripAdvisor) TripAdvisor',
     'GE':            '(GE) Grape Escapes',
     'FrenchTour':    '(FrenchTour) MyFrenchTour',
     'Challanges':    '(Challanges) Château de Challanges',
@@ -3714,7 +3712,7 @@ init();
 // Normalise les labels via pour regrouper TripAdvisor + Viator
 function normVia(v) {
   if (!v) return v;
-  if (v === 'TripAdvisor' || v === 'Viator' || /tripadvisor|viator/i.test(v)) return 'TripAdvisor / Viator';
+  if (v === 'TripAdvisor' || v === 'Viator' || /tripadvisor|viator/i.test(v)) return 'TripAdvisor';
   return v;
 }
 
@@ -4245,7 +4243,7 @@ function parseCSVVisites(text, defaultActivity) {
     if      (/\bFH\b/.test(rest))                        via = 'FH';
     else if (/\bGYG\b/i.test(rest))                      via = 'GYG';
     else if (/\bWinalist\b/i.test(rest))                  via = 'Winalist';
-    else if (/\btripadvisor\b/i.test(rest))               via = 'TripAdvisor / Viator';
+    else if (/\btripadvisor\b/i.test(rest))               via = 'TripAdvisor';
     else if (/\bChallanges?\b/i.test(rest))               via = 'Challanges';
     else if (/\bOT\b/.test(rest))                         via = 'OT';
     else if (/\binvitation\b/i.test(rest))                via = 'invitation';
