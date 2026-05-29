@@ -1746,6 +1746,7 @@ async function fetchWithTimeout(url, ms) {
 // Fetch an ICS calendar through multiple CORS proxies; returns raw text or null
 async function fetchICS(url) {
   const sources = [
+    () => fetchWithTimeout('/.netlify/functions/proxy-ics?url=' + encodeURIComponent(url), 10000),
     () => fetchWithTimeout(url, 7000),
     () => fetchWithTimeout('https://corsproxy.io/?' + url, 10000),
     () => fetchWithTimeout('https://api.allorigins.win/raw?url=' + encodeURIComponent(url), 10000),
