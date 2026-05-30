@@ -1648,7 +1648,7 @@ function getGroupedFHBookings(k) {
   for (const bk of raw) {
     const gKey = (bk.time||'') + '§§' + (bk.activity||'');
     const resolvedVia = (bk.bookingPk && fhTags[bk.bookingPk] !== undefined) ? fhTags[bk.bookingPk] : bk.via;
-    const part = { pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, audioGuide: bk.audioGuide||false, clientName: bk.clientName, via: resolvedVia, comment: bk.comment, bookingPk: bk.bookingPk, status: bk.status };
+    const part = { pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, via: resolvedVia, comment: bk.comment, bookingPk: bk.bookingPk, status: bk.status };
     if (gKey in keyMap) {
       const g = groups[keyMap[gKey]];
       g.pax += (bk.pax || 0);
@@ -2181,16 +2181,25 @@ function parseICS(raw) {
         'ja': { code:'JPN', flag:'🇯🇵' }, 'ru': { code:'RUS', flag:'🇷🇺' },
         'us': { code:'USA', flag:'🇺🇸' },
       };
-      let blockLangObj = lang; // default = event-level language
-      let audioGuide   = false;
+      // Toutes réservations FH/en ligne = toujours audioguide (GUIDÉE = uniquement saisie manuelle)
+      let blockLangObj = lang; // fallback = langue détectée au niveau de l'événement
       for (const line of lines) {
-        // "Language: de" or "Language Code: de"
-        const lm = line.match(/^language(?:\s+code)?\s*[:\-]\s*([a-z]{2,3})\s*$/i);
-        if (lm && ISO_TO_LANG[lm[1].toLowerCase()]) blockLangObj = ISO_TO_LANG[lm[1].toLowerCase()];
-        // "Language Option: AUDIO" or "Language Option: Audio Guide"
-        if (/^language\s*option\s*[:\-]\s*audio/i.test(line)) audioGuide = true;
+        // "Language: de" / "Language Code: fr" → code ISO 2 lettres
+        // "Langue: Allemand" / "Language: français" → nom complet (FR ou EN)
+        const lm = line.match(/^(?:language|langue)\s*(?:code)?\s*[:\-]\s*(.+?)\s*$/i);
+        if (lm) {
+          const val = lm[1].trim();
+          if (/^audio/i.test(val)) continue; // ignorer "Language Option: AUDIO"
+          if (ISO_TO_LANG[val.toLowerCase()]) {
+            blockLangObj = ISO_TO_LANG[val.toLowerCase()]; // code ISO exact
+          } else {
+            const detected = detectLang(val); // nom complet → detectLang
+            if (detected) blockLangObj = detected;
+          }
+        }
       }
-      const bkLangFlag = (blockLangObj ? blockLangObj.flag : '') + (audioGuide ? ' 🎧' : '');
+      // 🎧 toujours affiché pour les réservations en ligne (FH, Viator, GYG, RDV…)
+      const bkLangFlag = (blockLangObj ? blockLangObj.flag : '') + ' 🎧';
       const bkLangCode = blockLangObj ? blockLangObj.code : '';
 
       // comment
@@ -2200,7 +2209,7 @@ function parseICS(raw) {
         if (m) { comment=m[1].trim().slice(0,80); break; }
       }
 
-      events.push({ dateKey, time, pax, status:evStatus, activity, langFlag:bkLangFlag, langCode:bkLangCode, clientName, via, comment, bookingPk, audioGuide, source:'fareharbor' });
+      events.push({ dateKey, time, pax, status:evStatus, activity, langFlag:bkLangFlag, langCode:bkLangCode, clientName, via, comment, bookingPk, source:'fareharbor' });
     }
   });
   return events.sort((a,b)=>(a.dateKey+a.time).localeCompare(b.dateKey+b.time));
@@ -2255,14 +2264,14 @@ function parseWinalist(raw) {
       clientName = clientLine.split(/\s*-\s*/)[0].trim().slice(0, 35);
     }
 
-    // Détection de langue
+    // Détection de langue — Winalist = toujours audioguide
     const lang     = detectLang(rawSum + ' ' + rawDesc);
-    const langFlag = lang ? lang.flag : '';
+    const langFlag = (lang ? lang.flag : '') + ' 🎧';
     const langCode = lang ? lang.code : '';
 
     events.push({ dateKey, time, pax, status: evStatus, activity,
       langFlag, langCode, clientName,
-      via: 'Winalist', comment: '', bookingPk: 0, source: 'winalist' });
+      via: 'Winalist', comment: '', bookingPk: 0, audioGuide: true, source: 'winalist' });
   });
   return events.sort((a,b)=>(a.dateKey+a.time).localeCompare(b.dateKey+b.time));
 }
