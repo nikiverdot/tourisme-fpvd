@@ -2581,7 +2581,7 @@ function buildVisiteBody(bk, ckState) {
       const parts = [];
       if (p.pax)  parts.push(p.pax + 'pax');
       // Toujours afficher 🎧 pour les réservations en ligne (FH/Winalist/GYG/Viator…)
-      parts.push([langFlag, pLangCode, '🎧'].filter(Boolean).join(' '));
+      parts.push(['🎧', langFlag, pLangCode].filter(Boolean).join(' '));
       if (clientName)               parts.push(esc(clientName));
       parts.push(p.via ? viaLabel(p.via) : fhBadge);
       const internalNote = p.bookingPk && fhNotes[p.bookingPk];
