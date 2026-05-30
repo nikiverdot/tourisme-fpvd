@@ -243,6 +243,9 @@ td.visite-cell { padding: 3px 8px; vertical-align: middle !important; }
 .add-visite-btn { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; color: #4a9e9e; cursor: pointer; padding: 2px 6px; border-radius: 4px; margin-top: 1px; }
 .add-visite-btn:hover { background: #f0f8f7; }
 
+/* Absence autorisée badge */
+.absence-auth-badge { display:block; font-size:9px; font-weight:800; color:#16a34a; line-height:1; margin-top:2px; }
+
 /* CHECK-IN badges */
 .visite-line.ck-arrived { background:#f0fdf4; border-left:3px solid #16a34a; padding-left:5px; border-radius:3px; }
 .visite-line.ck-noshow  { background:#fef2f2; border-left:3px solid #dc2626; padding-left:5px; border-radius:3px; text-decoration:line-through; color:#dc2626 !important; }
@@ -844,6 +847,7 @@ let fhTags       = {};   // bookingPk → via code (manuel, persisté Firebase)
 let fhNotes      = {};   // bookingPk → note interne (persisté Firebase)
 let fhOverrides  = {};   // bookingPk → {clientName, langFlag} (persisté Firebase)
 let checkinData  = {};   // { boutique: { dateKey: { timeKey: 'arrived'|'noshow' } } }
+let absenceAuth  = {};   // { boutique: { dateKey: authorizedByEmail } } — absences autorisées par Monique
 let modalCtx     = null;
 let firstDataLoad = true;
 let db          = null;
@@ -1035,6 +1039,12 @@ function initFirebaseData() {
       setSyncBadge('offline', 'Hors ligne');
     }
   });
+
+  // Absences autorisées par Monique (temps réel)
+  db.ref('piffaut-absence-auth').on('value', snap => {
+    absenceAuth = snap.val() || {};
+    render();
+  }, () => {});
 
   // Chargement du cache FH persisté (2025+ uniquement pour ne pas alourdir)
   db.ref('piffaut-fh-cache').once('value').then(snap => {
@@ -1673,7 +1683,22 @@ function absentCount(b,k) {
     .filter(e => ['repos','conges','formation','maladie'].includes(sc[e]||'off'))
     .length;
 }
-function isAlert(b,k) { return absentCount(b,k)>=3 && maxGroupPax(b,k)>=10; }
+function isAlert(b,k) {
+  if (absenceAuth[b]?.[k]) return false; // autorisé par Monique
+  return absentCount(b,k) >= 3;
+}
+function authorizeAbsence(b, k) {
+  if (!authUser) return;
+  const email = authUser.email;
+  if (!isMonique(email) && !isAdmin(email)) return;
+  db.ref('piffaut-absence-auth/' + b + '/' + k).set(email)
+    .then(() => {
+      if (!absenceAuth[b]) absenceAuth[b] = {};
+      absenceAuth[b][k] = email;
+      render();
+    })
+    .catch(err => console.error('[absenceAuth] save failed:', err));
+}
 
 // ═══ CAVEAU FERME ═════════════════════════════
 // Caveau André Delorme : fermé Dim (0) + Lun (1) ; Jan+Fév : fermé Sam (6) + Dim (0)
@@ -2292,7 +2317,7 @@ function render() {
     const exc      = state.boutiques[b].exceptions?.[k] || null;
     const ferie    = isFerie(d);
 
-    if (alert) alertDaysList.push({ d: new Date(d), k });
+    if (alert) alertDaysList.push({ d: new Date(d), k, b, count: absentCount(b, k) });
 
     const rowCls = ['day-row','day-first',
       ferie  ? 'row-ferie'    : '',
@@ -2336,7 +2361,7 @@ function render() {
     html += '<td class="jour-cell" rowspan="' + rows + '">' + jourContent + '</td>';
 
     // Date (rowspan)
-    html += '<td class="date-cell" rowspan="' + rows + '"><span class="date-num">' + d.getDate() + '</span><span class="date-month">' + MONTHS_SHORT[m] + '</span>' + (ferie ? '<span class="ferie-label">' + esc(ferie) + '</span>' : '') + '</td>';
+    html += '<td class="date-cell" rowspan="' + rows + '"><span class="date-num">' + d.getDate() + '</span><span class="date-month">' + MONTHS_SHORT[m] + '</span>' + (ferie ? '<span class="ferie-label">' + esc(ferie) + '</span>' : '') + (absenceAuth[b]?.[k] ? '<span class="absence-auth-badge" title="Absences autorisées par Monique">✓</span>' : '') + '</td>';
 
     // RDV/Notes (rowspan)
     const canEditNote = currentUserRole !== 'viewer';
@@ -2464,11 +2489,15 @@ function render() {
   applyColStyles();
 
   // Alerts banner
-  document.getElementById('alerts-container').innerHTML = alertDaysList.map(a =>
-    '<div style="background:#fef2f2;border-left:3px solid #ef4444;padding:5px 14px;font-size:11px;color:#dc2626;font-weight:600">⚠ <strong>' +
-    DAYS_FR[a.d.getDay()] + ' ' + a.d.getDate() + ' ' + MONTHS_FR[a.d.getMonth()] +
-    '</strong> — 3+ absences + groupe 10+ pax</div>'
-  ).join('');
+  const canAuthorize = authUser && (isMonique(authUser.email) || isAdmin(authUser.email));
+  document.getElementById('alerts-container').innerHTML = alertDaysList.map(a => {
+    const authBtn = canAuthorize
+      ? '<button onclick="authorizeAbsence(\'' + a.b + '\',\'' + a.k + '\')" style="margin-left:10px;padding:2px 10px;background:#16a34a;color:white;border:none;border-radius:4px;font-size:10px;cursor:pointer;font-weight:700;vertical-align:middle">✓ Autoriser</button>'
+      : '';
+    return '<div style="background:#fef2f2;border-left:3px solid #ef4444;padding:5px 14px;font-size:11px;color:#dc2626;font-weight:600">⚠ <strong>' +
+      DAYS_FR[a.d.getDay()] + ' ' + a.d.getDate() + ' ' + MONTHS_FR[a.d.getMonth()] +
+      '</strong> — ' + a.count + ' absences' + authBtn + '</div>';
+  }).join('');
 
   updateMobileTodayCard();
   updateActivityDots();
