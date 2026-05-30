@@ -2581,7 +2581,7 @@ function buildVisiteBody(bk, ckState) {
       const parts = [];
       if (p.pax)  parts.push(p.pax + 'pax');
       // Toujours afficher 🎧 pour les réservations en ligne (FH/Winalist/GYG/Viator…)
-      parts.push(['🎧', langFlag, pLangCode].filter(Boolean).join(' '));
+      parts.push('🎧' + (langFlag||'') + (pLangCode ? ' ' + pLangCode : ''));
       if (clientName)               parts.push(esc(clientName));
       parts.push(p.via ? viaLabel(p.via) : fhBadge);
       const internalNote = p.bookingPk && fhNotes[p.bookingPk];
@@ -2675,6 +2675,44 @@ function buildGroupCellContent(group, b, k, isLast) {
     const onclick = isFH
       ? 'openFHDetail(\'' + k + '\',\'' + fhTime + '\',\'' + fhAct + '\')'
       : (_canAdd ? 'openBookingModal(\'' + b + '\',\'' + k + '\',' + manualIdx + ')' : '');
+    // FH avec plusieurs participants groupés (même horaire + activité) → ck-btn par participant
+    if (isFH && bk.participants && bk.participants.length > 1) {
+      const _fhBadge = '<span style="color:#0000ff;font-size:13px;font-weight:900">(FH)</span>';
+      const _vl = v => '<span style="font-size:13px;font-weight:900;color:#0000ff">(' + esc(VIA_TO_CODE[v]||v) + ')</span>';
+      const _pStates = [];
+      const _partsHtml = bk.participants.map(p => {
+        const _pk = p.bookingPk || 0;
+        const _pCkKey = 'fh' + (_pk || safeFirebaseKey((bk.time||'') + '_' + (bk.activity||'fh') + '_' + (p.clientName||'')));
+        const _pCkSt = getCheckin(b, k, _pCkKey);
+        _pStates.push(_pCkSt);
+        const _pCkIco = _pCkSt === 'arrived' ? '✓' : (_pCkSt === 'noshow' ? '✗' : '');
+        const _pCkBtn = currentUserRole !== 'viewer'
+          ? '<span class="ck-btn' + (_pCkSt ? ' ck-' + _pCkSt : '') + '" onclick="event.stopPropagation();toggleCheckin(\'' + b + '\',\'' + k + '\',\'' + _pCkKey + '\')" title="Arrivé → No-show → Effacer">' + _pCkIco + '</span>'
+          : (_pCkSt ? '<span class="ck-btn ck-' + _pCkSt + '">' + _pCkIco + '</span>' : '');
+        const _ov = (_pk && fhOverrides[_pk]) || {};
+        const _cli = _ov.clientName !== undefined ? _ov.clientName : (p.clientName || '');
+        const _flg = _ov.langFlag   !== undefined ? _ov.langFlag   : (p.langFlag   || '');
+        const _cod = p.langCode || '';
+        const _pSt = _ov.status    !== undefined ? _ov.status    : (p.status    || 'confirmed');
+        const _reg = _pCkSt === 'arrived'
+          ? '<span style="font-size:10px;font-weight:800;color:#15803d;background:#f0fdf4;padding:1px 5px;border-radius:3px;border:1px solid #86efac">RÉGLÉ ✓</span>'
+          : '<span style="font-size:10px;font-weight:800;color:#b91c1c;background:#fef2f2;padding:1px 5px;border-radius:3px;border:1px solid #fca5a5">(À RÉGLER)</span>';
+        const _pp = [];
+        if (p.pax) _pp.push(p.pax + 'pax');
+        _pp.push('🎧' + (_flg||'') + (_cod ? ' ' + _cod : ''));
+        if (_cli) _pp.push(esc(_cli));
+        _pp.push(p.via ? _vl(p.via) : _fhBadge);
+        if (_pk && fhNotes[_pk]) _pp.push('<span style="font-size:10px;color:#64748b;font-style:italic">📝 ' + esc(fhNotes[_pk].slice(0,40)) + '</span>');
+        if (_pSt === 'a_regler' || p.via === 'RDV') _pp.push(_reg);
+        return '<span class="visite-item' + (_pCkSt ? ' ck-' + _pCkSt : '') + '">' + _pp.join(' ') + _pCkBtn + '</span>';
+      }).join(' <span style="color:#94a3b8;font-weight:700;padding:0 1px"> + </span> ');
+      const _allArr = _pStates.length > 0 && _pStates.every(s => s === 'arrived');
+      const _allNsh = _pStates.length > 0 && _pStates.every(s => s === 'noshow');
+      const _lCls   = _allArr ? ' ck-arrived' : (_allNsh ? ' ck-noshow' : '');
+      const _actPfx = b !== 'bulle' && bk.activity ? esc(bk.activity) + ' — ' : '';
+      return '<div class="visite-line' + _lCls + '"' + (onclick ? ' onclick="event.stopPropagation();' + onclick + '" style="cursor:pointer"' : '') + '>'
+        + '<strong>' + (bk.time||'—') + '</strong> : ' + _actPfx + _partsHtml + '</div>' + addBtn;
+    }
     // Clé stable : bookingPk FH (sur participants[0]) ou time+activity en fallback
     const fhPk  = isFH ? ((bk.participants && bk.participants[0] && bk.participants[0].bookingPk) || bk.bookingPk || 0) : 0;
     const ckKey = isFH
