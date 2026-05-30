@@ -999,17 +999,9 @@ function initFirebaseCore() {
 function initFirebaseData() {
   setSyncBadge('saving','Connexion…');
   db.ref(DB_PATH).on('value', snap => {
+    if (pendingSave) return; // Ne pas écraser les modifications locales en cours de sauvegarde
     const data = snap.val();
-    if (!data) return;
-
-    // Check-ins : toujours synchroniser depuis Firebase, même pendant une sauvegarde en cours.
-    // On lit depuis le snapshot du nœud parent (jamais d'erreur séparée possible).
-    if (data.checkins !== undefined) checkinData = data.checkins || {};
-
-    // Guard pendingSave : ne pas écraser les modifications boutiques en cours de sauvegarde
-    if (pendingSave) { setSyncBadge('online', '● En ligne'); return; }
-
-    if (data.boutiques) {
+    if (data && data.boutiques) {
       Object.keys(data.boutiques).forEach(b => {
         if (state.boutiques[b]) {
           state.boutiques[b].schedule     = data.boutiques[b].schedule     || {};
@@ -1028,6 +1020,7 @@ function initFirebaseData() {
         }
       });
       patchEmployees();
+      if (data.checkins) checkinData = data.checkins;
       render();
       if (firstDataLoad) { firstDataLoad = false; setTimeout(scrollToToday, 150); }
     }
