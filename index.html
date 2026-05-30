@@ -1766,7 +1766,7 @@ async function fetchWithTimeout(url, ms) {
 // Fetch an ICS calendar via notre proxy Netlify sécurisé (feed = nom interne, URL résolue côté serveur)
 async function fetchICS(feed) {
   const sources = [
-    () => fetchWithTimeout('/.netlify/functions/proxy-ics?feed=' + encodeURIComponent(feed), 12000),
+    () => fetchWithTimeout('https://planning-tourisme.netlify.app/.netlify/functions/proxy-ics?feed=' + encodeURIComponent(feed), 12000),
   ];
   for (const src of sources) {
     try {
