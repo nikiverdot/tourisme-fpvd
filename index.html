@@ -2032,16 +2032,16 @@ async function saveFHOverride(bookingPk, fields) {
 
 // Language → { code, flag }
 const LANGS = [
-  { kw:['english','anglais','british'],       code:'ENG', flag:'🇬🇧' },
+  { kw:['english','anglais','british'],       code:'ANG', flag:'🇬🇧' },
   { kw:['american','usa'],                     code:'USA', flag:'🇺🇸' },
   { kw:['français','french','france','fra'],   code:'FRA', flag:'🇫🇷' },
-  { kw:['deutsch','german','allemand'],        code:'DEU', flag:'🇩🇪' },
+  { kw:['deutsch','german','allemand'],        code:'ALL', flag:'🇩🇪' },
   { kw:['español','spanish','espagnol'],       code:'ESP', flag:'🇪🇸' },
   { kw:['italiano','italian','italien'],       code:'ITA', flag:'🇮🇹' },
-  { kw:['dutch','néerlandais','nederlands'],   code:'NLD', flag:'🇳🇱' },
-  { kw:['português','portuguese','portugais'], code:'PRT', flag:'🇵🇹' },
-  { kw:['chinese','chinois'],                  code:'CHN', flag:'🇨🇳' },
-  { kw:['japanese','japonais'],               code:'JPN', flag:'🇯🇵' },
+  { kw:['dutch','néerlandais','nederlands'],   code:'NL',  flag:'🇳🇱' },
+  { kw:['português','portuguese','portugais'], code:'POR', flag:'🇵🇹' },
+  { kw:['chinese','chinois'],                  code:'CHI', flag:'🇨🇳' },
+  { kw:['japanese','japonais'],               code:'JAP', flag:'🇯🇵' },
   { kw:['russian','russe'],                   code:'RUS', flag:'🇷🇺' },
 ];
 
@@ -2198,8 +2198,7 @@ function parseICS(raw) {
           }
         }
       }
-      // 🎧 toujours affiché pour les réservations en ligne (FH, Viator, GYG, RDV…)
-      const bkLangFlag = (blockLangObj ? blockLangObj.flag : '') + ' 🎧';
+      const bkLangFlag = blockLangObj ? blockLangObj.flag : '';
       const bkLangCode = blockLangObj ? blockLangObj.code : '';
 
       // comment
@@ -2264,9 +2263,9 @@ function parseWinalist(raw) {
       clientName = clientLine.split(/\s*-\s*/)[0].trim().slice(0, 35);
     }
 
-    // Détection de langue — Winalist = toujours audioguide
+    // Détection de langue — Winalist = toujours audioguide (🎧 ajouté dans le rendu)
     const lang     = detectLang(rawSum + ' ' + rawDesc);
-    const langFlag = (lang ? lang.flag : '') + ' 🎧';
+    const langFlag = lang ? lang.flag : '';
     const langCode = lang ? lang.code : '';
 
     events.push({ dateKey, time, pax, status: evStatus, activity,
@@ -2578,10 +2577,11 @@ function buildVisiteBody(bk, ckState) {
       const clientName = ov.clientName !== undefined ? ov.clientName : (p.clientName || '');
       const langFlag   = ov.langFlag   !== undefined ? ov.langFlag   : (p.langFlag   || '');
       const status     = ov.status     !== undefined ? ov.status     : (p.status     || 'confirmed');
+      const pLangCode = p.langCode || '';
       const parts = [];
-      if (p.pax)      parts.push(p.pax + 'pax');
-      if (langFlag)   parts.push(langFlag);
-      if (clientName) parts.push(esc(clientName));
+      if (p.pax)                    parts.push(p.pax + 'pax');
+      if (langFlag || pLangCode)    parts.push(langFlag + (pLangCode ? ' ' + pLangCode : '') + ' 🎧');
+      if (clientName)               parts.push(esc(clientName));
       parts.push(p.via ? viaLabel(p.via) : fhBadge);
       const internalNote = p.bookingPk && fhNotes[p.bookingPk];
       if (internalNote) parts.push('<span style="font-size:10px;color:#64748b;font-style:italic">📝 ' + esc(internalNote.slice(0,40)) + '</span>');
