@@ -2,6 +2,7 @@
   "name": "fpvd-push",
   "version": "1.0.0",
   "dependencies": {
+    "@netlify/functions": "^2.0.0",
     "web-push": "^3.6.7"
   }
 }
