@@ -1215,6 +1215,7 @@ function updateActivityDots() {
 
 // ═══ ADMIN ════════════════════════════════════
 function openAdminPanel() {
+  if (!authUser || !isAdmin(authUser.email)) return;
   modalCtx = { type: 'admin' };
   document.getElementById('modal-title').textContent = '⚙ Gestion des accès';
   document.getElementById('modal-body').innerHTML =
