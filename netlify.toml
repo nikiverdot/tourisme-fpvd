@@ -3,8 +3,8 @@
   command = ""
   functions = "netlify/functions"
 
-[functions]
-  node_bundler = "esbuild"
+[[plugins]]
+  package = "@netlify/plugin-functions-install-core"
 
 # ── En-têtes de sécurité HTTP ────────────────────────────────────────────────
 [[headers]]
