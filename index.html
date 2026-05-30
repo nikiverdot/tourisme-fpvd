@@ -2301,6 +2301,7 @@ function render() {
   html += '<th class="th-left" data-col="rdv"><div class="th-inner">RDV / Notes' + rh('rdv') + '</div></th>';
   html += '<th class="th-left" data-col="visite"><div class="th-inner">Visites · Dégustations' + rh('visite') + '</div></th>';
   html += '<th data-col="pax"><div class="th-inner">Pax' + rh('pax') + '</div></th>';
+  const _isAdminRender = authUser && isAdmin(authUser.email);
   emps.forEach((e, idx) => {
     const label = e.length > 10 ? e.split(' ')[0] : e;
     const today = toKey(new Date());
@@ -2309,7 +2310,6 @@ function render() {
     html += '<th class="th-emp" data-col="emp-' + idx + '"' + (_isAdminRender ? ' onclick="openRenameEmpModal(\'' + b + '\',' + idx + ')" style="cursor:pointer"' : '') + ' title="' + titleTip + '"><div class="th-inner">' + esc(label) + rh('emp-' + idx) + '</div></th>';
   });
   const _rl = state.boutiques[b].renfortLabels || ['Renfort 1','Renfort 2'];
-  const _isAdminRender = authUser && isAdmin(authUser.email);
   html += '<th class="th-renfort" data-col="renfort-0"' + (_isAdminRender ? ' onclick="openRenameColModal(\'renfort-0\')" style="cursor:pointer" title="Renommer"' : '') + '><div class="th-inner">' + esc(_rl[0]) + rh('renfort-0') + '</div></th>';
   html += '<th class="th-renfort" data-col="renfort-1"' + (_isAdminRender ? ' onclick="openRenameColModal(\'renfort-1\')" style="cursor:pointer" title="Renommer"' : '') + '><div class="th-inner">' + esc(_rl[1]) + rh('renfort-1') + '</div></th>';
   html += '</tr></thead><tbody>';
