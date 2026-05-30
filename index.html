@@ -1648,7 +1648,7 @@ function getGroupedFHBookings(k) {
   for (const bk of raw) {
     const gKey = (bk.time||'') + '§§' + (bk.activity||'');
     const resolvedVia = (bk.bookingPk && fhTags[bk.bookingPk] !== undefined) ? fhTags[bk.bookingPk] : bk.via;
-    const part = { pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, via: resolvedVia, comment: bk.comment, bookingPk: bk.bookingPk, status: bk.status };
+    const part = { pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, audioGuide: bk.audioGuide||false, clientName: bk.clientName, via: resolvedVia, comment: bk.comment, bookingPk: bk.bookingPk, status: bk.status };
     if (gKey in keyMap) {
       const g = groups[keyMap[gKey]];
       g.pax += (bk.pax || 0);
@@ -1806,9 +1806,9 @@ async function fetchFHChannels(year) {
 
   const FH_AFF = {
     'vignerons':'RDV', 'rdv':'RDV', 'ruedes':'RDV',
-    'viator':'TripAdvisor',
+    'viator':'TripAdvisor', 'tripadvisor':'TripAdvisor',
     'getyourguide':'GYG', 'gyg':'GYG',
-    'grapeescapes':'GE', 'grapeescapes':'GE',
+    'grapeescapes':'GE',
   };
   const baseUrl = 'https://fareharbor.com/api/v1/companies/andre-delorme/bookings/?start-date=' + year + '-01-01&end-date=' + year + '-12-31&per_page=1000';
   const hdrs    = { 'X-FareHarbor-API-App': appKey, 'X-FareHarbor-API-User': userKey, 'Accept': 'application/json' };
@@ -2159,17 +2159,39 @@ function parseICS(raw) {
       if (emailM) {
         const dom = emailM[1].toLowerCase();
         if (dom.includes('grapeescapes')) via='GE';
-        else if (dom.includes('viator')) via='TripAdvisor';
+        else if (dom.includes('viator') || dom.includes('tripadvisor')) via='TripAdvisor';
         else if (dom.includes('getyourguide')||dom.includes('gyg.')) via='GYG';
         else if (dom.includes('vignerons')||dom.includes('rdv')) via='RDV';
       }
       if (!via) {
         const hl=bk.toLowerCase();
         if (/rue des vignerons/.test(hl)) via='RDV';
-        else if (/\bviator\b/.test(hl)) via='TripAdvisor';
+        else if (/\bviator\b/.test(hl) || /tripadvisor/.test(hl)) via='TripAdvisor';
         else if (/get your guide|gyg/.test(hl)) via='GYG';
         else if (/grape escapes/.test(hl)) via='GE';
       }
+
+      // Per-booking language: parse explicit "Language: XX" ISO code from FH description
+      // (overrides event-level detectLang — needed for Viator/TripAdvisor multi-language bookings)
+      const ISO_TO_LANG = {
+        'de': { code:'DEU', flag:'🇩🇪' }, 'en': { code:'ENG', flag:'🇬🇧' },
+        'fr': { code:'FRA', flag:'🇫🇷' }, 'es': { code:'ESP', flag:'🇪🇸' },
+        'it': { code:'ITA', flag:'🇮🇹' }, 'nl': { code:'NLD', flag:'🇳🇱' },
+        'pt': { code:'PRT', flag:'🇵🇹' }, 'zh': { code:'CHN', flag:'🇨🇳' },
+        'ja': { code:'JPN', flag:'🇯🇵' }, 'ru': { code:'RUS', flag:'🇷🇺' },
+        'us': { code:'USA', flag:'🇺🇸' },
+      };
+      let blockLangObj = lang; // default = event-level language
+      let audioGuide   = false;
+      for (const line of lines) {
+        // "Language: de" or "Language Code: de"
+        const lm = line.match(/^language(?:\s+code)?\s*[:\-]\s*([a-z]{2,3})\s*$/i);
+        if (lm && ISO_TO_LANG[lm[1].toLowerCase()]) blockLangObj = ISO_TO_LANG[lm[1].toLowerCase()];
+        // "Language Option: AUDIO" or "Language Option: Audio Guide"
+        if (/^language\s*option\s*[:\-]\s*audio/i.test(line)) audioGuide = true;
+      }
+      const bkLangFlag = (blockLangObj ? blockLangObj.flag : '') + (audioGuide ? ' 🎧' : '');
+      const bkLangCode = blockLangObj ? blockLangObj.code : '';
 
       // comment
       let comment = '';
@@ -2178,7 +2200,7 @@ function parseICS(raw) {
         if (m) { comment=m[1].trim().slice(0,80); break; }
       }
 
-      events.push({ dateKey, time, pax, status:evStatus, activity, langFlag, langCode, clientName, via, comment, bookingPk, source:'fareharbor' });
+      events.push({ dateKey, time, pax, status:evStatus, activity, langFlag:bkLangFlag, langCode:bkLangCode, clientName, via, comment, bookingPk, audioGuide, source:'fareharbor' });
     }
   });
   return events.sort((a,b)=>(a.dateKey+a.time).localeCompare(b.dateKey+b.time));
