@@ -2032,7 +2032,7 @@ async function saveFHOverride(bookingPk, fields) {
 
 // Language → { code, flag }
 const LANGS = [
-  { kw:['english','anglais','british'],       code:'',    flag:'🇬🇧' },
+  { kw:['english','anglais','british'],       code:'ANG', flag:'🇬🇧' },
   { kw:['american','usa'],                     code:'USA', flag:'🇺🇸' },
   { kw:['français','french','france','fra'],   code:'FRA', flag:'🇫🇷' },
   { kw:['deutsch','german','allemand'],        code:'ALL', flag:'🇩🇪' },
@@ -2174,11 +2174,11 @@ function parseICS(raw) {
       // Per-booking language: parse explicit "Language: XX" ISO code from FH description
       // (overrides event-level detectLang — needed for Viator/TripAdvisor multi-language bookings)
       const ISO_TO_LANG = {
-        'de': { code:'ALL', flag:'🇩🇪' }, 'en': { code:'',    flag:'🇬🇧' },
+        'de': { code:'DEU', flag:'🇩🇪' }, 'en': { code:'ENG', flag:'🇬🇧' },
         'fr': { code:'FRA', flag:'🇫🇷' }, 'es': { code:'ESP', flag:'🇪🇸' },
-        'it': { code:'ITA', flag:'🇮🇹' }, 'nl': { code:'NL',  flag:'🇳🇱' },
-        'pt': { code:'POR', flag:'🇵🇹' }, 'zh': { code:'CHI', flag:'🇨🇳' },
-        'ja': { code:'JAP', flag:'🇯🇵' }, 'ru': { code:'RUS', flag:'🇷🇺' },
+        'it': { code:'ITA', flag:'🇮🇹' }, 'nl': { code:'NLD', flag:'🇳🇱' },
+        'pt': { code:'PRT', flag:'🇵🇹' }, 'zh': { code:'CHN', flag:'🇨🇳' },
+        'ja': { code:'JPN', flag:'🇯🇵' }, 'ru': { code:'RUS', flag:'🇷🇺' },
         'us': { code:'USA', flag:'🇺🇸' },
       };
       // Toutes réservations FH/en ligne = toujours audioguide (GUIDÉE = uniquement saisie manuelle)
