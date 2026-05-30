@@ -999,9 +999,17 @@ function initFirebaseCore() {
 function initFirebaseData() {
   setSyncBadge('saving','Connexion…');
   db.ref(DB_PATH).on('value', snap => {
-    if (pendingSave) return; // Ne pas écraser les modifications locales en cours de sauvegarde
     const data = snap.val();
-    if (data && data.boutiques) {
+    if (!data) return;
+
+    // Check-ins : toujours synchroniser depuis Firebase, même pendant une sauvegarde en cours.
+    // On lit depuis le snapshot du nœud parent (jamais d'erreur séparée possible).
+    if (data.checkins !== undefined) checkinData = data.checkins || {};
+
+    // Guard pendingSave : ne pas écraser les modifications boutiques en cours de sauvegarde
+    if (pendingSave) { setSyncBadge('online', '● En ligne'); return; }
+
+    if (data.boutiques) {
       Object.keys(data.boutiques).forEach(b => {
         if (state.boutiques[b]) {
           state.boutiques[b].schedule     = data.boutiques[b].schedule     || {};
@@ -1025,15 +1033,6 @@ function initFirebaseData() {
     }
     setSyncBadge('online', '● En ligne');
   }, () => setSyncBadge('error','Erreur sync'));
-
-  // ── Listener dédié pour les check-ins (indépendant de pendingSave) ──────────
-  // Ce listener est séparé du listener principal pour ne jamais être bloqué
-  // par le guard pendingSave, garantissant que les check-ins sont toujours à jour.
-  db.ref(DB_PATH + '/checkins').on('value', snap => {
-    const data = snap.val();
-    checkinData = data || {};
-    render();
-  }, () => {}); // erreur silencieuse (les check-ins sont déjà en mémoire locale)
 
   // Connexion temps réel Firebase
   db.ref('.info/connected').on('value', snap => {
