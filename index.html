@@ -1020,13 +1020,20 @@ function initFirebaseData() {
         }
       });
       patchEmployees();
-      // Check-ins stockés dans le même nœud autorisé
-      if (data.checkins) checkinData = data.checkins;
       render();
       if (firstDataLoad) { firstDataLoad = false; setTimeout(scrollToToday, 150); }
     }
     setSyncBadge('online', '● En ligne');
   }, () => setSyncBadge('error','Erreur sync'));
+
+  // ── Listener dédié pour les check-ins (indépendant de pendingSave) ──────────
+  // Ce listener est séparé du listener principal pour ne jamais être bloqué
+  // par le guard pendingSave, garantissant que les check-ins sont toujours à jour.
+  db.ref(DB_PATH + '/checkins').on('value', snap => {
+    const data = snap.val();
+    checkinData = data || {};
+    render();
+  }, () => {}); // erreur silencieuse (les check-ins sont déjà en mémoire locale)
 
   // Connexion temps réel Firebase
   db.ref('.info/connected').on('value', snap => {
@@ -2589,7 +2596,14 @@ function toggleCheckin(boutique, dateKey, timeKey) {
   else checkinData[boutique][dateKey][timeKey] = next;
   const path = DB_PATH + '/checkins/' + boutique + '/' + dateKey + '/' + timeKey;
   const op = next === null ? db.ref(path).remove() : db.ref(path).set(next);
-  op.catch(err => toast('⚠ Check-in non sauvegardé (' + (err.code || err.message) + ')', '#dc2626'));
+  op.catch(err => {
+    // Revenir à l'état précédent en mémoire si la sauvegarde Firebase échoue
+    if (current === null) delete checkinData[boutique]?.[dateKey]?.[timeKey];
+    else if (checkinData[boutique]?.[dateKey]) checkinData[boutique][dateKey][timeKey] = current;
+    render();
+    toast('❌ Check-in NON sauvegardé — ' + (err.code || err.message) + '. Vérifiez votre connexion.', '#dc2626');
+    console.error('[checkin] save failed:', err);
+  });
   render();
 }
 
@@ -3623,7 +3637,7 @@ document.addEventListener('keydown', e => {
 // ═══ EXPORT / IMPORT ══════════════════════════
 function exportData() {
   if (!authUser || !isAdmin(authUser.email)) return toast('⛔ Accès refusé','#dc2626');
-  const json=JSON.stringify({version:2,exportedAt:new Date().toISOString(),boutiques:state.boutiques},null,2);
+  const json=JSON.stringify({version:2,exportedAt:new Date().toISOString(),boutiques:state.boutiques,checkins:checkinData},null,2);
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([json],{type:'application/json'})); a.download='planning-piffaut-'+toKey(new Date())+'.json'; a.click();
 }
 function importData(e) {
