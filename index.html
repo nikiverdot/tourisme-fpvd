@@ -2306,7 +2306,7 @@ function render() {
     const today = toKey(new Date());
     const cpP   = getCPPeriod(e, today);
     const titleTip = 'Renommer : ' + esc(e) + (cpP ? ' · ' + cpP.label + (cpP.to ? ' → ' + cpP.to : ' (CDI)') + ' · CP: ' + cpP.cpTotal + 'j' + (cpP.revTotal ? ' + ' + cpP.revTotal + 'j révision' : '') : '');
-    html += '<th class="th-emp" data-col="emp-' + idx + '" onclick="openRenameEmpModal(\'' + b + '\',' + idx + ')" title="' + titleTip + '"><div class="th-inner">' + esc(label) + rh('emp-' + idx) + '</div></th>';
+    html += '<th class="th-emp" data-col="emp-' + idx + '"' + (_isAdminRender ? ' onclick="openRenameEmpModal(\'' + b + '\',' + idx + ')" style="cursor:pointer"' : '') + ' title="' + titleTip + '"><div class="th-inner">' + esc(label) + rh('emp-' + idx) + '</div></th>';
   });
   const _rl = state.boutiques[b].renfortLabels || ['Renfort 1','Renfort 2'];
   const _isAdminRender = authUser && isAdmin(authUser.email);
@@ -3033,6 +3033,7 @@ function updateMobileTodayCard() {
 
 // ═══ RENAME EMPLOYEE MODAL ════════════════════
 function openRenameEmpModal(b, empIdx) {
+  if (!authUser || !isAdmin(authUser.email)) return;
   const emp = state.boutiques[b].employees[empIdx];
   modalCtx = { type:'renameEmp', b, empIdx };
   document.getElementById('modal-title').textContent = 'Renommer le poste';
