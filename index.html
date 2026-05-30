@@ -848,6 +848,8 @@ let fhNotes      = {};   // bookingPk → note interne (persisté Firebase)
 let fhOverrides  = {};   // bookingPk → {clientName, langFlag} (persisté Firebase)
 let checkinData  = {};   // { boutique: { dateKey: { timeKey: 'arrived'|'noshow' } } }
 let absenceAuth  = {};   // { boutique: { dateKey: authorizedByEmail } } — absences autorisées par Monique
+const RGPD_VERSION     = '1.1';  // Incrémenter si mise à jour majeure de la politique
+let   rgpdConsentGiven = false;  // true une fois le consentement enregistré
 let modalCtx     = null;
 let firstDataLoad = true;
 let db          = null;
@@ -3809,6 +3811,8 @@ function init() {
     syncFareHarbor();
     // Auto-sync FH toutes les 10 minutes
     setInterval(() => { if (authUser) syncFareHarbor(); }, 10 * 60 * 1000);
+    // Vérifier le consentement RGPD (non-bloquant)
+    checkRGPDConsent(user);
   });
 }
 init();
@@ -4536,13 +4540,12 @@ if ('serviceWorker' in navigator) {
 }
 
 // ── Politique de confidentialité (RGPD) ──────────────────────────────────────
-function openRGPDModal() {
-  const html = `
-  <div style="font-size:13px;color:#1e293b;line-height:1.7;max-height:65vh;overflow-y:auto;padding-right:4px">
 
+function getRGPDContent() {
+  return `
     <p style="background:#f0f9ff;border-left:3px solid #0284c7;padding:8px 12px;border-radius:4px;margin:0 0 16px">
       Cette application est réservée exclusivement aux collaborateurs autorisés de <strong>FPVD (Famille Piffaut Vins &amp; Domaines)</strong>.
-      Aucune donnée personnelle n'est collectée auprès des clients des domaines.
+      Aucune donnée personnelle n'est collectée auprès des visiteurs ou clients des domaines.
     </p>
 
     <h4 style="color:#1b2b4b;margin:14px 0 6px;font-size:13px">1 · Responsable du traitement</h4>
@@ -4559,31 +4562,38 @@ function openRGPDModal() {
       </tr>
       <tr>
         <td style="padding:5px 8px;border:1px solid #e2e8f0">Comptes collaborateurs</td>
-        <td style="padding:5px 8px;border:1px solid #e2e8f0">Email pro, prénom/nom, rôle</td>
+        <td style="padding:5px 8px;border:1px solid #e2e8f0">Email professionnel, prénom/nom, rôle</td>
         <td style="padding:5px 8px;border:1px solid #e2e8f0">Intérêt légitime (gestion d'activité)</td>
         <td style="padding:5px 8px;border:1px solid #e2e8f0">Jusqu'au départ</td>
       </tr>
       <tr style="background:#f8f9fa">
         <td style="padding:5px 8px;border:1px solid #e2e8f0">Données de planning</td>
-        <td style="padding:5px 8px;border:1px solid #e2e8f0">Dates, pax, canal de vente</td>
+        <td style="padding:5px 8px;border:1px solid #e2e8f0">Présences, absences, notes internes</td>
         <td style="padding:5px 8px;border:1px solid #e2e8f0">Intérêt légitime (opérations)</td>
         <td style="padding:5px 8px;border:1px solid #e2e8f0">Durée de l'activité</td>
       </tr>
       <tr>
-        <td style="padding:5px 8px;border:1px solid #e2e8f0">Cache réservations FH</td>
-        <td style="padding:5px 8px;border:1px solid #e2e8f0">Créneaux, activité, nb pax, noms clients issus de FareHarbor</td>
+        <td style="padding:5px 8px;border:1px solid #e2e8f0">Cache réservations</td>
+        <td style="padding:5px 8px;border:1px solid #e2e8f0">Créneaux, activité, nb pax, noms clients (FareHarbor, Winalist, GetYourGuide, TripAdvisor)</td>
         <td style="padding:5px 8px;border:1px solid #e2e8f0">Intérêt légitime (synchro)</td>
         <td style="padding:5px 8px;border:1px solid #e2e8f0">Exercice en cours</td>
+      </tr>
+      <tr style="background:#f8f9fa">
+        <td style="padding:5px 8px;border:1px solid #e2e8f0">Consentement RGPD</td>
+        <td style="padding:5px 8px;border:1px solid #e2e8f0">Email, horodatage d'acceptation, version de la politique</td>
+        <td style="padding:5px 8px;border:1px solid #e2e8f0">Obligation légale (art. 7 RGPD)</td>
+        <td style="padding:5px 8px;border:1px solid #e2e8f0">5 ans après la fin du contrat</td>
       </tr>
     </table>
 
     <h4 style="color:#1b2b4b;margin:14px 0 6px;font-size:13px">3 · Hébergement &amp; sécurité</h4>
     <ul style="margin:0 0 12px;padding-left:18px">
-      <li><strong>Application :</strong> Netlify (CDN mondial, HTTPS automatique, données de transit uniquement)</li>
+      <li><strong>Application :</strong> GitHub Pages (tourisme-fpvd.fr) + Netlify Functions — HTTPS obligatoire, données de transit uniquement.</li>
       <li><strong>Base de données :</strong> Firebase Realtime Database — région <strong>europe-west1 (Belgique)</strong>, Google Cloud. Les données ne quittent jamais l'Union Européenne.</li>
       <li><strong>Authentification :</strong> Firebase Auth — sessions sécurisées, aucun mot de passe stocké en clair.</li>
-      <li><strong>Clés secrètes :</strong> stockées uniquement dans les variables d'environnement Netlify (serveur) — jamais dans le code source.</li>
-      <li><strong>Cookies :</strong> aucun cookie de tracking ou publicitaire. Seul le token d'authentification Firebase est conservé en session.</li>
+      <li><strong>Clés secrètes :</strong> stockées uniquement dans les variables d'environnement Netlify (côté serveur) — jamais dans le code source.</li>
+      <li><strong>Contrôle d'accès :</strong> chaque collaborateur n'accède qu'à son périmètre autorisé (rôle admin / manager / employé / lecture seule).</li>
+      <li><strong>Cookies :</strong> aucun cookie de tracking ou publicitaire. Seul le token Firebase Auth est conservé en session locale.</li>
     </ul>
 
     <h4 style="color:#1b2b4b;margin:14px 0 6px;font-size:13px">4 · Vos droits (RGPD Art. 15-17-20)</h4>
@@ -4591,26 +4601,84 @@ function openRGPDModal() {
       <li><strong>Accès :</strong> vous pouvez demander une copie de vos données à tout moment.</li>
       <li><strong>Rectification :</strong> vos informations peuvent être corrigées par l'administrateur.</li>
       <li><strong>Effacement :</strong> votre compte peut être supprimé sur demande (départ ou demande explicite).</li>
-      <li><strong>Portabilité :</strong> vos données sont exportables au format JSON structuré.</li>
+      <li><strong>Portabilité :</strong> vos données sont exportables au format JSON structuré (bouton Export dans l'application).</li>
+      <li><strong>Limitation :</strong> vous pouvez demander la suspension du traitement de vos données.</li>
     </ul>
     <p style="margin:0 0 12px">Pour exercer vos droits : <a href="mailto:tourisme@fpvd.fr" style="color:#0284c7">tourisme@fpvd.fr</a></p>
 
-    <h4 style="color:#1b2b4b;margin:14px 0 6px;font-size:13px">5 · Sous-traitants</h4>
+    <h4 style="color:#1b2b4b;margin:14px 0 6px;font-size:13px">5 · Sous-traitants (données hébergées hors FPVD)</h4>
     <ul style="margin:0 0 8px;padding-left:18px">
-      <li><strong>Google Firebase / Google Cloud</strong> — hébergement base de données &amp; authentification. DPA RGPD disponible : <a href="https://firebase.google.com/support/privacy" target="_blank" style="color:#0284c7">firebase.google.com/support/privacy</a></li>
-      <li><strong>Netlify</strong> — hébergement application web. DPA RGPD disponible : <a href="https://www.netlify.com/gdpr-ccpa" target="_blank" style="color:#0284c7">netlify.com/gdpr-ccpa</a></li>
+      <li><strong>Google Firebase / Google Cloud</strong> — base de données &amp; authentification. DPA RGPD : <a href="https://firebase.google.com/support/privacy" target="_blank" style="color:#0284c7">firebase.google.com/support/privacy</a></li>
+      <li><strong>GitHub Pages</strong> — hébergement du site web. Politique : <a href="https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement" target="_blank" style="color:#0284c7">docs.github.com/privacy</a></li>
+      <li><strong>Netlify</strong> — fonctions serverless. DPA RGPD : <a href="https://www.netlify.com/gdpr-ccpa" target="_blank" style="color:#0284c7">netlify.com/gdpr-ccpa</a></li>
+      <li><strong>FareHarbor</strong> — plateforme de réservation (noms clients synchronisés en lecture seule). Politique : <a href="https://fareharbor.com/privacy/" target="_blank" style="color:#0284c7">fareharbor.com/privacy</a></li>
+      <li><strong>Winalist</strong> — plateforme de réservation oenotourisme (noms clients synchronisés en lecture seule). Politique : <a href="https://www.winalist.com/legal/privacy-policy" target="_blank" style="color:#0284c7">winalist.com/legal/privacy-policy</a></li>
     </ul>
 
     <p style="margin:16px 0 0;font-size:11px;color:#64748b;border-top:1px solid #e2e8f0;padding-top:10px">
-      Dernière mise à jour : mai 2026 · Version 1.0
-    </p>
-  </div>`;
+      Dernière mise à jour : mai 2026 · Version ${RGPD_VERSION}
+    </p>`;
+}
 
+function openRGPDModal() {
   document.getElementById('modal-title').textContent = '🔒 Politique de confidentialité — RGPD';
-  document.getElementById('modal-body').innerHTML = html;
+  document.getElementById('modal-body').innerHTML =
+    '<div style="font-size:13px;color:#1e293b;line-height:1.7;max-height:65vh;overflow-y:auto;padding-right:4px">'
+    + getRGPDContent() + '</div>';
   document.getElementById('modal-actions').innerHTML = '<button class="btn-mp" onclick="closeModal()">Fermer</button>';
   openModal();
 }
+
+// ── Consentement RGPD (overlay dédié, non-dismissible sans acceptation) ───────
+async function checkRGPDConsent(user) {
+  if (!db) return;
+  try {
+    const snap = await db.ref('piffaut-rgpd-consent/' + user.uid).once('value');
+    const c = snap.val();
+    if (c && c.version === RGPD_VERSION) { rgpdConsentGiven = true; return; }
+    // Première connexion ou politique mise à jour → afficher l'overlay
+    document.getElementById('rgpd-consent-body').innerHTML = getRGPDContent();
+    document.getElementById('rgpd-consent-overlay').style.display = 'flex';
+  } catch(e) {
+    // En cas d'erreur réseau, ne pas bloquer l'accès
+    rgpdConsentGiven = true;
+    console.warn('[RGPD] consent check failed, access granted anyway:', e);
+  }
+}
+
+async function acceptRGPD() {
+  const btn = document.getElementById('rgpd-accept-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Enregistrement…'; }
+  try {
+    if (authUser && db) {
+      await db.ref('piffaut-rgpd-consent/' + authUser.uid).set({
+        acceptedAt: Date.now(),
+        email:      authUser.email,
+        version:    RGPD_VERSION
+      });
+    }
+  } catch(e) {
+    console.error('[RGPD] consent save failed:', e);
+  }
+  rgpdConsentGiven = true;
+  document.getElementById('rgpd-consent-overlay').style.display = 'none';
+}
 </script>
+
+<!-- ── Overlay consentement RGPD (non-dismissible sans acceptation) ─────────── -->
+<div id="rgpd-consent-overlay" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(15,23,42,0.96);align-items:center;justify-content:center;padding:16px">
+  <div style="background:white;border-radius:14px;width:min(660px,96vw);max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 60px rgba(0,0,0,0.6)">
+    <div style="padding:18px 22px 14px;background:#1b2b4b;border-radius:14px 14px 0 0;flex-shrink:0">
+      <div style="font-size:20px;margin-bottom:4px">🔒</div>
+      <div style="color:white;font-size:15px;font-weight:700">Politique de confidentialité — RGPD</div>
+      <div style="color:#94a3b8;font-size:12px;margin-top:3px">Veuillez lire et accepter pour accéder au planning</div>
+    </div>
+    <div id="rgpd-consent-body" style="padding:16px 20px;overflow-y:auto;flex:1;font-size:13px;color:#1e293b;line-height:1.7"></div>
+    <div style="padding:14px 20px;border-top:1px solid #e2e8f0;background:#f8fafc;border-radius:0 0 14px 14px;flex-shrink:0;display:flex;justify-content:flex-end">
+      <button id="rgpd-accept-btn" onclick="acceptRGPD()" style="background:#1b2b4b;color:white;border:none;border-radius:8px;padding:11px 22px;font-size:13px;font-weight:700;cursor:pointer">✅ J'ai lu et j'accepte la politique de confidentialité</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
