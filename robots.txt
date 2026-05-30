@@ -1,0 +1,4 @@
+# Planning Oenotourisme FPVD — Application privée
+# Accès réservé aux collaborateurs FPVD autorisés
+User-agent: *
+Disallow: /

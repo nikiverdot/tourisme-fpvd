@@ -1,18 +1,22 @@
-// Proxy server-side pour les flux ICS FareHarbor/Winalist (contourne CORS)
+// Proxy server-side pour les flux ICS FareHarbor/Winalist
+// Les URLs des flux sont stockées dans les variables d'environnement Netlify — jamais exposées côté client.
 exports.handler = async (event) => {
-  const url = event.queryStringParameters && event.queryStringParameters.url;
-  if (!url) {
-    return { statusCode: 400, body: 'Paramètre url manquant' };
+  // Mapping feed → variable d'environnement
+  const FEEDS = {
+    'fh-delorme':       process.env.ICS_FH_DELORME,
+    'fh-bulle':         process.env.ICS_FH_BULLE,
+    'winalist-bulle':   process.env.ICS_WINALIST_BULLE,
+    'winalist-delorme': process.env.ICS_WINALIST_DELORME,
+  };
+
+  const feed = event.queryStringParameters && event.queryStringParameters.feed;
+  if (!feed) {
+    return { statusCode: 400, body: 'Paramètre feed manquant' };
   }
 
-  // Sécurité : autoriser seulement les domaines connus
-  const allowed = ['fareharbor.com', 'winalist.fr', 'winalist.com'];
-  let hostname;
-  try { hostname = new URL(url).hostname; } catch(e) {
-    return { statusCode: 400, body: 'URL invalide' };
-  }
-  if (!allowed.some(d => hostname.endsWith(d))) {
-    return { statusCode: 403, body: 'Domaine non autorisé' };
+  const url = FEEDS[feed];
+  if (!url) {
+    return { statusCode: 400, body: 'Feed inconnu : ' + feed };
   }
 
   try {

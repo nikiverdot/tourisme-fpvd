@@ -23,10 +23,12 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "546018620268",
   appId:             "1:546018620268:web:043de99203b72cb9e27949"
 };
-const FAREHARBOR_ICS_DELORME = "https://fareharbor.com/integrations/ics/andre-delorme/calendar/?token=cc1ce7f0-f5f4-43d8-b6ec-b0d86f86f062";
-const FAREHARBOR_ICS_BULLE   = "https://fareharbor.com/integrations/ics/les-petits-veuve-ambal/calendar/?token=b2355683-6798-4049-8de9-46fdf9311166";
-const WINALIST_ICS_BULLE     = "https://www.winalist.fr/ics/experiences/feed/148/5KXKToGoHt4YYyBdjoqXpnlBUk5Ko8";
-const WINALIST_ICS_DELORME   = "https://www.winalist.fr/ics/experiences/feed/667/Zf9VbGVo86VT02wQtxjSilX6onx8Ut";
+// Les URLs des flux ICS sont stockées dans les variables d'environnement Netlify (côté serveur).
+// Le client utilise uniquement des noms de flux — les tokens ne sont jamais exposés dans le code source.
+const ICS_FEEDS = {
+  delorme: { fh: 'fh-delorme', winalist: 'winalist-delorme' },
+  bulle:   { fh: 'fh-bulle',   winalist: 'winalist-bulle'   },
+};
 </script>
 <style>
 :root { color-scheme: light; }
@@ -719,6 +721,8 @@ body.is-admin #btn-admin-tools { display: inline-flex; }
     <span>|</span>
     <span>Application développée par <strong style="color:#c4956a">Monique Verdot</strong> · Tous droits réservés · © <span id="footer-year"></span></span>
     <script>document.getElementById('footer-year').textContent=new Date().getFullYear();</script>
+    <span>·</span>
+    <a href="#" onclick="openRGPDModal();return false;" style="color:#c4956a;text-decoration:none;font-weight:700">Politique de confidentialité</a>
   </div>
 </div>
 
@@ -1753,15 +1757,10 @@ async function fetchWithTimeout(url, ms) {
   });
 }
 
-// Fetch an ICS calendar through multiple CORS proxies; returns raw text or null
-async function fetchICS(url) {
+// Fetch an ICS calendar via notre proxy Netlify sécurisé (feed = nom interne, URL résolue côté serveur)
+async function fetchICS(feed) {
   const sources = [
-    () => fetchWithTimeout('/.netlify/functions/proxy-ics?url=' + encodeURIComponent(url), 10000),
-    () => fetchWithTimeout(url, 7000),
-    () => fetchWithTimeout('https://corsproxy.io/?' + url, 10000),
-    () => fetchWithTimeout('https://api.allorigins.win/raw?url=' + encodeURIComponent(url), 10000),
-    () => fetchWithTimeout('https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url), 10000),
-    () => fetchWithTimeout('https://thingproxy.freeboard.io/fetch/' + url, 10000)
+    () => fetchWithTimeout('/.netlify/functions/proxy-ics?feed=' + encodeURIComponent(feed), 12000),
   ];
   for (const src of sources) {
     try {
@@ -1769,7 +1768,7 @@ async function fetchICS(url) {
       if (!resp.ok) continue;
       const txt = await resp.text();
       if (txt.includes('BEGIN:VEVENT')) return txt;
-    } catch(e) { /* try next proxy */ }
+    } catch(e) { /* proxy indisponible */ }
   }
   return null;
 }
@@ -1857,12 +1856,12 @@ async function syncFareHarbor() {
   btn.disabled = true; btn.textContent = '⏳…';
   msg.style.color = '#64748b'; msg.textContent = '⏳ Récupération des calendriers…';
 
-  // Fetch all sources in parallel (FH + Winalist pour les 2 boutiques)
+  // Fetch all sources in parallel via notre proxy sécurisé (tokens résolus côté serveur Netlify)
   const [txtDelorme, txtBulle, txtWinalistB, txtWinalistD] = await Promise.all([
-    fetchICS(FAREHARBOR_ICS_DELORME),
-    fetchICS(FAREHARBOR_ICS_BULLE),
-    fetchICS(WINALIST_ICS_BULLE),
-    fetchICS(WINALIST_ICS_DELORME)
+    fetchICS(ICS_FEEDS.delorme.fh),
+    fetchICS(ICS_FEEDS.bulle.fh),
+    fetchICS(ICS_FEEDS.bulle.winalist),
+    fetchICS(ICS_FEEDS.delorme.winalist)
   ]);
 
   if (!txtDelorme && !txtBulle && !txtWinalistB && !txtWinalistD) {
@@ -4427,6 +4426,83 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
+}
+
+// ── Politique de confidentialité (RGPD) ──────────────────────────────────────
+function openRGPDModal() {
+  const html = `
+  <div style="font-size:13px;color:#1e293b;line-height:1.7;max-height:65vh;overflow-y:auto;padding-right:4px">
+
+    <p style="background:#f0f9ff;border-left:3px solid #0284c7;padding:8px 12px;border-radius:4px;margin:0 0 16px">
+      Cette application est réservée exclusivement aux collaborateurs autorisés de <strong>FPVD (Famille Piffaut Vins &amp; Domaines)</strong>.
+      Aucune donnée personnelle n'est collectée auprès des clients des domaines.
+    </p>
+
+    <h4 style="color:#1b2b4b;margin:14px 0 6px;font-size:13px">1 · Responsable du traitement</h4>
+    <p style="margin:0 0 12px">FPVD — Famille Piffaut Vins &amp; Domaines<br>
+    Contact : <a href="mailto:tourisme@fpvd.fr" style="color:#0284c7">tourisme@fpvd.fr</a></p>
+
+    <h4 style="color:#1b2b4b;margin:14px 0 6px;font-size:13px">2 · Données traitées</h4>
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <tr style="background:#f8f9fa">
+        <th style="padding:5px 8px;text-align:left;border:1px solid #e2e8f0">Catégorie</th>
+        <th style="padding:5px 8px;text-align:left;border:1px solid #e2e8f0">Données</th>
+        <th style="padding:5px 8px;text-align:left;border:1px solid #e2e8f0">Base légale</th>
+        <th style="padding:5px 8px;text-align:left;border:1px solid #e2e8f0">Durée</th>
+      </tr>
+      <tr>
+        <td style="padding:5px 8px;border:1px solid #e2e8f0">Comptes collaborateurs</td>
+        <td style="padding:5px 8px;border:1px solid #e2e8f0">Email pro, prénom/nom, rôle</td>
+        <td style="padding:5px 8px;border:1px solid #e2e8f0">Intérêt légitime (gestion d'activité)</td>
+        <td style="padding:5px 8px;border:1px solid #e2e8f0">Jusqu'au départ</td>
+      </tr>
+      <tr style="background:#f8f9fa">
+        <td style="padding:5px 8px;border:1px solid #e2e8f0">Données de planning</td>
+        <td style="padding:5px 8px;border:1px solid #e2e8f0">Dates, pax, canal de vente</td>
+        <td style="padding:5px 8px;border:1px solid #e2e8f0">Intérêt légitime (opérations)</td>
+        <td style="padding:5px 8px;border:1px solid #e2e8f0">Durée de l'activité</td>
+      </tr>
+      <tr>
+        <td style="padding:5px 8px;border:1px solid #e2e8f0">Cache réservations FH</td>
+        <td style="padding:5px 8px;border:1px solid #e2e8f0">Créneaux, activité, nb pax, noms clients issus de FareHarbor</td>
+        <td style="padding:5px 8px;border:1px solid #e2e8f0">Intérêt légitime (synchro)</td>
+        <td style="padding:5px 8px;border:1px solid #e2e8f0">Exercice en cours</td>
+      </tr>
+    </table>
+
+    <h4 style="color:#1b2b4b;margin:14px 0 6px;font-size:13px">3 · Hébergement &amp; sécurité</h4>
+    <ul style="margin:0 0 12px;padding-left:18px">
+      <li><strong>Application :</strong> Netlify (CDN mondial, HTTPS automatique, données de transit uniquement)</li>
+      <li><strong>Base de données :</strong> Firebase Realtime Database — région <strong>europe-west1 (Belgique)</strong>, Google Cloud. Les données ne quittent jamais l'Union Européenne.</li>
+      <li><strong>Authentification :</strong> Firebase Auth — sessions sécurisées, aucun mot de passe stocké en clair.</li>
+      <li><strong>Clés secrètes :</strong> stockées uniquement dans les variables d'environnement Netlify (serveur) — jamais dans le code source.</li>
+      <li><strong>Cookies :</strong> aucun cookie de tracking ou publicitaire. Seul le token d'authentification Firebase est conservé en session.</li>
+    </ul>
+
+    <h4 style="color:#1b2b4b;margin:14px 0 6px;font-size:13px">4 · Vos droits (RGPD Art. 15-17-20)</h4>
+    <ul style="margin:0 0 12px;padding-left:18px">
+      <li><strong>Accès :</strong> vous pouvez demander une copie de vos données à tout moment.</li>
+      <li><strong>Rectification :</strong> vos informations peuvent être corrigées par l'administrateur.</li>
+      <li><strong>Effacement :</strong> votre compte peut être supprimé sur demande (départ ou demande explicite).</li>
+      <li><strong>Portabilité :</strong> vos données sont exportables au format JSON structuré.</li>
+    </ul>
+    <p style="margin:0 0 12px">Pour exercer vos droits : <a href="mailto:tourisme@fpvd.fr" style="color:#0284c7">tourisme@fpvd.fr</a></p>
+
+    <h4 style="color:#1b2b4b;margin:14px 0 6px;font-size:13px">5 · Sous-traitants</h4>
+    <ul style="margin:0 0 8px;padding-left:18px">
+      <li><strong>Google Firebase / Google Cloud</strong> — hébergement base de données &amp; authentification. DPA RGPD disponible : <a href="https://firebase.google.com/support/privacy" target="_blank" style="color:#0284c7">firebase.google.com/support/privacy</a></li>
+      <li><strong>Netlify</strong> — hébergement application web. DPA RGPD disponible : <a href="https://www.netlify.com/gdpr-ccpa" target="_blank" style="color:#0284c7">netlify.com/gdpr-ccpa</a></li>
+    </ul>
+
+    <p style="margin:16px 0 0;font-size:11px;color:#64748b;border-top:1px solid #e2e8f0;padding-top:10px">
+      Dernière mise à jour : mai 2026 · Version 1.0
+    </p>
+  </div>`;
+
+  document.getElementById('modal-title').textContent = '🔒 Politique de confidentialité — RGPD';
+  document.getElementById('modal-body').innerHTML = html;
+  document.getElementById('modal-actions').innerHTML = '<button class="btn-mp" onclick="closeModal()">Fermer</button>';
+  openModal();
 }
 </script>
 </body>

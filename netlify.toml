@@ -1,2 +1,19 @@
 [build]
   functions = "netlify/functions"
+
+# ── En-têtes de sécurité HTTP ────────────────────────────────────────────────
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # Empêche l'intégration dans une iframe (clickjacking)
+    X-Frame-Options = "DENY"
+    # Empêche le sniffing MIME
+    X-Content-Type-Options = "nosniff"
+    # Politique de referrer stricte
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    # Désactive les APIs sensibles non utilisées
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+    # Politique de sécurité du contenu
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.googleapis.com https://apis.google.com; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com wss://*.firebaseio.com https://planning-tourisme-default-rtdb.europe-west1.firebasedatabase.app; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'"
+    # Force HTTPS strict (1 an)
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
