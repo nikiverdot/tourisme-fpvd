@@ -946,7 +946,7 @@ async function authSubmit() {
           await cred.user.delete();
           await firebase.auth().signOut();
           document.getElementById('auth-submit-btn').disabled = false;
-          return showAuthErr("Votre email n'est pas autorisé. Contactez mfverdot@gmail.com.");
+          return showAuthErr("Votre email n'est pas autorisé. Contactez votre responsable.");
         }
       }
       await cred.user.updateProfile({ displayName: name });
@@ -3673,7 +3673,7 @@ function init() {
         if (!snap.exists()) {
           await firebase.auth().signOut();
           document.getElementById('auth-overlay').style.display = 'flex';
-          showAuthErr("Votre email n'est pas autorisé. Contactez mfverdot@gmail.com.");
+          showAuthErr("Votre email n'est pas autorisé. Contactez votre responsable.");
           return;
         }
         // Appliquer la boutique par défaut et le rôle de cet utilisateur

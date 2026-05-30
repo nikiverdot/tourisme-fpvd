@@ -27,7 +27,7 @@ exports.handler = async (event) => {
       statusCode: 200,
       headers: {
         'Content-Type': 'text/calendar; charset=utf-8',
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': 'https://tourisme-fpvd.fr',
         'Cache-Control': 'no-store'
       },
       body
