@@ -866,9 +866,16 @@ let authTab     = 'login';
 const ADMIN_EMAIL       = 'mfverdot@gmail.com';  // admin principal
 // Tous les comptes de Monique (présence invisible + seule à modifier sa colonne)
 const MONIQUE_EMAILS    = ['mfverdot@gmail.com', 'verdotmf@gmail.com', 'monique.verdot@fpvd.fr', 'verdotmonique@gmail.com'];
-// Comptes admin qui court-circuitent l'ACL (verdotmonique passe par l'ACL Firebase)
-const ADMIN_EMAILS      = ['mfverdot@gmail.com', 'verdotmf@gmail.com'];
-const isAdmin   = (email) => ADMIN_EMAILS.includes((email||'').toLowerCase());
+// ── Super-admins : hardcodés, invisibles, ne peuvent pas être retirés ──────────
+const SUPER_ADMIN_EMAILS = ['mfverdot@gmail.com', 'verdotmf@gmail.com'];
+const ADMIN_EMAILS       = SUPER_ADMIN_EMAILS; // alias rétro-compat
+const isSuperAdmin = (email) => SUPER_ADMIN_EMAILS.includes((email||'').toLowerCase());
+// isAdmin : super-admin (hardcodé) OU rôle 'admin' attribué en ACL (ex : Thomas)
+const isAdmin = (email) => {
+  if (!email) return false;
+  if (SUPER_ADMIN_EMAILS.includes(email.toLowerCase())) return true;
+  return !!(authUser && email.toLowerCase() === authUser.email.toLowerCase() && currentUserRole === 'admin');
+};
 const isMonique = (email) => MONIQUE_EMAILS.includes((email||'').toLowerCase());
 // Clé publique VAPID — remplacer par la vraie clé après génération
 const VAPID_PUBLIC_KEY  = 'BLVOFQuubXbAZWnYeLgBNam55ifATR_3igEBmf9E5XqDiJ3emTzJmCn9Y5FT-pck6dcQpqg2z_X_G55rSyY6uK8';
@@ -1240,6 +1247,7 @@ function openAdminPanel() {
     + '<option value="employee">👤 Employé(e)</option>'
     + '<option value="viewer">👁 Visualisation seule</option>'
     + '<option value="manager">⭐ Manager</option>'
+    + (isSuperAdmin(authUser?.email) ? '<option value="admin">🔑 Admin</option>' : '')
     + '</select></div>'
     + '</div>'
     + '<p style="font-size:10px;color:#94a3b8;margin-top:4px">💡 Aucun email automatique n\'est envoyé — copie le message ci-dessous et envoie-le toi-même.</p>'
@@ -1261,31 +1269,58 @@ async function loadAdminList() {
   el.innerHTML = '<div style="font-size:11px;color:#94a3b8;padding:4px 0">Chargement…</div>';
   const snap = await db.ref(ACL_PATH).once('value');
   const users = snap.val() || {};
+  const amSuperAdmin = isSuperAdmin(authUser?.email);
   let html = '<p style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Utilisateurs autorisés</p>';
-  ADMIN_EMAILS.forEach(adm => {
-    html += '<div class="admin-user-row"><span>👑 ' + esc(adm) + '</span><span style="font-size:10px;background:#f0f8f7;color:#0e5c5c;border:1px solid #c4956a;padding:2px 7px;border-radius:4px;font-weight:700">ADMIN</span></div>';
-  });
-  Object.entries(users).forEach(([k,u]) => {
+
+  // Super-admins : visibles uniquement par eux-mêmes
+  if (amSuperAdmin) {
+    SUPER_ADMIN_EMAILS.forEach(adm => {
+      html += '<div class="admin-user-row"><span>👑 ' + esc(adm) + '</span>'
+        + '<span style="font-size:10px;background:#fdf4ff;color:#7e22ce;border:1px solid #d8b4fe;padding:2px 7px;border-radius:4px;font-weight:700">SUPER ADMIN</span></div>';
+    });
+  }
+
+  const roleInfo = {
+    employee: { label: '👤 Employé',      bg: '#eff6ff', color: '#2563eb', border: '#93c5fd' },
+    viewer:   { label: '👁 Lecture seule', bg: '#fef9c3', color: '#854d0e', border: '#fde68a' },
+    manager:  { label: '⭐ Manager',       bg: '#f0f8f7', color: '#0e5c5c', border: '#7bc4bc' },
+    admin:    { label: '🔑 Admin',         bg: '#fdf4ff', color: '#7e22ce', border: '#d8b4fe' }
+  };
+
+  // Utilisateurs ACL — super-admins filtrés pour les non-super-admins
+  const filtered = Object.entries(users).filter(([,u]) => amSuperAdmin || !isSuperAdmin(u.email||''));
+  filtered.forEach(([k, u]) => {
     const bq    = u.defaultBoutique || 'bulle';
     const bNext = bq === 'delorme' ? 'bulle' : 'delorme';
     const bLabel= bq === 'delorme' ? '🍾 AD' : '🫧 Bulle';
     const role  = u.role || 'employee';
-    const roleCycle = { 'employee': 'viewer', 'viewer': 'manager', 'manager': 'employee' };
-    const roleNext  = roleCycle[role] || 'employee';
-    const roleInfo  = {
-      employee: { label: '👤 Employé',      bg: '#eff6ff', color: '#2563eb', border: '#93c5fd' },
-      viewer:   { label: '👁 Lecture seule', bg: '#fef9c3', color: '#854d0e', border: '#fde68a' },
-      manager:  { label: '⭐ Manager',       bg: '#f0f8f7', color: '#0e5c5c', border: '#7bc4bc' }
-    };
-    const ri = roleInfo[role] || roleInfo.employee;
+    // Cycle de rôle : super-admin peut assigner 'admin', admin ordinaire ne peut pas
+    const roleCycleSuper = { employee:'viewer', viewer:'manager', manager:'admin', admin:'employee' };
+    const roleCycleNorm  = { employee:'viewer', viewer:'manager', manager:'employee' };
+    const cycle    = amSuperAdmin ? roleCycleSuper : roleCycleNorm;
+    const roleNext = cycle[role] || 'employee';
+    const ri  = roleInfo[role] || roleInfo.employee;
+    const isOwnEntry = u.email?.toLowerCase() === authUser?.email?.toLowerCase();
+    // Un admin ACL ne peut pas modifier d'autres admins ACL ni sa propre entrée
+    const canEdit   = amSuperAdmin || (!isOwnEntry && role !== 'admin');
+    const canRemove = amSuperAdmin || (!isOwnEntry && role !== 'admin');
     html += '<div class="admin-user-row"><div><strong>' + esc(u.name||'') + '</strong> <span style="color:#94a3b8;font-size:11px">' + esc(u.email) + '</span></div>'
       + '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
-      + '<span onclick="adminToggleBoutique(\'' + k + '\',\'' + bNext + '\')" style="font-size:10px;font-weight:700;color:#0e5c5c;background:#e0f2f0;border:1px solid #7bc4bc;border-radius:4px;padding:1px 6px;cursor:pointer" title="Cliquer pour changer la boutique">' + bLabel + ' ↕</span>'
-      + '<span onclick="adminToggleRole(\'' + k + '\',\'' + roleNext + '\')" style="font-size:10px;font-weight:700;color:' + ri.color + ';background:' + ri.bg + ';border:1px solid ' + ri.border + ';border-radius:4px;padding:1px 6px;cursor:pointer" title="Cliquer pour changer le rôle">' + ri.label + ' ↕</span>'
-      + '<button onclick="adminRemoveUser(\'' + k + '\')" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:5px;padding:2px 8px;cursor:pointer;font-size:10px;font-weight:600;flex-shrink:0">Retirer</button>'
+      + (canEdit
+          ? '<span onclick="adminToggleBoutique(\'' + k + '\',\'' + bNext + '\')" style="font-size:10px;font-weight:700;color:#0e5c5c;background:#e0f2f0;border:1px solid #7bc4bc;border-radius:4px;padding:1px 6px;cursor:pointer" title="Changer la boutique">' + bLabel + ' ↕</span>'
+          : '<span style="font-size:10px;font-weight:700;color:#94a3b8;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;padding:1px 6px">' + bLabel + '</span>'
+        )
+      + (canEdit
+          ? '<span onclick="adminToggleRole(\'' + k + '\',\'' + roleNext + '\')" style="font-size:10px;font-weight:700;color:' + ri.color + ';background:' + ri.bg + ';border:1px solid ' + ri.border + ';border-radius:4px;padding:1px 6px;cursor:pointer" title="Changer le rôle">' + ri.label + ' ↕</span>'
+          : '<span style="font-size:10px;font-weight:700;color:' + ri.color + ';background:' + ri.bg + ';border:1px solid ' + ri.border + ';border-radius:4px;padding:1px 6px">' + ri.label + '</span>'
+        )
+      + (canRemove
+          ? '<button onclick="adminRemoveUser(\'' + k + '\')" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:5px;padding:2px 8px;cursor:pointer;font-size:10px;font-weight:600;flex-shrink:0">Retirer</button>'
+          : ''
+        )
       + '</div></div>';
   });
-  if (!Object.keys(users).length) html += '<div style="font-size:11px;color:#94a3b8;padding:4px 0">Aucun autre utilisateur autorisé.</div>';
+  if (!filtered.length && !amSuperAdmin) html += '<div style="font-size:11px;color:#94a3b8;padding:4px 0">Aucun autre utilisateur autorisé.</div>';
   el.innerHTML = html;
 }
 
@@ -1295,6 +1330,8 @@ async function adminAddUser() {
   const boutique = document.getElementById('adm-boutique')?.value || 'bulle';
   const role     = document.getElementById('adm-role')?.value || 'employee';
   if (!email || !name) return toast('⚠ Remplissez email et prénom/nom','#dc2626');
+  if (role === 'admin' && !isSuperAdmin(authUser?.email)) return toast('⛔ Seul le super-admin peut créer un compte admin','#dc2626');
+  if (isSuperAdmin(email)) return toast('⛔ Ce compte est protégé','#dc2626');
   await db.ref(ACL_PATH + '/' + emailKey(email)).set({ email, name, defaultBoutique: boutique, role, addedAt: Date.now(), addedBy: authUser?.email || ADMIN_EMAIL });
   document.getElementById('adm-email').value = '';
   document.getElementById('adm-name').value  = '';
@@ -1320,8 +1357,9 @@ async function adminToggleBoutique(key, newBoutique) {
 }
 
 async function adminToggleRole(key, newRole) {
+  if (newRole === 'admin' && !isSuperAdmin(authUser?.email)) return;
   await db.ref(ACL_PATH + '/' + key + '/role').set(newRole);
-  const labels = { employee: 'Employé(e)', viewer: 'Lecture seule', manager: 'Manager' };
+  const labels = { employee: 'Employé(e)', viewer: 'Lecture seule', manager: 'Manager', admin: 'Admin' };
   toast('✅ Rôle → ' + (labels[newRole] || newRole), '#16a34a');
   loadAdminList();
 }
@@ -3770,8 +3808,8 @@ function init() {
       return;
     }
 
-    // Vérifier l'autorisation (sauf admins)
-    const isAdminLogin = isAdmin(user.email);
+    // Vérifier l'autorisation (sauf super-admins hardcodés)
+    const isAdminLogin = isSuperAdmin(user.email);
     if (!isAdminLogin) {
       try {
         const snap = await db.ref(ACL_PATH + '/' + emailKey(user.email)).once('value');
