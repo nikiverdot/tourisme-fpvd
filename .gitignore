@@ -1,2 +1,35 @@
-# Local Netlify folder
+# ── Netlify ────────────────────────────────────
 .netlify
+netlify/functions/node_modules/
+netlify/functions/package-lock.json
+
+# ── macOS ──────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V3
+.Trashes
+*.swp
+
+# ── Éditeurs ──────────────────────────────────
+.vscode/
+.idea/
+*.sublime-workspace
+
+# ── Node ──────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# ── Variables d'environnement (JAMAIS dans git) ─
+.env
+.env.local
+.env.production
+
+# ── Fichiers locaux / archives ─────────────────
+planning-famille-piffaut.html
+*.bak
+*.old
+
+# ── Claude local session ───────────────────────
+.claude/

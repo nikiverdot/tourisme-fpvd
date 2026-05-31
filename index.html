@@ -1960,11 +1960,7 @@ async function syncFareHarbor() {
     cntB  > 0 ? cntB  + ' ADB (FH)'      : '',
     cntWB > 0 ? cntWB + ' ADB (Winalist)': ''
   ].filter(Boolean).join(' · ');
-  // Diagnostic console — liste tous les events parsés (utile pour déboguer absences)
-  console.group('[FH sync] ' + new Date().toLocaleTimeString('fr-FR'));
-  allEvents.forEach(ev => console.log(ev.boutique, ev.dateKey, ev.time, ev.activity, 'pk:' + ev.bookingPk, ev.clientName, ev.status));
-  console.groupEnd();
-  // Expose dans window pour debug rapide depuis la console : debugFH('2026-08')
+  // Helper debug disponible depuis la console navigateur : debugFH('2026-08')
   window.debugFH = (prefix) => {
     const entries = Object.entries(fhBookings).filter(([k]) => !prefix || k.startsWith(prefix));
     entries.sort(([a],[b]) => a.localeCompare(b));
