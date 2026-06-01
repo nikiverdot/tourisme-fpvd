@@ -3598,20 +3598,22 @@ function openFHDetail(k, time, activity) {
   const participants = bk.participants || [{ pax: bk.pax, langFlag: bk.langFlag, langCode: bk.langCode, clientName: bk.clientName, via: bk.via, comment: bk.comment, bookingPk: bk.bookingPk, status: bk.status }];
   document.getElementById('modal-title').textContent = 'FareHarbor · ' + DAYS_FR[date.getDay()] + ' ' + date.getDate() + ' ' + MONTHS_FR[date.getMonth()];
 
-  const VIA_OPTIONS = ['', 'RDV', 'GYG', 'TripAdvisor', 'GE', 'FrenchTour', 'Challanges', 'Go Côté Saône', 'Winalist', 'OT', 'BFC'];
+  const VIA_OPTIONS = ['', 'Direct', 'Dijon City Pass', 'RDV', 'GYG', 'TripAdvisor', 'GE', 'FrenchTour', 'Challanges', 'Go Côté Saône', 'Winalist', 'OT', 'BFC'];
   const VIA_LABELS  = {
-    '':              '— Aucun canal',
-    'RDV':           '(RDV) Rue des Vignerons',
-    'GYG':           '(GYG) GetYourGuide',
-    'TripAdvisor': '(TripAdvisor) TripAdvisor',
-    'GE':            '(GE) Grape Escapes',
-    'FrenchTour':    '(FrenchTour) MyFrenchTour',
-    'Challanges':    '(Challanges) Château de Challanges',
-    'Go Côté Saône': '(Go Côté Saône) Go Côté Saône',
-    'Winalist':      '(Winalist) Winalist',
-    'OT':            '(OT) Office de Tourisme',
-    'BFC':           '(BFC) Bourgogne Franche-Comté Tourisme',
-    'À REGLER':      '(À REGLER) Règlement sur place',
+    '':                '— Aucun canal',
+    'Direct':          '(Direct) Réservation directe',
+    'Dijon City Pass': '(DCP) Dijon City Pass',
+    'RDV':             '(RDV) Rue des Vignerons',
+    'GYG':             '(GYG) GetYourGuide',
+    'TripAdvisor':     '(TripAdvisor) TripAdvisor',
+    'GE':              '(GE) Grape Escapes',
+    'FrenchTour':      '(FrenchTour) MyFrenchTour',
+    'Challanges':      '(Challanges) Château de Challanges',
+    'Go Côté Saône':   '(Go Côté Saône) Go Côté Saône',
+    'Winalist':        '(Winalist) Winalist',
+    'OT':              '(OT) Office de Tourisme',
+    'BFC':             '(BFC) Bourgogne Franche-Comté Tourisme',
+    'À REGLER':        '(À REGLER) Règlement sur place',
   };
   const LANG_OPTIONS = [
     ['', '— Aucune'],
