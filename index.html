@@ -1098,7 +1098,22 @@ function doSaveNow() {
   pendingSave = true;
   setSyncBadge('saving','Sauvegarde…');
   db.ref(DB_PATH).update(buildPayload())
-    .then(() => { pendingSave = false; setSyncBadge('online','✓ Sauvegardé · ' + new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})); })
+    .then(() => {
+      pendingSave = false;
+      setSyncBadge('online','✓ Sauvegardé · ' + new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}));
+      // Le listener Firebase peut avoir été bloqué pendant le save (pendingSave=true)
+      // → recharger les notes explicitement pour éviter qu'elles restent vides
+      db.ref(DB_PATH + '/boutiques').once('value').then(snap => {
+        const d = snap.val();
+        if (!d) return;
+        Object.keys(d).forEach(b => {
+          if (state.boutiques[b]) {
+            state.boutiques[b].notes = d[b]?.notes || state.boutiques[b].notes || {};
+          }
+        });
+        render();
+      }).catch(() => {});
+    })
     .catch(err => {
       pendingSave = false;
       setSyncBadge('error','Erreur save');
