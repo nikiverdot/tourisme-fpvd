@@ -1010,8 +1010,27 @@ function initFirebaseCore() {
   } catch(e) { console.error('Firebase init error', e); return false; }
 }
 
+function loadNotesFromFirebase() {
+  // Chargement garanti des notes — jamais bloqué par pendingSave
+  if (!db) return;
+  db.ref(DB_PATH + '/boutiques').once('value').then(snap => {
+    const d = snap.val();
+    if (!d) return;
+    let changed = false;
+    Object.keys(d).forEach(b => {
+      if (state.boutiques[b] && d[b] && d[b].notes) {
+        state.boutiques[b].notes = d[b].notes;
+        changed = true;
+      }
+    });
+    if (changed) render();
+  }).catch(() => {});
+}
+
 function initFirebaseData() {
   setSyncBadge('saving','Connexion…');
+  // Chargement initial garanti (indépendant de pendingSave)
+  loadNotesFromFirebase();
   db.ref(DB_PATH).on('value', snap => {
     if (pendingSave) return; // Ne pas écraser les modifications locales en cours de sauvegarde
     const data = snap.val();
