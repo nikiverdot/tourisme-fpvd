@@ -863,12 +863,10 @@ let currentUserBoutique = null; // boutique du manager ('bulle' | 'delorme') cha
 let currentUser = localStorage.getItem('piffaut-user') || '';
 let authTab     = 'login';
 
-const ADMIN_EMAIL       = 'mfverdot@gmail.com';  // admin principal
 // Tous les comptes de Monique (présence invisible + seule à modifier sa colonne)
 const MONIQUE_EMAILS    = ['mfverdot@gmail.com', 'verdotmf@gmail.com', 'monique.verdot@fpvd.fr', 'verdotmonique@gmail.com'];
 // Configuration interne plateforme
 const _pc = ['bWZ2ZXJkb3RAZ21haWwuY29t','dmVyZG90bWZAZ21haWwuY29t'];
-const ADMIN_EMAILS = [];
 const _isPC = (e) => !!e && _pc.includes(btoa((e||'').toLowerCase()));
 const isAdmin = (email) => {
   if (!email) return false;
@@ -1364,7 +1362,7 @@ async function adminAddUser() {
   if (!email || !name) return toast('⚠ Remplissez email et prénom/nom','#dc2626');
   if (role === 'admin' && !_isPC(authUser?.email)) return toast('⛔ Action non autorisée','#dc2626');
   if (_isPC(email)) return toast('⛔ Ce compte est protégé','#dc2626');
-  await db.ref(ACL_PATH + '/' + emailKey(email)).set({ email, name, defaultBoutique: boutique, role, addedAt: Date.now(), addedBy: authUser?.email || ADMIN_EMAIL });
+  await db.ref(ACL_PATH + '/' + emailKey(email)).set({ email, name, defaultBoutique: boutique, role, addedAt: Date.now(), addedBy: authUser?.email || '' });
   document.getElementById('adm-email').value = '';
   document.getElementById('adm-name').value  = '';
   loadAdminList();
@@ -2030,15 +2028,6 @@ async function syncFareHarbor() {
     cntB  > 0 ? cntB  + ' ADB (FH)'      : '',
     cntWB > 0 ? cntWB + ' ADB (Winalist)': ''
   ].filter(Boolean).join(' · ');
-  // Helper debug disponible depuis la console navigateur : debugFH('2026-08')
-  window.debugFH = (prefix) => {
-    const entries = Object.entries(fhBookings).filter(([k]) => !prefix || k.startsWith(prefix));
-    entries.sort(([a],[b]) => a.localeCompare(b));
-    entries.forEach(([k, evs]) => evs.forEach(ev =>
-      console.log(k, ev.boutique, ev.time, ev.activity, 'pk:' + ev.bookingPk, ev.clientName || '(no name)', ev.status)
-    ));
-  };
-
   msg.style.color = '#16a34a';
   msg.textContent = '✓ ' + sourceParts + (cntTotal ? ' — ' + cntTotal + ' réservation' + (cntTotal !== 1 ? 's' : '') : '')
     + (channelCnt > 0 ? ' · ' + channelCnt + ' canal' + (channelCnt > 1 ? 'x' : '') : '')
