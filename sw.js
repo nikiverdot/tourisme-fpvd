@@ -1,4 +1,4 @@
-const CACHE = 'fp-planning-v2';
+const CACHE = 'fp-planning-v3';
 const ASSETS = ['/', '/index.html', '/icon.svg', '/manifest.json'];
 
 self.addEventListener('install', e => {

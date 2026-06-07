@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html><!-- v3 -->
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
@@ -1846,26 +1846,23 @@ function getEffectiveStatus(b, k, emp, ferme) {
 }
 
 // ═══ FAREHARBOR ICS ════════════════════════════
-async function fetchWithTimeout(url, ms) {
+async function fetchWithTimeout(url, ms, headers) {
   return new Promise((res, rej) => {
     const t = setTimeout(() => rej(new Error('timeout')), ms);
-    fetch(url).then(r => { clearTimeout(t); res(r); }).catch(e => { clearTimeout(t); rej(e); });
+    const opts = headers ? { headers } : {};
+    fetch(url, opts).then(r => { clearTimeout(t); res(r); }).catch(e => { clearTimeout(t); rej(e); });
   });
 }
 
 // Fetch an ICS calendar via notre proxy Netlify sécurisé (feed = nom interne, URL résolue côté serveur)
 async function fetchICS(feed) {
-  const sources = [
-    () => fetchWithTimeout('https://planning-tourisme.netlify.app/.netlify/functions/proxy-ics?feed=' + encodeURIComponent(feed), 12000),
-  ];
-  for (const src of sources) {
-    try {
-      const resp = await src();
-      if (!resp.ok) continue;
+  try {
+    const resp = await fetchWithTimeout('/.netlify/functions/proxy-ics?feed=' + encodeURIComponent(feed), 12000);
+    if (resp.ok) {
       const txt = await resp.text();
       if (txt.includes('BEGIN:VEVENT')) return txt;
-    } catch(e) { /* proxy indisponible */ }
-  }
+    }
+  } catch(e) { /* proxy indisponible */ }
   return null;
 }
 
@@ -1888,17 +1885,11 @@ async function fetchFHChannels(year) {
 
   // Paginate through all results (API may cap at 1000 per page)
   async function fetchPage(url) {
-    const proxies = [
-      () => fetch(url, { headers: hdrs }),
-      () => fetch('https://corsproxy.io/?' + encodeURIComponent(url), { headers: hdrs }),
-    ];
-    for (const src of proxies) {
-      try {
-        const resp = await src();
-        if (!resp.ok) continue;
-        return await resp.json();
-      } catch(e) { /* next proxy */ }
-    }
+    try {
+      const proxyUrl = '/.netlify/functions/proxy-fh-api?url=' + encodeURIComponent(url);
+      const resp = await fetchWithTimeout(proxyUrl, 12000, { 'x-fh-app-key': appKey, 'x-fh-user-key': userKey });
+      if (resp.ok) return await resp.json();
+    } catch(e) { /* proxy failed */ }
     return null;
   }
 
@@ -1967,13 +1958,11 @@ async function fetchDelormeViaAPI(year) {
   const hdrs = { 'X-FareHarbor-API-App': appKey, 'X-FareHarbor-API-User': userKey, 'Accept': 'application/json' };
 
   async function fetchPage(url) {
-    const proxies = [
-      () => fetch(url, { headers: hdrs }),
-      () => fetch('https://corsproxy.io/?' + encodeURIComponent(url), { headers: hdrs }),
-    ];
-    for (const src of proxies) {
-      try { const r = await src(); if (r.ok) return await r.json(); } catch(e) {}
-    }
+    try {
+      const proxyUrl = '/.netlify/functions/proxy-fh-api?url=' + encodeURIComponent(url);
+      const r = await fetchWithTimeout(proxyUrl, 12000, { 'x-fh-app-key': appKey, 'x-fh-user-key': userKey });
+      if (r.ok) return await r.json();
+    } catch(e) {}
     return null;
   }
 
@@ -2043,6 +2032,14 @@ async function syncFareHarbor() {
   const msg = document.getElementById('ics-status');
   btn.disabled = true; btn.textContent = '⏳…';
   msg.style.color = '#64748b'; msg.textContent = '⏳ Récupération des calendriers…';
+  try { await _syncFareHarborCore(btn, msg); } catch(e) {
+    console.error('[FH sync] erreur inattendue:', e);
+    msg.style.color = '#dc2626'; msg.textContent = '⚠ Erreur sync: ' + e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = '🔄 Sync FareHarbor';
+  }
+}
+async function _syncFareHarborCore(btn, msg) {
 
   // Delorme : API FH directe (pas de token ICS à maintenir)
   // Bulle   : ICS proxy Netlify (pas d'accès API pour l'instant)
@@ -2063,8 +2060,7 @@ async function syncFareHarbor() {
   }
 
   if (!eventsDelorme.length && !txtBulle && !txtWinalistB && !txtWinalistD) {
-    msg.style.color = '#dc2626'; msg.textContent = '⚠ Calendriers inaccessibles. Vérifiez les clés API FareHarbor.';
-    btn.disabled = false; btn.textContent = '🔄 Sync FareHarbor';
+    msg.style.color = '#dc2626'; msg.textContent = '⚠ Calendriers inaccessibles. Vérifiez la configuration.';
     return;
   }
 
@@ -2075,9 +2071,10 @@ async function syncFareHarbor() {
   const allEvents       = [...eventsDelorme, ...eventsBulle, ...eventsWinalistB, ...eventsWinalistD];
 
   // Canaux Delorme déjà inclus dans l'API — enrichir seulement Bulle si clés dispo
+  let channelMap = {};
   if (apiDelorme === null) {
     msg.style.color = '#64748b'; msg.textContent = '⏳ Récupération des canaux…';
-    const channelMap = await fetchFHChannels(state.currentYear);
+    channelMap = await fetchFHChannels(state.currentYear);
     allEvents.forEach(ev => { if (!ev.via && ev.bookingPk && channelMap[ev.bookingPk]) ev.via = channelMap[ev.bookingPk]; });
   }
 
@@ -2136,10 +2133,9 @@ async function syncFareHarbor() {
     + (channelCnt > 0 ? ' · ' + channelCnt + ' canal' + (channelCnt > 1 ? 'x' : '') : '')
     + (tagCnt     > 0 ? ' · ' + tagCnt     + ' tag'   + (tagCnt     > 1 ? 's' : '') : '');
 
-  btn.disabled = false; btn.textContent = '🔄 Sync FareHarbor';
   render();
-  updateMobileTodayCard(); // s'assurer que le widget jour est à jour après sync FH
-  setTimeout(scrollToToday, 100); // repositionner sur aujourd'hui après reconstruction du DOM
+  updateMobileTodayCard();
+  setTimeout(scrollToToday, 100);
 }
 
 // ═══ FH MANUAL TAGS ══════════════════════════
