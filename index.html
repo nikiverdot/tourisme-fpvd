@@ -1946,37 +1946,140 @@ function saveFHSettings() {
   closeModal();
 }
 
+// Fetch Delorme bookings directly from FH API — no ICS token needed
+async function fetchDelormeViaAPI(year) {
+  const appKey  = localStorage.getItem('fh-api-app')  || '';
+  const userKey = localStorage.getItem('fh-api-user') || '';
+  if (!appKey || !userKey) return null; // pas de clés → fallback ICS
+
+  const FH_AFF = {
+    'vignerons':'RDV','rdv':'RDV','ruedes':'RDV',
+    'viator':'TripAdvisor','tripadvisor':'TripAdvisor',
+    'getyourguide':'GYG','gyg':'GYG',
+    'grapeescapes':'GE',
+  };
+  const FH_ACTIVITY_MAP = {
+    'Visite & Dégustation : Saveurs du Terroir': 'Visite & Dégustation : Saveurs du Terroir (Mâchon)',
+  };
+
+  const baseUrl = 'https://fareharbor.com/api/v1/companies/andre-delorme/bookings/'
+    + '?start-date=' + year + '-01-01&end-date=' + year + '-12-31&per_page=1000';
+  const hdrs = { 'X-FareHarbor-API-App': appKey, 'X-FareHarbor-API-User': userKey, 'Accept': 'application/json' };
+
+  async function fetchPage(url) {
+    const proxies = [
+      () => fetch(url, { headers: hdrs }),
+      () => fetch('https://corsproxy.io/?' + encodeURIComponent(url), { headers: hdrs }),
+    ];
+    for (const src of proxies) {
+      try { const r = await src(); if (r.ok) return await r.json(); } catch(e) {}
+    }
+    return null;
+  }
+
+  const events = [];
+  let nextUrl = baseUrl, pages = 0;
+  while (nextUrl && pages < 20) {
+    const data = await fetchPage(nextUrl);
+    if (!data) break;
+
+    for (const bk of (data.bookings || [])) {
+      if (bk.status === 'cancelled' || bk.status === 'rebooked') continue;
+
+      const startAt = bk.availability && bk.availability.start_at;
+      if (!startAt) continue;
+      const u = new Date(startAt);
+      const dateKey = toKey(u);
+      const lh = u.getHours(), lm = u.getMinutes();
+      const time = String(lh).padStart(2,'0') + 'h' + (lm ? String(lm).padStart(2,'0') : '');
+
+      let activity = (bk.availability && bk.availability.item && bk.availability.item.name) || 'Dégustation';
+      activity = FH_ACTIVITY_MAP[activity] || activity;
+
+      const pax = (bk.customers || []).length || 1;
+      const clientName = ((bk.contact && bk.contact.name) || '').slice(0, 35);
+
+      // Canal : affiliate d'abord, sinon domaine email
+      let via = '';
+      const aff = bk.affiliate_company;
+      if (aff) {
+        const key = (aff.shortname || aff.name || '').toLowerCase().replace(/[\s-]+/g,'');
+        const m = Object.entries(FH_AFF).find(([k]) => key.includes(k));
+        if (m) via = m[1];
+      }
+      if (!via && bk.contact && bk.contact.email) {
+        const dom = (bk.contact.email.split('@')[1] || '').toLowerCase();
+        if (dom.includes('getyourguide') || dom.includes('gyg.')) via = 'GYG';
+        else if (dom.includes('viator') || dom.includes('tripadvisor')) via = 'TripAdvisor';
+        else if (dom.includes('grapeescapes')) via = 'GE';
+        else if (dom.includes('vignerons') || dom.includes('rdv')) via = 'RDV';
+      }
+
+      const noteText = (bk.note_safe_html || '').replace(/<[^>]+>/g, ' ').trim();
+      const lang = detectLang(activity + ' ' + noteText);
+      const evStatus = bk.status === 'standby' ? 'option' : 'confirmed';
+
+      events.push({
+        dateKey, time, pax,
+        status: evStatus,
+        activity,
+        langFlag: lang ? lang.flag : '',
+        langCode: lang ? lang.code : '',
+        clientName,
+        via,
+        comment: noteText.slice(0, 80),
+        bookingPk: bk.pk,
+        source: 'fareharbor'
+      });
+    }
+    nextUrl = data.next || null;
+    pages++;
+  }
+  return events.sort((a,b) => (a.dateKey + a.time).localeCompare(b.dateKey + b.time));
+}
+
 async function syncFareHarbor() {
   const btn = document.getElementById('btn-ics');
   const msg = document.getElementById('ics-status');
   btn.disabled = true; btn.textContent = '⏳…';
   msg.style.color = '#64748b'; msg.textContent = '⏳ Récupération des calendriers…';
 
-  // Fetch all sources in parallel via notre proxy sécurisé (tokens résolus côté serveur Netlify)
-  const [txtDelorme, txtBulle, txtWinalistB, txtWinalistD] = await Promise.all([
-    fetchICS(ICS_FEEDS.delorme.fh),
+  // Delorme : API FH directe (pas de token ICS à maintenir)
+  // Bulle   : ICS proxy Netlify (pas d'accès API pour l'instant)
+  const [apiDelorme, txtBulle, txtWinalistB, txtWinalistD] = await Promise.all([
+    fetchDelormeViaAPI(state.currentYear),
     fetchICS(ICS_FEEDS.bulle.fh),
     fetchICS(ICS_FEEDS.bulle.winalist),
     fetchICS(ICS_FEEDS.delorme.winalist)
   ]);
 
-  if (!txtDelorme && !txtBulle && !txtWinalistB && !txtWinalistD) {
-    msg.style.color = '#dc2626'; msg.textContent = '⚠ Calendriers inaccessibles (CORS). Fonctionne depuis un serveur web.';
+  // Fallback ICS pour Delorme si pas de clés API configurées
+  let eventsDelorme;
+  if (apiDelorme !== null) {
+    eventsDelorme = apiDelorme.map(ev => ({ ...ev, boutique: 'delorme' }));
+  } else {
+    const txtDelorme = await fetchICS(ICS_FEEDS.delorme.fh);
+    eventsDelorme = txtDelorme ? parseICS(txtDelorme).map(ev => ({ ...ev, boutique: 'delorme' })) : [];
+  }
+
+  if (!eventsDelorme.length && !txtBulle && !txtWinalistB && !txtWinalistD) {
+    msg.style.color = '#dc2626'; msg.textContent = '⚠ Calendriers inaccessibles. Vérifiez les clés API FareHarbor.';
     btn.disabled = false; btn.textContent = '🔄 Sync FareHarbor';
     return;
   }
 
   // Parse each ICS and tag with boutique
-  const eventsDelorme   = txtDelorme   ? parseICS(txtDelorme).map(ev =>       ({ ...ev, boutique: 'delorme' })) : [];
   const eventsBulle     = txtBulle     ? parseICS(txtBulle).map(ev =>         ({ ...ev, boutique: 'bulle'   })) : [];
   const eventsWinalistB = txtWinalistB ? parseWinalist(txtWinalistB).map(ev => ({ ...ev, boutique: 'bulle'   })) : [];
   const eventsWinalistD = txtWinalistD ? parseWinalist(txtWinalistD).map(ev => ({ ...ev, boutique: 'delorme' })) : [];
   const allEvents       = [...eventsDelorme, ...eventsBulle, ...eventsWinalistB, ...eventsWinalistD];
 
-  // Enrich with partner/channel from FH API (if keys configured)
-  msg.style.color = '#64748b'; msg.textContent = '⏳ Récupération des canaux…';
-  const channelMap = await fetchFHChannels(state.currentYear);
-  allEvents.forEach(ev => { if (!ev.via && ev.bookingPk && channelMap[ev.bookingPk]) ev.via = channelMap[ev.bookingPk]; });
+  // Canaux Delorme déjà inclus dans l'API — enrichir seulement Bulle si clés dispo
+  if (apiDelorme === null) {
+    msg.style.color = '#64748b'; msg.textContent = '⏳ Récupération des canaux…';
+    const channelMap = await fetchFHChannels(state.currentYear);
+    allEvents.forEach(ev => { if (!ev.via && ev.bookingPk && channelMap[ev.bookingPk]) ev.via = channelMap[ev.bookingPk]; });
+  }
 
   // Load manual tags + internal notes from Firebase
   if (db) {
