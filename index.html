@@ -1967,10 +1967,11 @@ async function fetchDelormeViaAPI(year) {
   }
 
   const events = [];
-  let nextUrl = baseUrl, pages = 0;
+  let nextUrl = baseUrl, pages = 0, apiReachable = false;
   while (nextUrl && pages < 20) {
     const data = await fetchPage(nextUrl);
-    if (!data) break;
+    if (!data) { if (!apiReachable) return null; break; } // proxy inaccessible → fallback ICS
+    apiReachable = true;
 
     for (const bk of (data.bookings || [])) {
       if (bk.status === 'cancelled' || bk.status === 'rebooked') continue;
