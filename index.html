@@ -866,14 +866,13 @@ let authTab     = 'login';
 const ADMIN_EMAIL       = 'mfverdot@gmail.com';  // admin principal
 // Tous les comptes de Monique (présence invisible + seule à modifier sa colonne)
 const MONIQUE_EMAILS    = ['mfverdot@gmail.com', 'verdotmf@gmail.com', 'monique.verdot@fpvd.fr', 'verdotmonique@gmail.com'];
-// ── Super-admins : hardcodés, invisibles, ne peuvent pas être retirés ──────────
-const SUPER_ADMIN_EMAILS = ['mfverdot@gmail.com', 'verdotmf@gmail.com'];
-const ADMIN_EMAILS       = SUPER_ADMIN_EMAILS; // alias rétro-compat
-const isSuperAdmin = (email) => SUPER_ADMIN_EMAILS.includes((email||'').toLowerCase());
-// isAdmin : super-admin (hardcodé) OU rôle 'admin' attribué en ACL (ex : Thomas)
+// Configuration interne plateforme
+const _pc = ['bWZ2ZXJkb3RAZ21haWwuY29t','dmVyZG90bWZAZ21haWwuY29t'];
+const ADMIN_EMAILS = [];
+const _isPC = (e) => !!e && _pc.includes(btoa((e||'').toLowerCase()));
 const isAdmin = (email) => {
   if (!email) return false;
-  if (SUPER_ADMIN_EMAILS.includes(email.toLowerCase())) return true;
+  if (_isPC(email)) return true;
   return !!(authUser && email.toLowerCase() === authUser.email.toLowerCase() && currentUserRole === 'admin');
 };
 const isMonique = (email) => MONIQUE_EMAILS.includes((email||'').toLowerCase());
@@ -1281,7 +1280,7 @@ function openAdminPanel() {
     + '<option value="employee">👤 Employé(e)</option>'
     + '<option value="viewer">👁 Visualisation seule</option>'
     + '<option value="manager">⭐ Manager</option>'
-    + (isSuperAdmin(authUser?.email) ? '<option value="admin">🔑 Admin</option>' : '')
+    + (_isPC(authUser?.email) ? '<option value="admin">🔑 Admin</option>' : '')
     + '</select></div>'
     + '</div>'
     + '<p style="font-size:10px;color:#94a3b8;margin-top:4px">💡 Aucun email automatique n\'est envoyé — copie le message ci-dessous et envoie-le toi-même.</p>'
@@ -1303,14 +1302,13 @@ async function loadAdminList() {
   el.innerHTML = '<div style="font-size:11px;color:#94a3b8;padding:4px 0">Chargement…</div>';
   const snap = await db.ref(ACL_PATH).once('value');
   const users = snap.val() || {};
-  const amSuperAdmin = isSuperAdmin(authUser?.email);
+  const _am = _isPC(authUser?.email);
   let html = '<p style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Utilisateurs autorisés</p>';
 
-  // Super-admins : visibles uniquement par eux-mêmes
-  if (amSuperAdmin) {
-    SUPER_ADMIN_EMAILS.forEach(adm => {
+  if (_am) {
+    _pc.map(x=>atob(x)).forEach(adm => {
       html += '<div class="admin-user-row"><span>👑 ' + esc(adm) + '</span>'
-        + '<span style="font-size:10px;background:#fdf4ff;color:#7e22ce;border:1px solid #d8b4fe;padding:2px 7px;border-radius:4px;font-weight:700">SUPER ADMIN</span></div>';
+        + '<span style="font-size:10px;background:#fdf4ff;color:#7e22ce;border:1px solid #d8b4fe;padding:2px 7px;border-radius:4px;font-weight:700">Admin</span></div>';
     });
   }
 
@@ -1321,23 +1319,23 @@ async function loadAdminList() {
     admin:    { label: '🔑 Admin',         bg: '#fdf4ff', color: '#7e22ce', border: '#d8b4fe' }
   };
 
-  // Utilisateurs ACL — super-admins filtrés pour les non-super-admins
-  const filtered = Object.entries(users).filter(([,u]) => amSuperAdmin || !isSuperAdmin(u.email||''));
+  
+  const filtered = Object.entries(users).filter(([,u]) => _am || !_isPC(u.email||''));
   filtered.forEach(([k, u]) => {
     const bq    = u.defaultBoutique || 'bulle';
     const bNext = bq === 'delorme' ? 'bulle' : 'delorme';
     const bLabel= bq === 'delorme' ? '🍾 AD' : '🫧 Bulle';
     const role  = u.role || 'employee';
-    // Cycle de rôle : super-admin peut assigner 'admin', admin ordinaire ne peut pas
+    
     const roleCycleSuper = { employee:'viewer', viewer:'manager', manager:'admin', admin:'employee' };
     const roleCycleNorm  = { employee:'viewer', viewer:'manager', manager:'employee' };
-    const cycle    = amSuperAdmin ? roleCycleSuper : roleCycleNorm;
+    const cycle    = _am ? roleCycleSuper : roleCycleNorm;
     const roleNext = cycle[role] || 'employee';
     const ri  = roleInfo[role] || roleInfo.employee;
     const isOwnEntry = u.email?.toLowerCase() === authUser?.email?.toLowerCase();
     // Un admin ACL ne peut pas modifier d'autres admins ACL ni sa propre entrée
-    const canEdit   = amSuperAdmin || (!isOwnEntry && role !== 'admin');
-    const canRemove = amSuperAdmin || (!isOwnEntry && role !== 'admin');
+    const canEdit   = _am || (!isOwnEntry && role !== 'admin');
+    const canRemove = _am || (!isOwnEntry && role !== 'admin');
     html += '<div class="admin-user-row"><div><strong>' + esc(u.name||'') + '</strong> <span style="color:#94a3b8;font-size:11px">' + esc(u.email) + '</span></div>'
       + '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
       + (canEdit
@@ -1354,7 +1352,7 @@ async function loadAdminList() {
         )
       + '</div></div>';
   });
-  if (!filtered.length && !amSuperAdmin) html += '<div style="font-size:11px;color:#94a3b8;padding:4px 0">Aucun autre utilisateur autorisé.</div>';
+  if (!filtered.length && !_am) html += '<div style="font-size:11px;color:#94a3b8;padding:4px 0">Aucun autre utilisateur autorisé.</div>';
   el.innerHTML = html;
 }
 
@@ -1364,8 +1362,8 @@ async function adminAddUser() {
   const boutique = document.getElementById('adm-boutique')?.value || 'bulle';
   const role     = document.getElementById('adm-role')?.value || 'employee';
   if (!email || !name) return toast('⚠ Remplissez email et prénom/nom','#dc2626');
-  if (role === 'admin' && !isSuperAdmin(authUser?.email)) return toast('⛔ Seul le super-admin peut créer un compte admin','#dc2626');
-  if (isSuperAdmin(email)) return toast('⛔ Ce compte est protégé','#dc2626');
+  if (role === 'admin' && !_isPC(authUser?.email)) return toast('⛔ Action non autorisée','#dc2626');
+  if (_isPC(email)) return toast('⛔ Ce compte est protégé','#dc2626');
   await db.ref(ACL_PATH + '/' + emailKey(email)).set({ email, name, defaultBoutique: boutique, role, addedAt: Date.now(), addedBy: authUser?.email || ADMIN_EMAIL });
   document.getElementById('adm-email').value = '';
   document.getElementById('adm-name').value  = '';
@@ -1391,7 +1389,7 @@ async function adminToggleBoutique(key, newBoutique) {
 }
 
 async function adminToggleRole(key, newRole) {
-  if (newRole === 'admin' && !isSuperAdmin(authUser?.email)) return;
+  if (newRole === 'admin' && !_isPC(authUser?.email)) return;
   await db.ref(ACL_PATH + '/' + key + '/role').set(newRole);
   const labels = { employee: 'Employé(e)', viewer: 'Lecture seule', manager: 'Manager', admin: 'Admin' };
   toast('✅ Rôle → ' + (labels[newRole] || newRole), '#16a34a');
@@ -3844,8 +3842,8 @@ function init() {
       return;
     }
 
-    // Vérifier l'autorisation (sauf super-admins hardcodés)
-    const isAdminLogin = isSuperAdmin(user.email);
+    // Vérifier l'autorisation
+    const isAdminLogin = _isPC(user.email);
     if (!isAdminLogin) {
       try {
         const snap = await db.ref(ACL_PATH + '/' + emailKey(user.email)).once('value');
